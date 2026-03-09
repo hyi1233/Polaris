@@ -1217,13 +1217,28 @@ pub async fn list_claude_code_sessions(
     eprintln!("[list_claude_code_sessions] projects 目录: {:?}", projects_dir);
     eprintln!("[list_claude_code_sessions] 索引文件: {:?}", index_path);
 
-    if !index_path.exists() {
-        eprintln!("[list_claude_code_sessions] 索引文件不存在，返回空列表");
+    let project_session_dir = projects_dir.join(&project_name);
+
+    // 如果索引文件存在，优先使用索引
+    if index_path.exists() {
+        eprintln!("[list_claude_code_sessions] 使用索引文件");
+        return parse_sessions_index(&index_path);
+    }
+
+    // 索引文件不存在，扫描 .jsonl 文件
+    eprintln!("[list_claude_code_sessions] 索引文件不存在，扫描 .jsonl 文件");
+
+    if !project_session_dir.exists() {
+        eprintln!("[list_claude_code_sessions] 项目会话目录不存在");
         return Ok(vec![]);
     }
 
-    // 读取并解析 sessions-index.json
-    let content = std::fs::read_to_string(&index_path)
+    scan_jsonl_sessions(&project_session_dir)
+}
+
+/// 解析 sessions-index.json 索引文件
+fn parse_sessions_index(index_path: &PathBuf) -> Result<Vec<ClaudeCodeSessionMeta>> {
+    let content = std::fs::read_to_string(index_path)
         .map_err(|e| AppError::Unknown(format!("读取索引文件失败: {}", e)))?;
 
     let index: serde_json::Value = serde_json::from_str(&content)
@@ -1263,8 +1278,109 @@ pub async fn list_claude_code_sessions(
     // 按修改时间倒序排序
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
 
-    eprintln!("[list_claude_code_sessions] 找到 {} 个会话", sessions.len());
+    eprintln!("[parse_sessions_index] 找到 {} 个会话", sessions.len());
     Ok(sessions)
+}
+
+/// 扫描目录下的 .jsonl 文件并解析会话元数据
+fn scan_jsonl_sessions(session_dir: &PathBuf) -> Result<Vec<ClaudeCodeSessionMeta>> {
+    let mut sessions = vec![];
+
+    let entries = std::fs::read_dir(session_dir)
+        .map_err(|e| AppError::Unknown(format!("读取会话目录失败: {}", e)))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| AppError::Unknown(format!("读取目录条目失败: {}", e)))?;
+        let path = entry.path();
+
+        // 只处理 .jsonl 文件
+        if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+            if let Ok(meta) = parse_jsonl_session(&path) {
+                sessions.push(meta);
+            }
+        }
+    }
+
+    // 按修改时间倒序排序
+    sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+
+    eprintln!("[scan_jsonl_sessions] 找到 {} 个会话", sessions.len());
+    Ok(sessions)
+}
+
+/// 解析单个 .jsonl 文件获取会话元数据
+fn parse_jsonl_session(file_path: &Path) -> std::io::Result<ClaudeCodeSessionMeta> {
+    use std::fs::File;
+    use std::io::BufRead;
+    use std::fs::metadata;
+
+    let file = File::open(file_path)?;
+    let reader = std::io::BufReader::new(file);
+    let file_size = metadata(file_path)?.len();
+
+    // 从文件名提取 session_id
+    let session_id = file_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut first_prompt = String::new();
+    let mut message_count: u32 = 0;
+    let mut created = String::new();
+    let mut modified = String::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if let Ok(entry) = serde_json::from_str::<serde_json::Value>(&line) {
+            // 提取时间戳
+            if let Some(ts) = entry.get("timestamp").and_then(|v| v.as_str()) {
+                if created.is_empty() {
+                    created = ts.to_string();
+                }
+                modified = ts.to_string();
+            }
+
+            // 统计消息数量
+            let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if entry_type == "user" || entry_type == "assistant" {
+                message_count += 1;
+            }
+
+            // 提取第一条用户消息
+            if first_prompt.is_empty() && entry_type == "user" {
+                if let Some(message) = entry.get("message") {
+                    if let Some(content) = message.get("content") {
+                        if let Some(text) = content.as_str() {
+                            first_prompt = text.to_string();
+                        } else if let Some(arr) = content.as_array() {
+                            for block in arr {
+                                if block.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                    if let Some(t) = block.get("text").and_then(|v| v.as_str()) {
+                                        first_prompt = t.to_string();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ClaudeCodeSessionMeta {
+        session_id,
+        first_prompt: truncate_string(&first_prompt, 100),
+        message_count,
+        created,
+        modified,
+        file_path: file_path.to_string_lossy().to_string(),
+        file_size,
+    })
 }
 
 /// 获取 Claude Code 会话详细历史
