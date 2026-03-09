@@ -303,6 +303,7 @@ impl IFlowJsonlEvent {
 
 /// IFlow 会话元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IFlowSessionMeta {
     /// 会话 ID
     pub session_id: String,
@@ -324,6 +325,7 @@ pub struct IFlowSessionMeta {
 
 /// IFlow 简化消息（用于历史展示）
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IFlowHistoryMessage {
     /// 消息 UUID
     pub uuid: String,
@@ -360,6 +362,7 @@ pub struct IFlowToolCall {
 
 /// IFlow 文件上下文
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IFlowFileContext {
     /// 文件路径
     pub path: String,
@@ -375,6 +378,7 @@ pub struct IFlowFileContext {
 
 /// IFlow Token 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IFlowTokenStats {
     /// 输入 Token 总数
     pub total_input_tokens: u32,
