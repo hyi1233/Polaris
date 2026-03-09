@@ -244,11 +244,6 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Mermaid
 
           <div className="flex-1 min-w-0">
             <p className="text-sm text-danger font-medium">图表渲染失败</p>
-            {error && (
-              <p className="text-xs text-text-muted mt-1">
-                {error.includes('Parse error') ? '语法错误，请检查 Mermaid 代码格式' : error}
-              </p>
-            )}
             <details className="mt-2">
               <summary className="text-xs text-text-tertiary cursor-pointer hover:text-text-secondary transition-colors">
                 查看原始代码
