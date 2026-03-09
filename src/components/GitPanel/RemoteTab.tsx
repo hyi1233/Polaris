@@ -1,7 +1,7 @@
 /**
  * 远程仓库列表组件
  *
- * 显示远程仓库信息，支持刷新
+ * 显示远程仓库信息，支持添加、删除远程仓库
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -14,6 +14,9 @@ import {
   CloudOff,
   ExternalLink,
   Copy,
+  Plus,
+  Trash2,
+  X,
 } from 'lucide-react'
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
@@ -26,7 +29,19 @@ export function RemoteTab() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 添加远程仓库状态
+  const [showAddRemote, setShowAddRemote] = useState(false)
+  const [newRemoteName, setNewRemoteName] = useState('')
+  const [newRemoteUrl, setNewRemoteUrl] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+
+  // 删除远程仓库状态
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const getRemotes = useGitStore((s) => s.getRemotes)
+  const addRemote = useGitStore((s) => s.addRemote)
+  const removeRemote = useGitStore((s) => s.removeRemote)
   const branches = useGitStore((s) => s.branches)
   const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
   const toast = useToastStore()
@@ -99,6 +114,60 @@ export function RemoteTab() {
     window.open(openUrl, '_blank')
   }
 
+  // 添加远程仓库
+  const handleAddRemote = async () => {
+    if (!currentWorkspace) return
+
+    const name = newRemoteName.trim()
+    const url = newRemoteUrl.trim()
+
+    if (!name || !url) {
+      toast.error(t('remote.addRemoteRequired'))
+      return
+    }
+
+    // 简单的名称验证
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      toast.error(t('remote.invalidName'))
+      return
+    }
+
+    setIsAdding(true)
+    try {
+      await addRemote(currentWorkspace.path, name, url)
+      toast.success(t('remote.addSuccess', { name }))
+      setShowAddRemote(false)
+      setNewRemoteName('')
+      setNewRemoteUrl('')
+      // 刷新列表
+      await loadRemotes()
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      toast.error(t('remote.addFailed'), errorMsg)
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  // 删除远程仓库
+  const handleDeleteRemote = async (name: string) => {
+    if (!currentWorkspace) return
+
+    setIsDeleting(true)
+    try {
+      await removeRemote(currentWorkspace.path, name)
+      toast.success(t('remote.deleteSuccess', { name }))
+      setShowDeleteConfirm(null)
+      // 刷新列表
+      await loadRemotes()
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      toast.error(t('remote.deleteFailed'), errorMsg)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const renderRemoteItem = (remote: GitRemote) => {
     const host = getHostFromUrl(remote.fetchUrl || remote.pushUrl)
     const branchCount = getRemoteBranchCount(remote.name)
@@ -146,6 +215,13 @@ export function RemoteTab() {
                   >
                     <ExternalLink size={12} />
                   </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(remote.name)}
+                    className="p-0.5 text-text-tertiary hover:text-danger hover:bg-danger/10 rounded transition-colors"
+                    title={t('remote.deleteRemote')}
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               )}
             </div>
@@ -179,19 +255,128 @@ export function RemoteTab() {
             </span>
           )}
         </span>
-        <button
-          onClick={loadRemotes}
-          disabled={isLoading}
-          className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-hover rounded transition-colors disabled:opacity-50"
-          title={t('refresh', { ns: 'common' })}
-        >
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowAddRemote(true)}
+            className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-hover rounded transition-colors"
+            title={t('remote.addRemote')}
+          >
+            <Plus size={14} />
+          </button>
+          <button
+            onClick={loadRemotes}
+            disabled={isLoading}
+            className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-hover rounded transition-colors disabled:opacity-50"
+            title={t('refresh', { ns: 'common' })}
+          >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="px-4 py-2 text-xs text-danger bg-danger/10 border-b border-danger/20">
           {error}
+        </div>
+      )}
+
+      {/* 添加远程仓库弹窗 */}
+      {showAddRemote && (
+        <div className="px-4 py-3 border-b border-border-subtle bg-background-surface">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-text-primary">
+              {t('remote.addRemote')}
+            </span>
+            <button
+              onClick={() => {
+                setShowAddRemote(false)
+                setNewRemoteName('')
+                setNewRemoteUrl('')
+              }}
+              className="p-0.5 text-text-tertiary hover:text-text-primary rounded transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder={t('remote.namePlaceholder')}
+              value={newRemoteName}
+              onChange={(e) => setNewRemoteName(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddRemote()
+                } else if (e.key === 'Escape') {
+                  setShowAddRemote(false)
+                  setNewRemoteName('')
+                  setNewRemoteUrl('')
+                }
+              }}
+            />
+            <input
+              type="text"
+              placeholder={t('remote.urlPlaceholder')}
+              value={newRemoteUrl}
+              onChange={(e) => setNewRemoteUrl(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary font-mono text-xs"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddRemote()
+                } else if (e.key === 'Escape') {
+                  setShowAddRemote(false)
+                  setNewRemoteName('')
+                  setNewRemoteUrl('')
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddRemote(false)
+                  setNewRemoteName('')
+                  setNewRemoteUrl('')
+                }}
+                className="px-3 py-1 text-xs text-text-tertiary hover:text-text-primary transition-colors"
+              >
+                {t('cancel', { ns: 'common' })}
+              </button>
+              <button
+                onClick={handleAddRemote}
+                disabled={isAdding || !newRemoteName.trim() || !newRemoteUrl.trim()}
+                className="px-3 py-1 text-xs bg-primary text-white rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {isAdding && <Loader2 size={12} className="animate-spin" />}
+                {t('remote.add')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div className="px-4 py-3 border-b border-danger/30 bg-danger/5">
+          <div className="text-sm text-text-primary mb-2">
+            {t('remote.deleteConfirm', { name: showDeleteConfirm })}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(null)}
+              className="px-3 py-1 text-xs text-text-tertiary hover:text-text-primary transition-colors"
+            >
+              {t('cancel', { ns: 'common' })}
+            </button>
+            <button
+              onClick={() => handleDeleteRemote(showDeleteConfirm)}
+              disabled={isDeleting}
+              className="px-3 py-1 text-xs bg-danger text-white rounded hover:bg-danger/90 transition-colors disabled:opacity-50 flex items-center gap-1"
+            >
+              {isDeleting && <Loader2 size={12} className="animate-spin" />}
+              {t('remote.delete')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -205,6 +390,13 @@ export function RemoteTab() {
             <CloudOff size={24} className="mb-2 opacity-50" />
             <span className="text-sm">{t('remote.empty')}</span>
             <span className="text-xs mt-1 text-text-tertiary">{t('remote.emptyHint')}</span>
+            <button
+              onClick={() => setShowAddRemote(true)}
+              className="mt-3 px-3 py-1.5 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
+            >
+              <Plus size={12} />
+              {t('remote.addRemote')}
+            </button>
           </div>
         ) : (
           remotes.map((remote) => renderRemoteItem(remote))

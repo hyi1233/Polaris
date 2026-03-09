@@ -130,7 +130,20 @@
     "pushUrl": "推送 URL",
     "copyUrl": "复制 URL",
     "openInBrowser": "在浏览器中打开",
-    "copied": "已复制到剪贴板"
+    "copied": "已复制到剪贴板",
+    "addRemote": "添加远程仓库",
+    "namePlaceholder": "名称 (如: origin)",
+    "urlPlaceholder": "URL (如: https://github.com/user/repo.git)",
+    "add": "添加",
+    "addRemoteRequired": "请输入名称和 URL",
+    "invalidName": "名称只能包含字母、数字、下划线和连字符",
+    "addSuccess": "远程仓库 {{name}} 添加成功",
+    "addFailed": "添加远程仓库失败",
+    "deleteRemote": "删除远程仓库",
+    "deleteConfirm": "确定要删除远程仓库 \"{{name}}\" 吗？此操作无法撤销。",
+    "delete": "删除",
+    "deleteSuccess": "远程仓库 {{name}} 已删除",
+    "deleteFailed": "删除远程仓库失败"
   },
   "stash": {
     "title": "Stash",

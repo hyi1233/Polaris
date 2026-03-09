@@ -87,6 +87,8 @@ interface GitState {
   batchStage: (workspacePath: string, filePaths: string[]) => Promise<BatchStageResult>
 
   // 远程操作
+  addRemote: (workspacePath: string, name: string, url: string) => Promise<GitRemote>
+  removeRemote: (workspacePath: string, name: string) => Promise<void>
   pushBranch: (workspacePath: string, branchName: string, remoteName?: string, force?: boolean) => Promise<void>
   pull: (workspacePath: string, remoteName?: string, branchName?: string) => Promise<GitPullResult>
 
@@ -288,6 +290,48 @@ export const useGitStore = create<GitState>((set, get) => ({
       set({ remotes })
     } catch (err) {
       set({ error: parseGitError(err), remotes: [] })
+    }
+  },
+
+  // 添加远程仓库
+  async addRemote(workspacePath: string, name: string, url: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      const remote = await invoke<GitRemote>('git_add_remote', {
+        workspacePath,
+        name,
+        url,
+      })
+
+      // 刷新远程列表
+      await get().getRemotes(workspacePath)
+
+      set({ isLoading: false })
+      return remote
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 删除远程仓库
+  async removeRemote(workspacePath: string, name: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      await invoke('git_remove_remote', {
+        workspacePath,
+        name,
+      })
+
+      // 刷新远程列表
+      await get().getRemotes(workspacePath)
+
+      set({ isLoading: false })
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
     }
   },
 

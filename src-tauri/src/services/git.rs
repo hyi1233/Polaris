@@ -1222,9 +1222,9 @@ impl GitService {
     ) -> Result<(), GitServiceError> {
         let repo = Self::open_repository(path)?;
 
-        // 验证新分支名称
-        let invalid_chars = /[\s~^:?*\[\\]/;
-        if invalid_chars.is_match(new_name) {
+        // 验证新分支名称 - 检查非法字符
+        let invalid_chars = [' ', '~', '^', ':', '?', '*', '[', '\\'];
+        if new_name.chars().any(|c| invalid_chars.contains(&c)) {
             return Err(GitServiceError::CLIError(
                 format!("Invalid branch name '{}': contains illegal characters", new_name)
             ));
@@ -1506,6 +1506,43 @@ impl GitService {
         } else {
             GitHostType::Unknown
         }
+    }
+
+    /// 添加远程仓库
+    pub fn add_remote(
+        path: &Path,
+        name: &str,
+        url: &str,
+    ) -> Result<GitRemote, GitServiceError> {
+        let repo = Self::open_repository(path)?;
+
+        // 检查远程仓库是否已存在
+        if repo.find_remote(name).is_ok() {
+            return Err(GitServiceError::RemoteExists(name.to_string()));
+        }
+
+        // 创建远程仓库
+        let mut remote = repo.remote(name, url)?;
+
+        Ok(GitRemote {
+            name: name.to_string(),
+            fetch_url: remote.url().map(|s| s.to_string()),
+            push_url: remote.pushurl().map(|s| s.to_string()),
+        })
+    }
+
+    /// 删除远程仓库
+    pub fn delete_remote(path: &Path, name: &str) -> Result<(), GitServiceError> {
+        let repo = Self::open_repository(path)?;
+
+        // 检查远程仓库是否存在
+        if repo.find_remote(name).is_err() {
+            return Err(GitServiceError::RemoteNotFound(name.to_string()));
+        }
+
+        repo.remote_delete(name)?;
+
+        Ok(())
     }
 
     // ========================================================================

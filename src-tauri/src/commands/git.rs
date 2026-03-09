@@ -197,6 +197,24 @@ pub fn git_get_remotes(workspacePath: String) -> Result<Vec<GitRemote>, GitError
     GitService::get_remotes(&path).map_err(GitError::from)
 }
 
+/// 添加远程仓库
+#[tauri::command]
+pub fn git_add_remote(
+    workspacePath: String,
+    name: String,
+    url: String,
+) -> Result<GitRemote, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::add_remote(&path, &name, &url).map_err(GitError::from)
+}
+
+/// 删除远程仓库
+#[tauri::command]
+pub fn git_remove_remote(workspacePath: String, name: String) -> Result<(), GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::delete_remote(&path, &name).map_err(GitError::from)
+}
+
 /// 检测 Git Host 类型
 #[tauri::command]
 pub fn git_detect_host(remoteUrl: String) -> GitHostType {

@@ -328,6 +328,7 @@ pub enum GitServiceError {
     RebaseInProgress,
     MergeInProgress,
     RemoteNotFound(String),
+    RemoteExists(String),
     CLINotFound(String),
     CLIError(String),
 }
@@ -349,6 +350,7 @@ impl std::fmt::Display for GitServiceError {
             Self::RebaseInProgress => write!(f, "Rebase is already in progress"),
             Self::MergeInProgress => write!(f, "Merge is already in progress"),
             Self::RemoteNotFound(name) => write!(f, "Remote '{}' not found", name),
+            Self::RemoteExists(name) => write!(f, "Remote '{}' already exists", name),
             Self::CLINotFound(cli) => write!(f, "CLI tool '{}' not found", cli),
             Self::CLIError(err) => write!(f, "CLI error: {}", err),
         }
@@ -506,6 +508,11 @@ impl From<GitServiceError> for GitError {
             GitServiceError::RemoteNotFound(name) => (
                 "REMOTE_NOT_FOUND".to_string(),
                 format!("Remote '{}' not found", name),
+                None,
+            ),
+            GitServiceError::RemoteExists(name) => (
+                "REMOTE_EXISTS".to_string(),
+                format!("Remote '{}' already exists", name),
                 None,
             ),
             GitServiceError::CLINotFound(cli) => (

@@ -130,7 +130,20 @@
     "pushUrl": "Push URL",
     "copyUrl": "Copy URL",
     "openInBrowser": "Open in browser",
-    "copied": "Copied to clipboard"
+    "copied": "Copied to clipboard",
+    "addRemote": "Add Remote",
+    "namePlaceholder": "Name (e.g. origin)",
+    "urlPlaceholder": "URL (e.g. https://github.com/user/repo.git)",
+    "add": "Add",
+    "addRemoteRequired": "Please enter name and URL",
+    "invalidName": "Name can only contain letters, numbers, underscores and hyphens",
+    "addSuccess": "Remote {{name}} added successfully",
+    "addFailed": "Failed to add remote",
+    "deleteRemote": "Delete Remote",
+    "deleteConfirm": "Are you sure you want to delete remote \"{{name}}\"? This action cannot be undone.",
+    "delete": "Delete",
+    "deleteSuccess": "Remote {{name}} deleted",
+    "deleteFailed": "Failed to delete remote"
   },
   "stash": {
     "title": "Stash",
