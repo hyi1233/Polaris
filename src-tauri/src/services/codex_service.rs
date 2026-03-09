@@ -466,10 +466,14 @@ impl CodexService {
                     continue;
                 }
 
-                eprintln!("[CodexService] 输出: {}", line_trimmed.chars().take(100).collect::<String>());
+                eprintln!(
+                    "[CodexService] 输出(len={}): {}",
+                    line_trimmed.chars().count(),
+                    line_trimmed
+                );
 
-                // 解析 JSONL 事件
-                if let Some(stream_event) = Self::parse_codex_jsonl(line_trimmed) {
+                // 解析 JSONL 事件（可能一行产生多个事件）
+                for stream_event in Self::parse_codex_jsonl(line_trimmed) {
                     let is_session_end = matches!(stream_event, StreamEvent::SessionEnd);
                     callback(stream_event);
 
@@ -478,6 +482,10 @@ impl CodexService {
                         eprintln!("[CodexService] 检测到会话结束");
                         break;
                     }
+                }
+
+                if has_session_end {
+                    break;
                 }
             }
 
@@ -500,53 +508,163 @@ impl CodexService {
     /// - {"type":"thread.started","thread_id":"xxx"}
     /// - {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
     /// - {"type":"turn.completed","usage":{...}}
-    fn parse_codex_jsonl(line: &str) -> Option<StreamEvent> {
-        let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    fn parse_codex_jsonl(line: &str) -> Vec<StreamEvent> {
+        let value: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => return Vec::new(),
+        };
 
-        let event_type = value.get("type")?.as_str()?;
+        let event_type = match value.get("type").and_then(|t| t.as_str()) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
 
-        match event_type {
+        let result = match event_type {
             "thread.started" => {
                 // 线程开始，提取 thread_id 作为会话 ID
-                let thread_id = value.get("thread_id")?.as_str()?.to_string();
-                let mut extra = HashMap::new();
-                extra.insert("session_id".to_string(), serde_json::json!(thread_id));
-                Some(StreamEvent::System {
-                    subtype: Some("thread_started".to_string()),
-                    extra,
-                })
+                if let Some(thread_id) = value.get("thread_id").and_then(|t| t.as_str()) {
+                    let mut extra = HashMap::new();
+                    extra.insert("session_id".to_string(), serde_json::json!(thread_id));
+                    Some(StreamEvent::System {
+                        subtype: Some("thread_started".to_string()),
+                        extra,
+                    })
+                } else {
+                    None
+                }
             }
 
-            "item.completed" => {
-                let item = value.get("item")?;
-                let item_type = item.get("type")?.as_str()?;
+            "item.started" => {
+                let item = match value.get("item") {
+                    Some(v) => v,
+                    None => return Vec::new(),
+                };
+                let item_type = match item.get("type").and_then(|t| t.as_str()) {
+                    Some(v) => v,
+                    None => return Vec::new(),
+                };
 
                 match item_type {
-                    "agent_message" => {
-                        let text = item.get("text")?.as_str()?.to_string();
-                        let message = serde_json::json!({
-                            "content": [{
-                                "type": "text",
-                                "text": text
-                            }],
-                            "model": "codex",
-                            "id": item.get("id").and_then(|v| v.as_str()).unwrap_or("")
+                    "command_execution" => {
+                        let tool_id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let command = item.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                        let input = serde_json::json!({
+                            "command": command
                         });
-                        Some(StreamEvent::Assistant { message })
-                    }
-                    "tool_use" => {
-                        let tool_id = item.get("id")?.as_str()?.to_string();
-                        let tool_name = item.get("name")?.as_str()?.to_string();
-                        let tool_input = item.get("input").cloned().unwrap_or(serde_json::Value::Null);
 
                         Some(StreamEvent::ToolStart {
-                            tool_use_id: tool_id,
-                            tool_name,
-                            input: tool_input,
+                            tool_use_id: tool_id.to_string(),
+                            tool_name: "command_execution".to_string(),
+                            input,
                         })
                     }
                     _ => None,
                 }
+            }
+
+            "item.completed" => {
+                let item = match value.get("item") {
+                    Some(v) => v,
+                    None => return Vec::new(),
+                };
+                let item_type = match item.get("type").and_then(|t| t.as_str()) {
+                    Some(v) => v,
+                    None => return Vec::new(),
+                };
+
+                match item_type {
+                    "agent_message" => {
+                        if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                            let message = serde_json::json!({
+                                "content": [{
+                                    "type": "text",
+                                    "text": text
+                                }],
+                                "model": "codex",
+                                "id": item.get("id").and_then(|v| v.as_str()).unwrap_or("")
+                            });
+                            Some(StreamEvent::Assistant { message })
+                        } else {
+                            None
+                        }
+                    }
+                    "tool_use" => {
+                        let tool_id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let tool_name = item.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                        let tool_input = item.get("input").cloned().unwrap_or(serde_json::Value::Null);
+                        let tool_output = item.get("output")
+                            .or_else(|| item.get("result"))
+                            .and_then(|v| if v.is_string() { v.as_str().map(|s| s.to_string()) } else { Some(v.to_string()) });
+
+                        if tool_output.is_some() {
+                            return vec![
+                                StreamEvent::ToolStart {
+                                    tool_use_id: tool_id.to_string(),
+                                    tool_name: tool_name.to_string(),
+                                    input: tool_input,
+                                },
+                                StreamEvent::ToolEnd {
+                                    tool_use_id: tool_id.to_string(),
+                                    tool_name: Some(tool_name.to_string()),
+                                    output: tool_output,
+                                },
+                            ];
+                        }
+
+                        Some(StreamEvent::ToolStart {
+                            tool_use_id: tool_id.to_string(),
+                            tool_name: tool_name.to_string(),
+                            input: tool_input,
+                        })
+                    }
+                    "tool_result" => {
+                        let tool_id = item.get("tool_use_id")
+                            .or_else(|| item.get("id"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let output = item.get("output")
+                            .or_else(|| item.get("result"))
+                            .and_then(|v| if v.is_string() { v.as_str().map(|s| s.to_string()) } else { Some(v.to_string()) });
+
+                        Some(StreamEvent::ToolEnd {
+                            tool_use_id: tool_id.to_string(),
+                            tool_name: None,
+                            output,
+                        })
+                    }
+                    "command_execution" => {
+                        let tool_id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let output = item.get("combined_output")
+                            .or_else(|| item.get("output"))
+                            .or_else(|| item.get("stdout"))
+                            .or_else(|| item.get("stderr"))
+                            .or_else(|| item.get("result"))
+                            .and_then(|v| if v.is_string() { v.as_str().map(|s| s.to_string()) } else { Some(v.to_string()) });
+
+                        Some(StreamEvent::ToolEnd {
+                            tool_use_id: tool_id.to_string(),
+                            tool_name: Some("command_execution".to_string()),
+                            output,
+                        })
+                    }
+                    _ => None,
+                }
+            }
+
+            "tool_result" => {
+                let tool_id = value.get("tool_use_id")
+                    .or_else(|| value.get("id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let output = value.get("output")
+                    .or_else(|| value.get("result"))
+                    .and_then(|v| if v.is_string() { v.as_str().map(|s| s.to_string()) } else { Some(v.to_string()) });
+
+                Some(StreamEvent::ToolEnd {
+                    tool_use_id: tool_id.to_string(),
+                    tool_name: None,
+                    output,
+                })
             }
 
             "turn.completed" => {
@@ -555,7 +673,9 @@ impl CodexService {
             }
 
             _ => None,
-        }
+        };
+
+        result.into_iter().collect()
     }
 
     /// 查找会话对应的 JSONL 文件
