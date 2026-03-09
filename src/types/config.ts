@@ -3,7 +3,7 @@
  */
 
 /**  引擎 ID */
-export type EngineId = 'claude-code' | 'iflow' | 'deepseek' | 'deepseek'
+export type EngineId = 'claude-code' | 'iflow' | 'deepseek' | 'codex'
 
 /** 支持的语言 */
 export type Language = 'zh-CN' | 'en-US'
@@ -92,6 +92,11 @@ export interface Config {
     /** 最大 Token 数 (可选) */
     maxTokens?: number;
   };
+  /** Codex 引擎配置 */
+  codex: {
+    /** Codex CLI 命令路径 */
+    cliPath?: string;
+  };
   /** 工作目录 */
   workDir?: string;
   /** 会话保存路径 */
@@ -120,6 +125,10 @@ export interface HealthStatus {
   deepseekAvailable?: boolean;
   /** DeepSeek API Key 是否配置 */
   deepseekConfigured?: boolean;
+  /** Codex CLI 是否可用 */
+  codexAvailable?: boolean;
+  /** Codex 版本 */
+  codexVersion?: string;
   /** 工作目录 */
   workDir?: string;
   /** 配置是否有效 */

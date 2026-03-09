@@ -188,19 +188,27 @@ impl CodexService {
     fn build_codex_command(codex_cmd: &str, work_dir: &str, message: &str, session_id: Option<&str>) -> Command {
         let mut cmd = Command::new(codex_cmd);
 
-        // Codex exec 非交互模式，输出 JSONL 格式
-        cmd.arg("exec")
-            .arg("--json")
-            .arg("--skip-git-repo-check");
-
-        // 如果是恢复会话
+        // 如果是恢复会话，使用 resume 子命令
         if let Some(id) = session_id {
-            cmd.arg("--resume").arg(id);
-        }
+            cmd.arg("resume")
+                .arg("--last")  // 使用最近会话
+                .arg(id)        // 会话 ID
+                .arg("--full-auto");  // 自动执行模式
+            
+            // 消息作为参数传递
+            if !message.is_empty() {
+                cmd.arg(message);
+            }
+        } else {
+            // 新会话使用 exec 子命令
+            cmd.arg("exec")
+                .arg("--json")
+                .arg("--skip-git-repo-check");
 
-        // 消息作为参数传递
-        if !message.is_empty() {
-            cmd.arg(message);
+            // 消息作为参数传递
+            if !message.is_empty() {
+                cmd.arg(message);
+            }
         }
 
         cmd.current_dir(work_dir);

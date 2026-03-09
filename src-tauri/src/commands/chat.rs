@@ -925,19 +925,21 @@ async fn start_codex_chat_internal(
         }
 
         // 包装事件，添加 contextId
-        let event_json = if let Some(ref cid) = ctx_id {
+        let event_payload = if let Some(ref cid) = ctx_id {
             serde_json::json!({
                 "contextId": cid,
                 "payload": event
-            }).to_string()
+            })
         } else {
             serde_json::json!({
                 "contextId": "main",
                 "payload": event
-            }).to_string()
+            })
         };
-        eprintln!("[start_codex_chat] 发送事件: {}", event_json);
-        let _ = window_clone.emit("chat-event", event_json);
+        eprintln!("[start_codex_chat] 发送事件: {}", event_payload.to_string().chars().take(200).collect::<String>());
+        if let Err(e) = window_clone.emit("chat-event", &event_payload) {
+            eprintln!("[start_codex_chat] 发送事件失败: {:?}", e);
+        }
     });
 
     Ok(return_session_id)
@@ -1484,5 +1486,155 @@ fn truncate_string(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", s.chars().take(max_len.saturating_sub(3)).collect::<String>())
+    }
+}
+
+// ============================================================================
+// Codex CLI 命令
+// ============================================================================
+
+/// 路径验证结果
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexPathValidationResult {
+    /// 路径是否有效
+    pub valid: bool,
+    /// 错误信息
+    pub error: Option<String>,
+    /// Codex 版本
+    pub version: Option<String>,
+}
+
+/// 查找所有可用的 Codex CLI 路径
+#[tauri::command]
+pub fn find_codex_paths() -> Vec<String> {
+    let mut paths = Vec::new();
+
+    // 1. 检查 PATH 环境变量
+    if let Ok(path_env) = std::env::var("PATH") {
+        let separators = if cfg!(windows) { ";" } else { ":" };
+        for dir in path_env.split(separators) {
+            let codex_path = if cfg!(windows) {
+                PathBuf::from(dir).join("codex.cmd")
+            } else {
+                PathBuf::from(dir).join("codex")
+            };
+
+            if codex_path.exists() {
+                if let Some(path_str) = codex_path.to_str() {
+                    if !paths.contains(&path_str.to_string()) {
+                        paths.push(path_str.to_string());
+                    }
+                }
+            }
+
+            // 也检查 codex.exe (Windows)
+            if cfg!(windows) {
+                let codex_exe = PathBuf::from(dir).join("codex.exe");
+                if codex_exe.exists() {
+                    if let Some(path_str) = codex_exe.to_str() {
+                        if !paths.contains(&path_str.to_string()) {
+                            paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 检查常见安装位置
+    #[cfg(windows)]
+    {
+        let common_paths = vec![
+            // npm 全局安装
+            PathBuf::from(std::env::var("APPDATA").unwrap_or_default()).join("npm"),
+            // 用户目录
+            PathBuf::from(std::env::var("USERPROFILE").unwrap_or_default()).join(".codex"),
+        ];
+
+        for dir in common_paths {
+            let codex_cmd = dir.join("codex.cmd");
+            if codex_cmd.exists() {
+                if let Some(path_str) = codex_cmd.to_str() {
+                    if !paths.contains(&path_str.to_string()) {
+                        paths.push(path_str.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let common_paths = vec![
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".codex"),
+        ];
+
+        for dir in common_paths {
+            let codex_path = dir.join("codex");
+            if codex_path.exists() {
+                if let Some(path_str) = codex_path.to_str() {
+                    if !paths.contains(&path_str.to_string()) {
+                        paths.push(path_str.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    paths
+}
+
+/// 验证 Codex CLI 路径
+#[tauri::command]
+pub fn validate_codex_path(path: String) -> CodexPathValidationResult {
+    let codex_path = Path::new(&path);
+
+    // 检查文件是否存在
+    if !codex_path.exists() {
+        return CodexPathValidationResult {
+            valid: false,
+            error: Some("文件不存在".to_string()),
+            version: None,
+        };
+    }
+
+    // 尝试运行 codex --version
+    #[cfg(windows)]
+    let output = Command::new(&path)
+        .arg("--version")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
+    #[cfg(not(windows))]
+    let output = Command::new(&path)
+        .arg("--version")
+        .output();
+
+    match output {
+        Ok(output) => {
+            if output.status.success() {
+                let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                CodexPathValidationResult {
+                    valid: true,
+                    error: None,
+                    version: Some(version),
+                }
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                CodexPathValidationResult {
+                    valid: false,
+                    error: Some(format!("执行失败: {}", stderr)),
+                    version: None,
+                }
+            }
+        }
+        Err(e) => CodexPathValidationResult {
+            valid: false,
+            error: Some(format!("无法执行: {}", e)),
+            version: None,
+        },
     }
 }

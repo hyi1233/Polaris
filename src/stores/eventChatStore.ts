@@ -601,7 +601,7 @@ interface EventChatState {
   updateCurrentAssistantMessage: (blocks: ContentBlock[]) => void
 
   /** 初始化事件监听 */
-  initializeEventListeners: () => () => void
+  initializeEventListeners: () => Promise<() => void>
 
   /** 发送消息 */
   sendMessage: (content: string, workspaceDir?: string) => Promise<void>
@@ -1145,43 +1145,42 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
    * - 统一使用 AIEvent 进行状态更新
    * - 代码减少约 100 行
    */
-  initializeEventListeners: () => {
+  initializeEventListeners: async (): Promise<() => void> => {
     const cleanupCallbacks: Array<() => void> = []
 
     const eventBus = getEventBus({ debug: false })
 
     const router = getEventRouter()
     
-    router.initialize().then(() => {
-      const unregister = router.register('main', (payload: unknown) => {
-        try {
-          const streamEvent = payload as StreamEvent
-          const state = get()
+    // 同步等待初始化完成，确保 register 在监听开始前完成
+    await router.initialize()
+    
+    const unregister = router.register('main', (payload: unknown) => {
+      try {
+        const streamEvent = payload as StreamEvent
+        const state = get()
 
-          console.log('[EventChatStore] 收到 chat-event:', streamEvent.type)
+        console.log('[EventChatStore] 收到 chat-event:', streamEvent.type)
 
-          const aiEvents = convertStreamEventToAIEvents(streamEvent, state.conversationId)
+        const aiEvents = convertStreamEventToAIEvents(streamEvent, state.conversationId)
 
-          const workspacePath = useWorkspaceStore.getState().getCurrentWorkspace()?.path
+        const workspacePath = useWorkspaceStore.getState().getCurrentWorkspace()?.path
 
-          for (const aiEvent of aiEvents) {
-            try {
-              eventBus.emit(aiEvent)
-            } catch (e) {
-              console.error('[EventChatStore] EventBus 发送失败:', e)
-            }
-
-            handleAIEvent(aiEvent, set, get, workspacePath)
+        for (const aiEvent of aiEvents) {
+          try {
+            eventBus.emit(aiEvent)
+          } catch (e) {
+            console.error('[EventChatStore] EventBus 发送失败:', e)
           }
-        } catch (e) {
-          console.error('[EventChatStore] 处理事件失败:', e)
+
+          handleAIEvent(aiEvent, set, get, workspacePath)
         }
-      })
-      cleanupCallbacks.push(unregister)
-      console.log('[EventChatStore] EventRouter 初始化完成，已注册 main 处理器')
-    }).catch((err) => {
-      console.error('[EventChatStore] 初始化 EventRouter 失败:', err)
+      } catch (e) {
+        console.error('[EventChatStore] 处理事件失败:', e)
+      }
     })
+    cleanupCallbacks.push(unregister)
+    console.log('[EventChatStore] EventRouter 初始化完成，已注册 main 处理器')
 
     return () => {
       cleanupCallbacks.forEach((cleanup) => cleanup())
@@ -1266,6 +1265,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
             systemPrompt: normalizedSystemPrompt,
             workDir: actualWorkspaceDir,
             contextId: 'main',
+            engineId: currentEngine,
           })
         } else {
           const newSessionId = await invoke<string>('start_chat', {
@@ -1273,6 +1273,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
             systemPrompt: normalizedSystemPrompt,
             workDir: actualWorkspaceDir,
             contextId: 'main',
+            engineId: currentEngine,
           })
           set({ conversationId: newSessionId })
         }

@@ -33,14 +33,29 @@ export class EventRouter {
   private async doInitialize(): Promise<void> {
     this.unlisten = await listen<string>('chat-event', (event) => {
       try {
-        const rawData = JSON.parse(event.payload)
+        const rawPayload = event.payload
+        console.log('[EventRouter] 收到原始事件类型:', typeof rawPayload, '内容:', typeof rawPayload === 'string' ? rawPayload.slice(0, 200) : JSON.stringify(rawPayload).slice(0, 200))
+
+        // 处理不同类型的 payload
+        let rawData: unknown
+        if (typeof rawPayload === 'string') {
+          try {
+            rawData = JSON.parse(rawPayload)
+          } catch {
+            // 如果解析失败，直接使用原始字符串
+            rawData = rawPayload
+          }
+        } else {
+          // 已经是对象
+          rawData = rawPayload
+        }
 
         let routedEvent: RoutedEvent
 
-        if (rawData.contextId !== undefined && rawData.payload !== undefined) {
+        if (rawData && typeof rawData === 'object' && 'contextId' in rawData && 'payload' in rawData) {
           routedEvent = {
-            contextId: rawData.contextId,
-            payload: rawData.payload
+            contextId: (rawData as { contextId: string }).contextId,
+            payload: (rawData as { payload: unknown }).payload
           }
         } else {
           routedEvent = {
@@ -49,6 +64,7 @@ export class EventRouter {
           }
         }
 
+        console.log('[EventRouter] 路由事件到:', routedEvent.contextId, 'payload类型:', typeof routedEvent.payload)
         this.dispatch(routedEvent)
       } catch (e) {
         console.error('[EventRouter] Failed to parse event:', e)

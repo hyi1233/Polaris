@@ -200,10 +200,19 @@ function App() {
   const eventListenersCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (eventListenersCleanupRef.current) return; // 已经初始化过了
-    const cleanup = initializeEventListeners();
-    eventListenersCleanupRef.current = cleanup;
+    
+    let mounted = true;
+    initializeEventListeners().then((cleanup) => {
+      if (mounted) {
+        eventListenersCleanupRef.current = cleanup;
+      }
+    });
+    
     return () => {
-      if (cleanup) cleanup();
+      mounted = false;
+      if (eventListenersCleanupRef.current) {
+        eventListenersCleanupRef.current();
+      }
     };
   }, [initializeEventListeners]);
 

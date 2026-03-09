@@ -10,6 +10,9 @@ export * from './claude-code'
 // 导出 IFlow Engine
 export * from './iflow'
 
+// 导出 Codex Engine
+export * from './codex'
+
 // 未来可以在这里添加其他 Engine
 // export * from './openai'
 // export * from './ollama'
@@ -18,7 +21,7 @@ export * from './iflow'
  * 获取所有可用的 Engine IDs
  */
 export function getAvailableEngineIds(): string[] {
-  return ['claude-code', 'iflow']
+  return ['claude-code', 'iflow', 'codex']
 }
 
 /**
@@ -53,6 +56,12 @@ export function getEngineDescriptors(): EngineDescriptor[] {
       id: 'iflow',
       name: 'IFlow',
       description: '支持多种 AI 模型的智能编程助手',
+      available: true,
+    },
+    {
+      id: 'codex',
+      name: 'Codex',
+      description: 'OpenAI Codex CLI 代码生成助手',
       available: true,
     },
   ]

@@ -12,6 +12,7 @@ use commands::chat::{
     list_iflow_sessions, get_iflow_session_history,
     get_iflow_file_contexts, get_iflow_token_stats,
     list_claude_code_sessions, get_claude_code_session_history,
+    find_codex_paths, validate_codex_path,
 };
 use commands::{validate_workspace_path, get_directory_info, get_home_dir};
 use commands::window::{
@@ -229,6 +230,9 @@ pub fn run() {
             // Claude Code 原生会话历史相关
             list_claude_code_sessions,
             get_claude_code_session_history,
+            // Codex 相关
+            find_codex_paths,
+            validate_codex_path,
             // 工作区相关
             validate_workspace_path,
             get_directory_info,

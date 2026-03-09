@@ -9,11 +9,12 @@ import { getEngineRegistry, registerEngine } from '../ai-runtime'
 import { ClaudeCodeEngine } from '../engines/claude-code'
 import { IFlowEngine } from '../engines/iflow'
 import { DeepSeekEngine, type DeepSeekEngineConfig } from '../engines/deepseek'
+import { CodexEngine, type CodexEngineConfig } from '../engines/codex'
 
 /**
  * 已注册的 Engine ID 列表
  */
-export const REGISTERED_ENGINE_IDS = ['claude-code', 'iflow', 'deepseek'] as const
+export const REGISTERED_ENGINE_IDS = ['claude-code', 'iflow', 'deepseek', 'codex'] as const
 
 /**
  * Engine 类型
@@ -28,10 +29,12 @@ export type EngineId = typeof REGISTERED_ENGINE_IDS[number]
  *
  * @param defaultEngineId 默认引擎 ID，只初始化该引擎
  * @param deepSeekConfig DeepSeek 引擎配置（如果使用 DeepSeek）
+ * @param codexConfig Codex 引擎配置（如果使用 Codex）
  */
 export async function bootstrapEngines(
   defaultEngineId: EngineId = 'claude-code',
-  deepSeekConfig?: DeepSeekEngineConfig
+  deepSeekConfig?: DeepSeekEngineConfig,
+  codexConfig?: CodexEngineConfig
 ): Promise<void> {
   const registry = getEngineRegistry()
 
@@ -51,6 +54,9 @@ export async function bootstrapEngines(
       const deepseekEngine = new DeepSeekEngine(deepSeekConfig)
       registerEngine(deepseekEngine, { asDefault: true })
     }
+  } else if (defaultEngineId === 'codex') {
+    const codexEngine = new CodexEngine(codexConfig)
+    registerEngine(codexEngine, { asDefault: true })
   }
 
   // 初始化已注册的引擎
@@ -66,10 +72,12 @@ export async function bootstrapEngines(
  *
  * @param engineId 要注册的引擎 ID
  * @param deepSeekConfig DeepSeek 引擎配置（如果需要）
+ * @param codexConfig Codex 引擎配置（如果需要）
  */
 export async function registerEngineLazy(
   engineId: EngineId,
-  deepSeekConfig?: DeepSeekEngineConfig
+  deepSeekConfig?: DeepSeekEngineConfig,
+  codexConfig?: CodexEngineConfig
 ): Promise<void> {
   const registry = getEngineRegistry()
 
@@ -93,6 +101,10 @@ export async function registerEngineLazy(
     const deepseekEngine = new DeepSeekEngine(deepSeekConfig)
     registerEngine(deepseekEngine)
     await deepseekEngine.initialize()
+  } else if (engineId === 'codex') {
+    const codexEngine = new CodexEngine(codexConfig)
+    registerEngine(codexEngine)
+    await codexEngine.initialize()
   }
 
   console.log('[EngineBootstrap] Lazy registered engine:', engineId)

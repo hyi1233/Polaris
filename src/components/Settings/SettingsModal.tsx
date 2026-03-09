@@ -29,6 +29,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       name: 'DeepSeek',
       description: t('engines.deepseek.description'),
     },
+    {
+      id: 'codex',
+      name: 'Codex',
+      description: t('engines.codex.description', 'OpenAI Codex CLI'),
+    },
   ];
 
   const FLOATING_MODE_OPTIONS: { id: FloatingWindowMode; name: string; description: string }[] = [
@@ -87,6 +92,14 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     setLocalConfig({
       ...localConfig,
       iflow: { ...localConfig.iflow, cliPath: cmd }
+    });
+  };
+
+  const handleCodexCmdChange = (cmd: string) => {
+    if (!localConfig) return;
+    setLocalConfig({
+      ...localConfig,
+      codex: { ...localConfig.codex, cliPath: cmd }
     });
   };
 
@@ -419,6 +432,27 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {localConfig.defaultEngine === 'codex' && (
+          <div className="mb-6 p-4 bg-surface rounded-lg border border-border">
+            <h3 className="text-sm font-medium text-text-primary mb-3">{t('codex.title', 'Codex CLI')}</h3>
+            <div>
+              <label className="block text-xs text-text-secondary mb-2">
+                {t('codex.cliPath', 'CLI 路径')}
+              </label>
+              <ClaudePathSelector
+                value={localConfig.codex?.cliPath || 'codex'}
+                onChange={handleCodexCmdChange}
+                engineType="codex"
+                disabled={loading}
+                placeholder="codex"
+              />
+            </div>
+            <p className="mt-2 text-xs text-text-tertiary">
+              {t('codex.hint', 'OpenAI Codex CLI 路径，留空使用系统 PATH 中的 codex 命令')}
+            </p>
           </div>
         )}
 
