@@ -333,6 +333,7 @@
     "editorPlaceholder": "# 输入要忽略的文件模式...\n# 例如:\n# node_modules/\n# *.log\n# .env",
     "quickAddPlaceholder": "快速添加规则（如: node_modules/）",
     "ruleAdded": "规则已添加",
-    "templateAdded": "已添加 {{name}} 模板规则"
+    "templateAdded": "已添加 {{name}} 模板规则",
+    "more": "条"
   }
 }

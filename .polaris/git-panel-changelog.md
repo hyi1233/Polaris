@@ -35,6 +35,24 @@
 
 ---
 
+#### 3. GitignoreTab.tsx 国际化问题
+
+**问题描述**: GitignoreTab 组件中模板选择弹窗存在硬编码的英文文本 `more`，未使用国际化。
+
+**修改原因**: 确保所有文本支持多语言，提升国际化体验。
+
+**修改文件**: 
+- `src/components/GitPanel/GitignoreTab.tsx`
+- `src/locales/zh-CN/git.json`
+- `src/locales/en-US/git.json`
+
+**修改内容**:
+1. GitignoreTab.tsx 第 191 行: `+{template.rules.length - 4} more` → `+{template.rules.length - 4} {t('gitignore.more')}`
+2. 中文国际化文件添加: `"more": "条"`
+3. 英文国际化文件添加: `"more": "more"`
+
+---
+
 ### 验证结果
 
 - TypeScript 类型检查: ✅ 通过 (`npx tsc --noEmit`)

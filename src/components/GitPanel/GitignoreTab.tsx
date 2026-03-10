@@ -260,7 +260,7 @@ export function GitignoreTab() {
                       ))}
                       {template.rules.length > 4 && (
                         <span className="text-[10px] text-text-tertiary">
-                          +{template.rules.length - 4} more
+                          +{template.rules.length - 4} {t('gitignore.more')}
                         </span>
                       )}
                     </div>
