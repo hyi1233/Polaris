@@ -60,7 +60,10 @@ export function RemoteTab() {
   const getBranches = useGitStore((s) => s.getBranches)
   const branches = useGitStore((s) => s.branches)
   const status = useGitStore((s) => s.status)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const loadRemotes = useCallback(async () => {

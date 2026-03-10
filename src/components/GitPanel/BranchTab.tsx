@@ -62,7 +62,10 @@ export function BranchTab() {
   const rebaseContinue = useGitStore((s) => s.rebaseContinue)
   const refreshStatus = useGitStore((s) => s.refreshStatus)
   const stashSave = useGitStore((s) => s.stashSave)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const loadBranches = useCallback(async () => {

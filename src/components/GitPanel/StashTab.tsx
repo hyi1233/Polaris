@@ -21,7 +21,10 @@ export function StashTab() {
   const getStashList = useGitStore((s) => s.getStashList)
   const stashPop = useGitStore((s) => s.stashPop)
   const refreshStatus = useGitStore((s) => s.refreshStatus)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
 
   const loadStashes = useCallback(async () => {
     if (!currentWorkspace) return

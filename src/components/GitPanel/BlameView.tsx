@@ -25,7 +25,10 @@ export function BlameView({ filePath, onClose, onCommitClick }: BlameViewProps) 
   const [error, setError] = useState<string | null>(null)
 
   const blameFile = useGitStore((s) => s.blameFile)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const loadBlame = useCallback(async () => {

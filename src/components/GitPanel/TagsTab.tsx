@@ -35,7 +35,10 @@ export function TagsTab() {
   const createTag = useGitStore((s) => s.createTag)
   const deleteTag = useGitStore((s) => s.deleteTag)
   const status = useGitStore((s) => s.status)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const loadTags = useCallback(async () => {

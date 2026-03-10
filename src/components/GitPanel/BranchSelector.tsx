@@ -29,7 +29,10 @@ export function BranchSelector() {
   const createBranch = useGitStore((s) => s.createBranch)
   const refreshStatus = useGitStore((s) => s.refreshStatus)
   const stashSave = useGitStore((s) => s.stashSave)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
 
   useEffect(() => {
     if (isOpen && currentWorkspace) {

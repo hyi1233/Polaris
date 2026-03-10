@@ -30,7 +30,10 @@ export function GitignoreTab() {
   const saveGitignore = useGitStore((s) => s.saveGitignore)
   const addToGitignore = useGitStore((s) => s.addToGitignore)
   const getGitignoreTemplates = useGitStore((s) => s.getGitignoreTemplates)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const loadGitignore = useCallback(async () => {

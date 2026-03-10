@@ -30,7 +30,10 @@ type PullState =
 export function QuickActions({ hasChanges: _hasChanges }: QuickActionsProps) {
   const { t } = useTranslation('git')
   const { push, isLoading, refreshStatus, status, remotes, getRemotes } = useGitStore()
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
 
   const [isPushing, setIsPushing] = useState(false)
   const [isPulling, setIsPulling] = useState(false)

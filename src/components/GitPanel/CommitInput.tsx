@@ -24,7 +24,10 @@ export function CommitInput({ hasChanges: _hasChanges, selectedFiles }: CommitIn
   const [message, setMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const { commitChanges, isLoading, status, getIndexFileDiff, getWorktreeFileDiff } = useGitStore()
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
 
   const handleCommit = useCallback(async () => {
     if (!message.trim() || !currentWorkspace) return
