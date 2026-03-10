@@ -102,6 +102,7 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
   const loadCommits = useCallback(async (append = false) => {
     if (!currentWorkspace) {
+      setError(t('errors.noWorkspace'))
       return
     }
     if (loadingRef.current) {
@@ -123,15 +124,33 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
     try {
       const skip = append ? commitsLengthRef.current : 0
 
+      // 添加调试日志
+      console.log('[HistoryTab] Loading commits:', {
+        workspacePath: currentWorkspace.path,
+        limit: PAGE_SIZE,
+        skip,
+        append
+      })
+
       // 添加超时保护 (30秒超时)
       const result = await Promise.race([
         getLogRef.current(currentWorkspace.path, PAGE_SIZE, skip),
         createTimeoutPromise(30000)
       ]) as GitCommitType[]
 
+      console.log('[HistoryTab] Loaded commits:', result.length)
+
       // 验证数据格式
       if (!Array.isArray(result)) {
         throw new Error(`INVALID_DATA_FORMAT:${typeof result}`)
+      }
+
+      // 检查是否为空结果
+      if (result.length === 0 && !append) {
+        setCommits([])
+        setHasMore(false)
+        // 不显示错误，这是正常情况（新仓库）
+        return
       }
 
       if (result.length < PAGE_SIZE) {
