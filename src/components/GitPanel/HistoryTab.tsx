@@ -34,16 +34,6 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
   const retryCountRef = useRef(0)
   const MAX_RETRIES = 3
 
-  // 添加 commits 状态追踪
-  useEffect(() => {
-    console.log('[HistoryTab] 🔍 commits 状态变化', {
-      length: commits.length,
-      firstCommit: commits[0]?.shortSha || 'none',
-      isLoading,
-      hasMore
-    })
-  }, [commits, isLoading, hasMore])
-
   // Cherry-pick 相关状态
   const [showCherryPickDialog, setShowCherryPickDialog] = useState(false)
   const [cherryPickTarget, setCherryPickTarget] = useState<GitCommitType | null>(null)
@@ -68,30 +58,16 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
   // 过滤提交（按消息和作者搜索）
   const filteredCommits = useMemo(() => {
-    console.log('[HistoryTab] filteredCommits 计算', {
-      commitsLength: commits.length,
-      searchQuery
-    })
-
     if (!searchQuery.trim()) {
-      console.log('[HistoryTab] 无搜索条件，返回全部 commits')
       return commits
     }
 
     const query = searchQuery.toLowerCase()
-    const filtered = commits.filter((commit) =>
+    return commits.filter((commit) =>
       commit.message.toLowerCase().includes(query) ||
       commit.author.toLowerCase().includes(query) ||
       commit.shortSha.toLowerCase().includes(query)
     )
-
-    console.log('[HistoryTab] 过滤结果', {
-      原始数量: commits.length,
-      过滤后数量: filtered.length,
-      搜索词: query
-    })
-
-    return filtered
   }, [commits, searchQuery])
 
   // 处理从 Blame 跳转到指定提交
@@ -121,19 +97,10 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
   }
 
   const loadCommits = useCallback(async (append = false) => {
-    console.log('[HistoryTab] loadCommits called', {
-      currentWorkspace: currentWorkspace?.path,
-      append,
-      loadingRef: loadingRef.current,
-      commitsLength: commitsLengthRef.current
-    })
-
     if (!currentWorkspace) {
-      console.log('[HistoryTab] currentWorkspace is null, skipping load')
       return
     }
     if (loadingRef.current) {
-      console.log('[HistoryTab] already loading, skipping')
       return
     }
 
@@ -151,11 +118,6 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
     try {
       const skip = append ? commitsLengthRef.current : 0
-      console.log('[HistoryTab] calling getLog', {
-        path: currentWorkspace.path,
-        limit: PAGE_SIZE,
-        skip
-      })
 
       // 添加超时保护 (30秒超时)
       const result = await Promise.race([
@@ -163,60 +125,29 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
         createTimeoutPromise(30000)
       ]) as GitCommitType[]
 
-      console.log('[HistoryTab] getLog result', {
-        count: result.length,
-        isArray: Array.isArray(result),
-        append,
-        firstCommitSha: result[0]?.shortSha || 'none',
-        lastCommitSha: result[result.length - 1]?.shortSha || 'none'
-      })
-
       // 验证数据格式
       if (!Array.isArray(result)) {
-        console.error('[HistoryTab] ❌ getLog 返回的不是数组', result)
         throw new Error(`getLog 返回的不是数组，类型: ${typeof result}`)
       }
 
-      console.log('[HistoryTab] ✅ 数据格式验证通过', {
-        isArray: true,
-        length: result.length,
-        firstItemKeys: result[0] ? Object.keys(result[0]) : []
-      })
-
       if (result.length < PAGE_SIZE) {
         setHasMore(false)
-        console.log('[HistoryTab] 设置 hasMore = false')
       }
 
-      console.log('[HistoryTab] 准备更新 commits 状态...')
       setCommits((prev) => {
         const newCommits = append ? [...prev, ...result] : result
         commitsLengthRef.current = newCommits.length
-        console.log('[HistoryTab] ✅ commits 状态已更新', {
-          prevCount: prev.length,
-          newCount: newCommits.length,
-          append,
-          hasMore: result.length >= PAGE_SIZE
-        })
         return newCommits
       })
-
-      console.log('[HistoryTab] ✅ setCommits 调用完成')
 
       // 重置重试计数
       retryCountRef.current = 0
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
-      console.error('[HistoryTab] getLog error', {
-        error: errorMsg,
-        retryCount: retryCountRef.current,
-        maxRetries: MAX_RETRIES
-      })
 
       // 重试逻辑（超时错误不重试）
       retryCountRef.current++
       if (retryCountRef.current < MAX_RETRIES && !errorMsg.includes('超时')) {
-        console.log(`[HistoryTab] 重试加载 (${retryCountRef.current}/${MAX_RETRIES})`)
         setTimeout(() => {
           loadCommitsRef.current(append)
         }, 1000 * retryCountRef.current) // 递增延迟
@@ -225,22 +156,15 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
       setError(errorMsg)
     } finally {
-      console.log('[HistoryTab] finally 块执行')
       setIsLoading(false)
       setIsLoadingMore(false)
       loadingRef.current = false
-      console.log('[HistoryTab] ✅ loadCommits finished', {
-        isLoading: false,
-        commitsLength: commitsLengthRef.current,
-        hasMore
-      })
     }
   }, [currentWorkspace])
 
   // 清理函数 - 组件卸载时重置状态
   useEffect(() => {
     return () => {
-      console.log('[HistoryTab] 组件卸载，重置状态')
       loadingRef.current = false
       retryCountRef.current = 0
     }
@@ -252,19 +176,12 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
   // 初始加载 - 当 currentWorkspace 变化时重新加载（带防抖）
   useEffect(() => {
-    console.log('[HistoryTab] useEffect triggered', {
-      workspacePath: currentWorkspace?.path,
-      workspaceId: currentWorkspace?.id
-    })
-
     if (!currentWorkspace?.path) {
-      console.log('[HistoryTab] No workspace path, skipping load')
       return
     }
 
     // 防抖：延迟300ms再加载
     const timeoutId = setTimeout(() => {
-      console.log('[HistoryTab] 防抖结束，调用 loadCommitsRef.current(false)')
       loadCommitsRef.current(false)
     }, 300)
 

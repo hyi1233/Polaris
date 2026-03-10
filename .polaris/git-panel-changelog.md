@@ -81,3 +81,33 @@
 - [x] 弹窗层级：统一使用 `z-50`，层级一致
 - [x] 国际化：除上述问题外，其他文本均已国际化
 - [x] 状态提示：loading/error 状态处理完善
+
+---
+
+#### 5. HistoryTab.tsx 移除调试语句
+
+**问题描述**: HistoryTab 组件中存在大量 `console.log`/`console.error` 调试语句（共 23 处），在生产环境中会产生不必要的控制台输出。
+
+**修改原因**: 清理调试代码，减少生产环境的控制台噪音。
+
+**修改文件**: `src/components/GitPanel/HistoryTab.tsx`
+
+**修改内容**:
+1. 移除 commits 状态追踪的 useEffect（仅用于调试）
+2. 移除 filteredCommits useMemo 中的 console.log
+3. 移除 loadCommits 函数中的所有 console.log/console.error
+4. 移除清理函数 useEffect 中的 console.log
+5. 移除初始加载 useEffect 中的 console.log
+
+---
+
+#### 6. CommitInput.tsx 移除调试语句
+
+**问题描述**: CommitInput 组件中存在 `console.log` 调试语句。
+
+**修改原因**: 清理调试代码，减少生产环境的控制台噪音。
+
+**修改文件**: `src/components/GitPanel/CommitInput.tsx`
+
+**修改内容**:
+- 移除 handleCommit 函数中的 console.log 调试语句（保留 console.error 错误日志）

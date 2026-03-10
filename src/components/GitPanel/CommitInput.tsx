@@ -44,13 +44,6 @@ export function CommitInput({ hasChanges: _hasChanges, selectedFiles }: CommitIn
       const hasSelectedFiles = selectedFiles && selectedFiles.size > 0
       const filesToCommit = hasSelectedFiles ? Array.from(selectedFiles) : undefined
 
-      console.log('[CommitInput] Committing', {
-        workspace: currentWorkspace.name,
-        message: message.trim(),
-        selectedFilesCount: selectedFiles?.size ?? 0,
-        filesToCommit,
-      })
-
       // 始终传递 stageAll=true，后端会根据 selectedFiles 决定暂存哪些
       await commitChanges(currentWorkspace.path, message, true, filesToCommit)
       setMessage('')
