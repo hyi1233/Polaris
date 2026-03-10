@@ -26,6 +26,8 @@ import type {
   BatchStageResult,
   GitStashEntry,
   GitError,
+  GitIgnoreResult,
+  GitIgnoreTemplate,
 } from '@/types/git'
 
 function parseGitError(err: unknown): string {
@@ -126,6 +128,12 @@ interface GitState {
   // PR 操作
   createPR: (workspacePath: string, options: CreatePROptions) => Promise<PullRequest>
   getPRStatus: (workspacePath: string, prNumber: number) => Promise<PullRequest>
+
+  // .gitignore 管理
+  getGitignore: (workspacePath: string) => Promise<GitIgnoreResult>
+  saveGitignore: (workspacePath: string, content: string) => Promise<void>
+  addToGitignore: (workspacePath: string, rules: string[]) => Promise<void>
+  getGitignoreTemplates: () => Promise<GitIgnoreTemplate[]>
 
   // 工具方法
   clearError: () => void
@@ -1105,6 +1113,69 @@ export const useGitStore = create<GitState>((set, get) => ({
     } catch (err) {
       set({ error: parseGitError(err), isLoading: false })
       throw err
+    }
+  },
+
+  // 获取 .gitignore 文件内容
+  async getGitignore(workspacePath: string) {
+    try {
+      const result = await invoke<GitIgnoreResult>('git_get_gitignore', {
+        workspacePath,
+      })
+      return result
+    } catch (err) {
+      throw new Error(parseGitError(err))
+    }
+  },
+
+  // 保存 .gitignore 文件内容
+  async saveGitignore(workspacePath: string, content: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      await invoke('git_save_gitignore', {
+        workspacePath,
+        content,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 添加忽略规则到 .gitignore
+  async addToGitignore(workspacePath: string, rules: string[]) {
+    set({ isLoading: true, error: null })
+
+    try {
+      await invoke('git_add_to_gitignore', {
+        workspacePath,
+        rules,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 获取常用忽略规则模板
+  async getGitignoreTemplates() {
+    try {
+      const templates = await invoke<GitIgnoreTemplate[]>('git_get_gitignore_templates')
+      return templates
+    } catch (err) {
+      console.error('[GitStore] getGitignoreTemplates failed:', err)
+      return []
     }
   },
 

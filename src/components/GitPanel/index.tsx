@@ -43,6 +43,7 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
   const [isDiffLoading, setIsDiffLoading] = useState(false)
   const [showBlame, setShowBlame] = useState(false)
   const [blameFilePath, setBlameFilePath] = useState<string | null>(null)
+  const [targetCommitSha, setTargetCommitSha] = useState<string | null>(null)
 
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [isBatchOperating, setIsBatchOperating] = useState(false)
@@ -506,6 +507,10 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
                 workspacePath={currentWorkspace?.path || ''}
                 onFileClick={handleFileClick}
                 onUntrackedFileClick={handleUntrackedFileClick}
+                onBlame={(filePath) => {
+                  setBlameFilePath(filePath)
+                  setShowBlame(true)
+                }}
                 selectedFiles={selectedFiles}
                 onToggleFileSelection={toggleFileSelection}
                 onSelectAll={toggleSelectAll}
@@ -523,7 +528,12 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
             </>
           )}
 
-          {activeTab === 'history' && <HistoryTab />}
+          {activeTab === 'history' && (
+            <HistoryTab
+              targetCommitSha={targetCommitSha}
+              onCommitSelected={() => setTargetCommitSha(null)}
+            />
+          )}
           {activeTab === 'branch' && <BranchTab />}
           {activeTab === 'remote' && <RemoteTab />}
           {activeTab === 'tags' && <TagsTab />}
@@ -539,6 +549,12 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
           onClose={() => {
             setShowBlame(false)
             setBlameFilePath(null)
+          }}
+          onCommitClick={(commitSha) => {
+            setShowBlame(false)
+            setBlameFilePath(null)
+            setTargetCommitSha(commitSha)
+            setActiveTab('history')
           }}
         />
       )}

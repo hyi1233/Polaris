@@ -15,7 +15,12 @@ import type { GitCommit as GitCommitType, GitCherryPickResult, GitRevertResult }
 
 const PAGE_SIZE = 50
 
-export function HistoryTab() {
+interface HistoryTabProps {
+  targetCommitSha?: string | null
+  onCommitSelected?: () => void
+}
+
+export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProps) {
   const { t } = useTranslation('git')
   const [commits, setCommits] = useState<GitCommitType[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -88,6 +93,19 @@ export function HistoryTab() {
 
     return filtered
   }, [commits, searchQuery])
+
+  // 处理从 Blame 跳转到指定提交
+  useEffect(() => {
+    if (targetCommitSha && commits.length > 0) {
+      const targetCommit = commits.find(c => c.sha === targetCommitSha || c.sha.startsWith(targetCommitSha))
+      if (targetCommit) {
+        setSelectedCommit(targetCommit)
+        // 清除搜索条件以便找到提交
+        setSearchQuery('')
+        onCommitSelected?.()
+      }
+    }
+  }, [targetCommitSha, commits, onCommitSelected])
 
   // 使用 ref 存储 getLog 函数，避免依赖变化
   const getLogRef = useRef(getLog)

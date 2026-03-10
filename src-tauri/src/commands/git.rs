@@ -529,3 +529,34 @@ pub fn read_file_absolute(path: String) -> Result<String, GitError> {
     })
 }
 
+// ============================================================================
+// .gitignore 管理
+// ============================================================================
+
+/// 获取 .gitignore 文件内容
+#[tauri::command]
+pub fn git_get_gitignore(workspacePath: String) -> Result<GitIgnoreResult, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::get_gitignore(&path).map_err(GitError::from)
+}
+
+/// 保存 .gitignore 文件内容
+#[tauri::command]
+pub fn git_save_gitignore(workspacePath: String, content: String) -> Result<(), GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::save_gitignore(&path, &content).map_err(GitError::from)
+}
+
+/// 添加忽略规则到 .gitignore
+#[tauri::command]
+pub fn git_add_to_gitignore(workspacePath: String, rules: Vec<String>) -> Result<(), GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::add_to_gitignore(&path, &rules).map_err(GitError::from)
+}
+
+/// 获取常用忽略规则模板
+#[tauri::command]
+pub fn git_get_gitignore_templates() -> Vec<GitIgnoreTemplate> {
+    GitService::get_gitignore_templates()
+}
+

@@ -15,9 +15,10 @@ import type { GitBlameLine } from '@/types/git'
 interface BlameViewProps {
   filePath: string
   onClose: () => void
+  onCommitClick?: (commitSha: string) => void
 }
 
-export function BlameView({ filePath, onClose }: BlameViewProps) {
+export function BlameView({ filePath, onClose, onCommitClick }: BlameViewProps) {
   const { t } = useTranslation('git')
   const [lines, setLines] = useState<GitBlameLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -148,9 +149,16 @@ export function BlameView({ filePath, onClose }: BlameViewProps) {
                         <div className="flex flex-col gap-0.5 truncate">
                           <div className="flex items-center gap-1.5">
                             <GitCommit size={10} className="text-text-tertiary shrink-0" />
-                            <span className="text-text-secondary truncate font-sans">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onCommitClick?.(line.commitSha)
+                              }}
+                              className="text-text-secondary hover:text-primary truncate font-sans cursor-pointer hover:underline"
+                              title={t('blame.viewCommit')}
+                            >
                               {line.shortSha}
-                            </span>
+                            </button>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <User size={10} className="text-text-tertiary shrink-0" />

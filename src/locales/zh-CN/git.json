@@ -302,7 +302,8 @@
     "lines": "行",
     "empty": "没有内容",
     "loadFailed": "加载 Blame 信息失败",
-    "hint": "每行代码显示最近的修改提交"
+    "hint": "每行代码显示最近的修改提交",
+    "viewCommit": "查看此提交"
   },
   "batchStageSuccess": "批量暂存成功",
   "batchUnstageSuccess": "批量取消暂存成功",

@@ -432,3 +432,27 @@ export interface GitWorkflowConfig {
   prTemplate?: string          // PR 模板
   commitMessageTemplate?: string // 提交消息模板
 }
+
+/**
+ * .gitignore 文件信息
+ */
+export interface GitIgnoreResult {
+  /** 文件是否存在 */
+  exists: boolean
+  /** 文件内容 */
+  content: string
+  /** 文件路径（相对于仓库根目录） */
+  path: string
+}
+
+/**
+ * 常用忽略规则模板
+ */
+export interface GitIgnoreTemplate {
+  /** 模板名称 */
+  name: string
+  /** 模板描述 */
+  description: string
+  /** 规则列表 */
+  rules: string[]
+}

@@ -302,7 +302,8 @@
     "lines": "lines",
     "empty": "No content",
     "loadFailed": "Failed to load blame information",
-    "hint": "Each line shows the most recent commit that modified it"
+    "hint": "Each line shows the most recent commit that modified it",
+    "viewCommit": "View this commit"
   },
   "batchStageSuccess": "Batch stage successful",
   "batchUnstageSuccess": "Batch unstage successful",

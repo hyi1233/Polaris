@@ -686,3 +686,30 @@ impl From<GitServiceError> for GitError {
         Self { code, message, details }
     }
 }
+
+// ============================================================================
+// .gitignore 管理
+// ============================================================================
+
+/// .gitignore 文件信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitIgnoreResult {
+    /// 文件是否存在
+    pub exists: bool,
+    /// 文件内容
+    pub content: String,
+    /// 文件路径（相对于仓库根目录）
+    pub path: String,
+}
+
+/// 常用忽略规则模板
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitIgnoreTemplate {
+    /// 模板名称
+    pub name: String,
+    /// 模板描述
+    pub description: String,
+    /// 规则列表
+    pub rules: Vec<String>,
+}

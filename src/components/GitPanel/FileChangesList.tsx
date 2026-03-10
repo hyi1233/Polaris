@@ -5,7 +5,7 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import { File, Check, X, Plus, Minus } from 'lucide-react'
+import { File, Check, X, Plus, Minus, GitCommit } from 'lucide-react'
 import { useGitStore } from '@/stores/gitStore'
 import type { GitFileChange } from '@/types'
 
@@ -16,6 +16,7 @@ interface FileChangesListProps {
   workspacePath: string
   onFileClick?: (file: GitFileChange, type: 'staged' | 'unstaged') => void
   onUntrackedFileClick?: (path: string) => void
+  onBlame?: (filePath: string) => void
   selectedFiles?: Set<string>
   onToggleFileSelection?: (path: string) => void
   onSelectAll?: () => void
@@ -29,6 +30,7 @@ export function FileChangesList({
   workspacePath,
   onFileClick,
   onUntrackedFileClick,
+  onBlame,
   selectedFiles = new Set(),
   onToggleFileSelection,
   onSelectAll,
@@ -118,16 +120,30 @@ export function FileChangesList({
                     <span className="text-danger ml-1">-{file.deletions}</span>
                   </span>
                 )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    unstageFile(workspacePath, file.path)
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-text-primary hover:bg-background-surface rounded transition-all"
-                  title={t('unstage')}
-                >
-                  <X size={12} />
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                  {onBlame && file.status !== 'untracked' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onBlame(file.path)
+                      }}
+                      className="p-1 text-text-tertiary hover:text-primary hover:bg-background-surface rounded transition-all"
+                      title={t('blame.button')}
+                    >
+                      <GitCommit size={12} />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      unstageFile(workspacePath, file.path)
+                    }}
+                    className="p-1 text-text-tertiary hover:text-text-primary hover:bg-background-surface rounded transition-all"
+                    title={t('unstage')}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -167,16 +183,30 @@ export function FileChangesList({
                     <span className="text-danger ml-1">-{file.deletions}</span>
                   </span>
                 )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    stageFile(workspacePath, file.path)
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-success hover:bg-background-surface rounded transition-all"
-                  title={t('stage')}
-                >
-                  <Check size={12} />
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                  {onBlame && file.status !== 'untracked' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onBlame(file.path)
+                      }}
+                      className="p-1 text-text-tertiary hover:text-primary hover:bg-background-surface rounded transition-all"
+                      title={t('blame.button')}
+                    >
+                      <GitCommit size={12} />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      stageFile(workspacePath, file.path)
+                    }}
+                    className="p-1 text-text-tertiary hover:text-success hover:bg-background-surface rounded transition-all"
+                    title={t('stage')}
+                  >
+                    <Check size={12} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
