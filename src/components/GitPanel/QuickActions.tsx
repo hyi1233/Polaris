@@ -51,7 +51,7 @@ export function QuickActions({ hasChanges: _hasChanges }: QuickActionsProps) {
     }
 
     if (!remotes.some(r => r.name === 'origin')) {
-      setError(t('errors.pushFailed') + ': No remote named "origin"')
+      setError(t('errors.noRemoteOrigin'))
       return
     }
 

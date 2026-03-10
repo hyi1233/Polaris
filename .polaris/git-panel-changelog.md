@@ -111,3 +111,63 @@
 
 **修改内容**:
 - 移除 handleCommit 函数中的 console.log 调试语句（保留 console.error 错误日志）
+
+---
+
+#### 7. QuickActions.tsx 硬编码文本问题
+
+**问题描述**: QuickActions 组件中存在硬编码的英文文本 `No remote named "origin"`，未使用国际化。
+
+**修改原因**: 确保所有文本支持多语言，提升国际化体验。
+
+**修改文件**: 
+- `src/components/GitPanel/QuickActions.tsx`
+- `src/locales/zh-CN/git.json`
+- `src/locales/en-US/git.json`
+
+**修改内容**:
+1. QuickActions.tsx: `t('errors.pushFailed') + ': No remote named "origin"'` → `t('errors.noRemoteOrigin')`
+2. 中文国际化文件添加: `"noRemoteOrigin": "没有名为 \"origin\" 的远程仓库"`
+3. 英文国际化文件添加: `"noRemoteOrigin": "No remote named \"origin\""`
+
+---
+
+#### 8. BranchSelector.tsx 移除调试语句
+
+**问题描述**: BranchSelector 组件中存在 4 处 `console.error` 调试语句。
+
+**修改原因**: 清理调试代码，减少生产环境的控制台噪音。
+
+**修改文件**: `src/components/GitPanel/BranchSelector.tsx`
+
+**修改内容**:
+1. 移除 loadBranches 函数中的 console.error（第 73 行）
+2. 移除 doSwitchBranch 函数中的 console.error（第 128 行）
+3. 移除 handleStashAndSwitch 函数中的 console.error（第 139 行）
+4. 移除 handleCreateBranch 函数中的 console.error（第 152 行）
+
+---
+
+#### 9. BranchTab.tsx 移除调试语句
+
+**问题描述**: BranchTab 组件中存在 `console.error` 调试语句。
+
+**修改原因**: 清理调试代码，减少生产环境的控制台噪音。
+
+**修改文件**: `src/components/GitPanel/BranchTab.tsx`
+
+**修改内容**:
+- 移除 handleStashAndSwitch 函数中的 console.error（第 177 行）
+
+---
+
+#### 10. index.tsx 移除调试语句
+
+**问题描述**: GitPanel 主组件中存在 `console.error` 调试语句。
+
+**修改原因**: 清理调试代码，使用项目统一的 logger 工具替代 console。
+
+**修改文件**: `src/components/GitPanel/index.tsx`
+
+**修改内容**:
+- 将 handleUntrackedFileClick 函数中的 `console.error` 替换为 `logger.error`（第 184 行）

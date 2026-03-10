@@ -59,8 +59,6 @@ export function BranchSelector() {
     setIsLoading(true)
     try {
       await getBranches(currentWorkspace.path)
-    } catch (err) {
-      console.error('Failed to load branches:', err)
     } finally {
       setIsLoading(false)
     }
@@ -86,7 +84,6 @@ export function BranchSelector() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       setError(errorMsg)
-      console.error('Failed to switch branch:', err)
     } finally {
       setIsSwitching(false)
     }
@@ -111,7 +108,7 @@ export function BranchSelector() {
       await stashSave(currentWorkspace.path, `WIP: switching to ${targetBranch}`, true)
       await doSwitchBranch(targetBranch)
     } catch (err) {
-      console.error('Failed to stash and switch:', err)
+      // 忽略错误，doSwitchBranch 已经处理
     } finally {
       setIsSwitching(false)
     }
@@ -138,7 +135,7 @@ export function BranchSelector() {
       setShowNewBranch(false)
       setIsOpen(false)
     } catch (err) {
-      console.error('Failed to create branch:', err)
+      // 忽略错误
     } finally {
       setIsSwitching(false)
     }

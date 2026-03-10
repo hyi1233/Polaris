@@ -263,7 +263,8 @@
     "rebaseBranchFailed": "Failed to rebase branch",
     "rebaseAbortFailed": "Failed to abort rebase",
     "rebaseContinueFailed": "Failed to continue rebase",
-    "copyFailed": "Failed to copy"
+    "copyFailed": "Failed to copy",
+    "noRemoteOrigin": "No remote named \"origin\""
   },
   "cherryPick": {
     "title": "Cherry-pick Commit",

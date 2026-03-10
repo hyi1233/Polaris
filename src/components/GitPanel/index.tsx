@@ -103,7 +103,7 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
         setSelectedDiff(diff)
       }
     } catch (err) {
-      console.error('[GitPanel] 获取未跟踪文件 diff 失败:', err)
+      logger.error('[GitPanel] 获取未跟踪文件 diff 失败:', err)
       toast.error(t('errors.getDiffFailed'), err instanceof Error ? err.message : String(err))
     } finally {
       setIsDiffLoading(false)

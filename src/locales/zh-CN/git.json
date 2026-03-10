@@ -263,7 +263,8 @@
     "rebaseBranchFailed": "变基分支失败",
     "rebaseAbortFailed": "中止变基失败",
     "rebaseContinueFailed": "继续变基失败",
-    "copyFailed": "复制失败"
+    "copyFailed": "复制失败",
+    "noRemoteOrigin": "没有名为 \"origin\" 的远程仓库"
   },
   "cherryPick": {
     "title": "Cherry-pick 提交",

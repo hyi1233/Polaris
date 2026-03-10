@@ -146,7 +146,7 @@ export function BranchTab() {
       await stashSave(currentWorkspace.path, `WIP: switching to ${targetBranch}`, true)
       await doSwitchBranch(targetBranch)
     } catch (err) {
-      console.error('Failed to stash and switch:', err)
+      // 忽略错误，doSwitchBranch 已经处理
     } finally {
       setIsSwitching(false)
     }
