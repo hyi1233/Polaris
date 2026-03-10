@@ -234,6 +234,22 @@
     "rebaseContinueFailed": "Failed to continue rebase",
     "copyFailed": "Failed to copy"
   },
+  "cherryPick": {
+    "title": "Cherry-pick Commit",
+    "button": "Cherry-pick",
+    "confirm": "Confirm Cherry-pick",
+    "success": "Cherry-pick successful",
+    "failed": "Cherry-pick failed: {{error}}",
+    "conflicts": "Cherry-pick conflicts detected",
+    "conflictTitle": "Conflicts Detected",
+    "conflictDesc": "The following files have conflicts. Please resolve them manually before continuing",
+    "stillConflicts": "Conflicts still exist, please continue resolving",
+    "abort": "Abort",
+    "continue": "Continue",
+    "aborted": "Cherry-pick aborted",
+    "abortFailed": "Failed to abort cherry-pick: {{error}}",
+    "continueFailed": "Failed to continue cherry-pick: {{error}}"
+  },
   "batchStageSuccess": "Batch stage successful",
   "batchUnstageSuccess": "Batch unstage successful",
   "batchDiscardSuccess": "Batch discard successful",

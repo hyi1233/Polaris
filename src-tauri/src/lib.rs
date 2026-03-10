@@ -40,6 +40,7 @@ use commands::git::{
     git_pull, git_get_log, git_batch_stage,
     git_stash_save, git_stash_list, git_stash_pop, git_stash_drop,
     git_rebase_branch, git_rebase_abort, git_rebase_continue,
+    git_cherry_pick, git_cherry_pick_abort, git_cherry_pick_continue,
     test_param_serialization, write_file_absolute, read_file_absolute,
 };
 use commands::deepseek_tools::{

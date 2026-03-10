@@ -18,6 +18,7 @@ import type {
   GitPushResult,
   GitMergeResult,
   GitRebaseResult,
+  GitCherryPickResult,
   GitCommit,
   BatchStageResult,
   GitStashEntry,
@@ -85,6 +86,9 @@ interface GitState {
   rebaseBranch: (workspacePath: string, sourceBranch: string) => Promise<GitRebaseResult>
   rebaseAbort: (workspacePath: string) => Promise<void>
   rebaseContinue: (workspacePath: string) => Promise<GitRebaseResult>
+  cherryPick: (workspacePath: string, commitSha: string) => Promise<GitCherryPickResult>
+  cherryPickAbort: (workspacePath: string) => Promise<void>
+  cherryPickContinue: (workspacePath: string) => Promise<GitCherryPickResult>
   checkoutBranch: (workspacePath: string, name: string) => Promise<void>
   commitChanges: (workspacePath: string, message: string, stageAll?: boolean, selectedFiles?: string[]) => Promise<string>
   stageFile: (workspacePath: string, filePath: string) => Promise<void>
@@ -513,6 +517,66 @@ export const useGitStore = create<GitState>((set, get) => ({
       // 刷新状态和分支列表
       await get().refreshStatus(workspacePath)
       await get().getBranches(workspacePath)
+
+      set({ isLoading: false })
+      return result
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // Cherry-pick 提交
+  async cherryPick(workspacePath: string, commitSha: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      const result = await invoke<GitCherryPickResult>('git_cherry_pick', {
+        workspacePath,
+        commitSha,
+      })
+
+      // 刷新状态和提交历史
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+      return result
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 中止 Cherry-pick
+  async cherryPickAbort(workspacePath: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      await invoke('git_cherry_pick_abort', {
+        workspacePath,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 继续 Cherry-pick
+  async cherryPickContinue(workspacePath: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      const result = await invoke<GitCherryPickResult>('git_cherry_pick_continue', {
+        workspacePath,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
 
       set({ isLoading: false })
       return result

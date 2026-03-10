@@ -234,6 +234,22 @@
     "rebaseContinueFailed": "继续变基失败",
     "copyFailed": "复制失败"
   },
+  "cherryPick": {
+    "title": "Cherry-pick 提交",
+    "button": "Cherry-pick",
+    "confirm": "确认 Cherry-pick",
+    "success": "Cherry-pick 成功",
+    "failed": "Cherry-pick 失败: {{error}}",
+    "conflicts": "Cherry-pick 发现冲突",
+    "conflictTitle": "发现冲突",
+    "conflictDesc": "以下文件存在冲突，请手动解决后再继续",
+    "stillConflicts": "仍存在冲突，请继续解决",
+    "abort": "中止",
+    "continue": "继续",
+    "aborted": "Cherry-pick 已中止",
+    "abortFailed": "中止 Cherry-pick 失败: {{error}}",
+    "continueFailed": "继续 Cherry-pick 失败: {{error}}"
+  },
   "batchStageSuccess": "批量暂存成功",
   "batchUnstageSuccess": "批量取消暂存成功",
   "batchDiscardSuccess": "批量丢弃成功",

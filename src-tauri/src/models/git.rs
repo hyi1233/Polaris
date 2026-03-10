@@ -326,6 +326,7 @@ pub enum GitServiceError {
         conflicted_files: Vec<String>,
     },
     RebaseInProgress,
+    CherryPickInProgress,
     MergeInProgress,
     RemoteNotFound(String),
     RemoteExists(String),
@@ -348,6 +349,7 @@ impl std::fmt::Display for GitServiceError {
                 write!(f, "Merge conflicts: {}. Files: {:?}", message, conflicted_files)
             }
             Self::RebaseInProgress => write!(f, "Rebase is already in progress"),
+            Self::CherryPickInProgress => write!(f, "Cherry-pick is already in progress"),
             Self::MergeInProgress => write!(f, "Merge is already in progress"),
             Self::RemoteNotFound(name) => write!(f, "Remote '{}' not found", name),
             Self::RemoteExists(name) => write!(f, "Remote '{}' already exists", name),
@@ -437,6 +439,23 @@ pub struct GitRebaseResult {
     pub current_step: usize,
     /// 总步骤数
     pub total_steps: usize,
+    /// 是否已完成
+    pub finished: bool,
+}
+
+/// Cherry-pick 操作结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitCherryPickResult {
+    /// 是否成功
+    pub success: bool,
+    /// 是否有冲突
+    pub has_conflicts: bool,
+    /// 冲突文件列表
+    pub conflicts: Vec<String>,
+    /// 提交 SHA
+    pub commit_sha: String,
+    /// 提交消息
+    pub commit_message: String,
     /// 是否已完成
     pub finished: bool,
 }
@@ -538,6 +557,11 @@ impl From<GitServiceError> for GitError {
             GitServiceError::RebaseInProgress => (
                 "REBASE_IN_PROGRESS".to_string(),
                 "A rebase is already in progress".to_string(),
+                None,
+            ),
+            GitServiceError::CherryPickInProgress => (
+                "CHERRY_PICK_IN_PROGRESS".to_string(),
+                "A cherry-pick is already in progress".to_string(),
                 None,
             ),
             GitServiceError::MergeInProgress => (

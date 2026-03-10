@@ -174,6 +174,30 @@ pub fn git_rebase_continue(workspacePath: String) -> Result<GitRebaseResult, Git
     GitService::rebase_continue(&path).map_err(GitError::from)
 }
 
+/// Cherry-pick 提交
+#[tauri::command]
+pub fn git_cherry_pick(
+    workspacePath: String,
+    commitSha: String,
+) -> Result<GitCherryPickResult, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::cherry_pick(&path, &commitSha).map_err(GitError::from)
+}
+
+/// 中止 Cherry-pick
+#[tauri::command]
+pub fn git_cherry_pick_abort(workspacePath: String) -> Result<(), GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::cherry_pick_abort(&path).map_err(GitError::from)
+}
+
+/// 继续 Cherry-pick
+#[tauri::command]
+pub fn git_cherry_pick_continue(workspacePath: String) -> Result<GitCherryPickResult, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::cherry_pick_continue(&path).map_err(GitError::from)
+}
+
 /// 提交变更
 #[tauri::command]
 pub async fn git_commit_changes(
