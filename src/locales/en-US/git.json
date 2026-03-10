@@ -250,6 +250,22 @@
     "abortFailed": "Failed to abort cherry-pick: {{error}}",
     "continueFailed": "Failed to continue cherry-pick: {{error}}"
   },
+  "revert": {
+    "title": "Revert Commit",
+    "button": "Revert",
+    "confirm": "Confirm Revert",
+    "success": "Revert successful",
+    "failed": "Revert failed: {{error}}",
+    "conflicts": "Revert conflicts detected",
+    "conflictTitle": "Conflicts Detected",
+    "conflictDesc": "The following files have conflicts. Please resolve them manually before continuing",
+    "stillConflicts": "Conflicts still exist, please continue resolving",
+    "abort": "Abort",
+    "continue": "Continue",
+    "aborted": "Revert aborted",
+    "abortFailed": "Failed to abort revert: {{error}}",
+    "continueFailed": "Failed to continue revert: {{error}}"
+  },
   "batchStageSuccess": "Batch stage successful",
   "batchUnstageSuccess": "Batch unstage successful",
   "batchDiscardSuccess": "Batch discard successful",

@@ -198,6 +198,30 @@ pub fn git_cherry_pick_continue(workspacePath: String) -> Result<GitCherryPickRe
     GitService::cherry_pick_continue(&path).map_err(GitError::from)
 }
 
+/// Revert 提交
+#[tauri::command]
+pub fn git_revert(
+    workspacePath: String,
+    commitSha: String,
+) -> Result<GitRevertResult, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::revert(&path, &commitSha).map_err(GitError::from)
+}
+
+/// 中止 Revert
+#[tauri::command]
+pub fn git_revert_abort(workspacePath: String) -> Result<(), GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::revert_abort(&path).map_err(GitError::from)
+}
+
+/// 继续 Revert
+#[tauri::command]
+pub fn git_revert_continue(workspacePath: String) -> Result<GitRevertResult, GitError> {
+    let path = PathBuf::from(workspacePath);
+    GitService::revert_continue(&path).map_err(GitError::from)
+}
+
 /// 提交变更
 #[tauri::command]
 pub async fn git_commit_changes(

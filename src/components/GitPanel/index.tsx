@@ -398,8 +398,8 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
       )}
 
       {!(useInternalDiff && selectedDiff) && (
-        <>
-          <div className="flex items-center border-b border-border-subtle">
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex items-center border-b border-border-subtle shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -421,6 +421,7 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
             ))}
           </div>
 
+          <div className="flex-1 overflow-hidden flex flex-col">
           {activeTab === 'changes' && (
             <>
               <GitStatusHeader
@@ -511,7 +512,8 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
           {activeTab === 'branch' && <BranchTab />}
           {activeTab === 'remote' && <RemoteTab />}
           {activeTab === 'stash' && <StashTab />}
-        </>
+          </div>
+        </div>
       )}
     </aside>
   )

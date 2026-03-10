@@ -327,6 +327,7 @@ pub enum GitServiceError {
     },
     RebaseInProgress,
     CherryPickInProgress,
+    RevertInProgress,
     MergeInProgress,
     RemoteNotFound(String),
     RemoteExists(String),
@@ -350,6 +351,7 @@ impl std::fmt::Display for GitServiceError {
             }
             Self::RebaseInProgress => write!(f, "Rebase is already in progress"),
             Self::CherryPickInProgress => write!(f, "Cherry-pick is already in progress"),
+            Self::RevertInProgress => write!(f, "Revert is already in progress"),
             Self::MergeInProgress => write!(f, "Merge is already in progress"),
             Self::RemoteNotFound(name) => write!(f, "Remote '{}' not found", name),
             Self::RemoteExists(name) => write!(f, "Remote '{}' already exists", name),
@@ -460,6 +462,23 @@ pub struct GitCherryPickResult {
     pub finished: bool,
 }
 
+/// Revert 操作结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitRevertResult {
+    /// 是否成功
+    pub success: bool,
+    /// 是否有冲突
+    pub has_conflicts: bool,
+    /// 冲突文件列表
+    pub conflicts: Vec<String>,
+    /// 新提交的 SHA（revert 成功后）
+    pub commit_sha: String,
+    /// 提交消息
+    pub commit_message: String,
+    /// 是否已完成
+    pub finished: bool,
+}
+
 // ============================================================================
 // 批量暂存结果
 // ============================================================================
@@ -562,6 +581,11 @@ impl From<GitServiceError> for GitError {
             GitServiceError::CherryPickInProgress => (
                 "CHERRY_PICK_IN_PROGRESS".to_string(),
                 "A cherry-pick is already in progress".to_string(),
+                None,
+            ),
+            GitServiceError::RevertInProgress => (
+                "REVERT_IN_PROGRESS".to_string(),
+                "A revert is already in progress".to_string(),
                 None,
             ),
             GitServiceError::MergeInProgress => (

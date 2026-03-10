@@ -265,6 +265,18 @@ export interface GitCherryPickResult {
 }
 
 /**
+ * Revert 操作结果
+ */
+export interface GitRevertResult {
+  success: boolean       // 是否成功
+  hasConflicts: boolean  // 是否有冲突
+  conflicts: string[]    // 冲突文件列表
+  commitSha: string      // 提交 SHA
+  commitMessage: string  // 提交消息
+  finished: boolean      // 是否已完成
+}
+
+/**
  * 批量暂存结果
  */
 export interface BatchStageResult {

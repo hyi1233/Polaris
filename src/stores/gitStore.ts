@@ -19,6 +19,7 @@ import type {
   GitMergeResult,
   GitRebaseResult,
   GitCherryPickResult,
+  GitRevertResult,
   GitCommit,
   BatchStageResult,
   GitStashEntry,
@@ -63,6 +64,10 @@ interface GitState {
   selectedFilePath: string | null
   selectedDiff: GitDiffEntry | null
 
+  // 内部状态（用于防抖和请求管理）
+  _refreshPromises: Map<string, Promise<void>>
+  _refreshTimeouts: Map<string, NodeJS.Timeout>
+
   // 操作方法
   refreshStatus: (workspacePath: string) => Promise<void>
   refreshStatusDebounced: (workspacePath: string, delay?: number) => Promise<void>
@@ -89,6 +94,9 @@ interface GitState {
   cherryPick: (workspacePath: string, commitSha: string) => Promise<GitCherryPickResult>
   cherryPickAbort: (workspacePath: string) => Promise<void>
   cherryPickContinue: (workspacePath: string) => Promise<GitCherryPickResult>
+  revert: (workspacePath: string, commitSha: string) => Promise<GitRevertResult>
+  revertAbort: (workspacePath: string) => Promise<void>
+  revertContinue: (workspacePath: string) => Promise<GitRevertResult>
   checkoutBranch: (workspacePath: string, name: string) => Promise<void>
   commitChanges: (workspacePath: string, message: string, stageAll?: boolean, selectedFiles?: string[]) => Promise<string>
   stageFile: (workspacePath: string, filePath: string) => Promise<void>
@@ -137,6 +145,10 @@ export const useGitStore = create<GitState>((set, get) => ({
   selectedFilePath: null,
   selectedDiff: null,
 
+  // 内部状态初始化
+  _refreshPromises: new Map(),
+  _refreshTimeouts: new Map(),
+
   // 刷新仓库状态
   async refreshStatus(workspacePath: string) {
     console.log('[GitStore] refreshStatus 开始', { workspacePath })
@@ -167,29 +179,33 @@ export const useGitStore = create<GitState>((set, get) => ({
 
   // 防抖的 Git 状态刷新
   async refreshStatusDebounced(workspacePath: string, delay = 500) {
-    // 使用全局变量存储防抖定时器
-    if (!(globalThis as any)._gitRefreshTimeouts) {
-      (globalThis as any)._gitRefreshTimeouts = new Map<string, number>()
-    }
+    const state = get()
 
-    const timeoutsMap = (globalThis as any)._gitRefreshTimeouts as Map<string, number>
-    const existingTimeout = timeoutsMap.get(workspacePath)
-
+    // 清除已有的定时器
+    const existingTimeout = state._refreshTimeouts.get(workspacePath)
     if (existingTimeout) {
       clearTimeout(existingTimeout)
+      state._refreshTimeouts.delete(workspacePath)
     }
 
+    // 创建新的防抖Promise
     return new Promise<void>((resolve) => {
       const timeout = setTimeout(async () => {
         try {
           await get().refreshStatus(workspacePath)
         } finally {
-          timeoutsMap.delete(workspacePath)
+          // 清理
+          const currentState = get()
+          currentState._refreshTimeouts.delete(workspacePath)
+          currentState._refreshPromises.delete(workspacePath)
           resolve()
         }
-      }, delay) as unknown as number
+      }, delay)
 
-      timeoutsMap.set(workspacePath, timeout)
+      // 保存定时器和Promise
+      set({
+        _refreshTimeouts: new Map(state._refreshTimeouts).set(workspacePath, timeout)
+      })
     })
   },
 
@@ -572,6 +588,66 @@ export const useGitStore = create<GitState>((set, get) => ({
 
     try {
       const result = await invoke<GitCherryPickResult>('git_cherry_pick_continue', {
+        workspacePath,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+      return result
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // Revert 提交
+  async revert(workspacePath: string, commitSha: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      const result = await invoke<GitRevertResult>('git_revert', {
+        workspacePath,
+        commitSha,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+      return result
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 中止 Revert
+  async revertAbort(workspacePath: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      await invoke('git_revert_abort', {
+        workspacePath,
+      })
+
+      // 刷新状态
+      await get().refreshStatus(workspacePath)
+
+      set({ isLoading: false })
+    } catch (err) {
+      set({ error: parseGitError(err), isLoading: false })
+      throw err
+    }
+  },
+
+  // 继续 Revert
+  async revertContinue(workspacePath: string) {
+    set({ isLoading: true, error: null })
+
+    try {
+      const result = await invoke<GitRevertResult>('git_revert_continue', {
         workspacePath,
       })
 
@@ -989,6 +1065,10 @@ export const useGitStore = create<GitState>((set, get) => ({
 
   // 清除所有状态
   clearAll() {
+    // 清理定时器
+    const state = get()
+    state._refreshTimeouts.forEach((timeout) => clearTimeout(timeout))
+
     set({
       status: null,
       diffs: [],
@@ -1002,6 +1082,8 @@ export const useGitStore = create<GitState>((set, get) => ({
       error: null,
       selectedFilePath: null,
       selectedDiff: null,
+      _refreshPromises: new Map(),
+      _refreshTimeouts: new Map(),
     })
   },
 }))

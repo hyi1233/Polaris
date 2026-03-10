@@ -6,12 +6,12 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GitCommit, User, Clock, RefreshCw, ChevronRight, Loader2, Search, X, Cherry, AlertTriangle, XCircle, CheckCircle } from 'lucide-react'
+import { GitCommit, User, Clock, RefreshCw, ChevronRight, Loader2, Search, X, Cherry, AlertTriangle, XCircle, CheckCircle, RotateCcw } from 'lucide-react'
 import { Virtuoso } from 'react-virtuoso'
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useToastStore } from '@/stores/toastStore'
-import type { GitCommit as GitCommitType, GitCherryPickResult } from '@/types/git'
+import type { GitCommit as GitCommitType, GitCherryPickResult, GitRevertResult } from '@/types/git'
 
 const PAGE_SIZE = 50
 
@@ -25,6 +25,19 @@ export function HistoryTab() {
   const [hasMore, setHasMore] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const loadingRef = useRef(false)
+  const commitsLengthRef = useRef(0)
+  const retryCountRef = useRef(0)
+  const MAX_RETRIES = 3
+
+  // 添加 commits 状态追踪
+  useEffect(() => {
+    console.log('[HistoryTab] 🔍 commits 状态变化', {
+      length: commits.length,
+      firstCommit: commits[0]?.shortSha || 'none',
+      isLoading,
+      hasMore
+    })
+  }, [commits, isLoading, hasMore])
 
   // Cherry-pick 相关状态
   const [showCherryPickDialog, setShowCherryPickDialog] = useState(false)
@@ -32,29 +45,69 @@ export function HistoryTab() {
   const [cherryPickResult, setCherryPickResult] = useState<GitCherryPickResult | null>(null)
   const [isCherryPicking, setIsCherryPicking] = useState(false)
 
+  // Revert 相关状态
+  const [showRevertDialog, setShowRevertDialog] = useState(false)
+  const [revertTarget, setRevertTarget] = useState<GitCommitType | null>(null)
+  const [revertResult, setRevertResult] = useState<GitRevertResult | null>(null)
+  const [isReverting, setIsReverting] = useState(false)
+
   const getLog = useGitStore((s) => s.getLog)
   const cherryPick = useGitStore((s) => s.cherryPick)
   const cherryPickAbort = useGitStore((s) => s.cherryPickAbort)
   const cherryPickContinue = useGitStore((s) => s.cherryPickContinue)
+  const revert = useGitStore((s) => s.revert)
+  const revertAbort = useGitStore((s) => s.revertAbort)
+  const revertContinue = useGitStore((s) => s.revertContinue)
   const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
   const toast = useToastStore()
 
   // 过滤提交（按消息和作者搜索）
   const filteredCommits = useMemo(() => {
-    if (!searchQuery.trim()) return commits
+    console.log('[HistoryTab] filteredCommits 计算', {
+      commitsLength: commits.length,
+      searchQuery
+    })
+
+    if (!searchQuery.trim()) {
+      console.log('[HistoryTab] 无搜索条件，返回全部 commits')
+      return commits
+    }
+
     const query = searchQuery.toLowerCase()
-    return commits.filter((commit) =>
+    const filtered = commits.filter((commit) =>
       commit.message.toLowerCase().includes(query) ||
       commit.author.toLowerCase().includes(query) ||
       commit.shortSha.toLowerCase().includes(query)
     )
+
+    console.log('[HistoryTab] 过滤结果', {
+      原始数量: commits.length,
+      过滤后数量: filtered.length,
+      搜索词: query
+    })
+
+    return filtered
   }, [commits, searchQuery])
 
+  // 使用 ref 存储 getLog 函数，避免依赖变化
+  const getLogRef = useRef(getLog)
+  getLogRef.current = getLog
+
+  // 创建超时Promise
+  const createTimeoutPromise = (timeoutMs: number) => {
+    return new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`请求超时 (${timeoutMs}ms)`))
+      }, timeoutMs)
+    })
+  }
+
   const loadCommits = useCallback(async (append = false) => {
-    console.log('[HistoryTab] loadCommits called', { 
-      currentWorkspace: currentWorkspace?.path, 
+    console.log('[HistoryTab] loadCommits called', {
+      currentWorkspace: currentWorkspace?.path,
       append,
-      loadingRef: loadingRef.current 
+      loadingRef: loadingRef.current,
+      commitsLength: commitsLengthRef.current
     })
 
     if (!currentWorkspace) {
@@ -72,60 +125,149 @@ export function HistoryTab() {
       setIsLoading(true)
       setCommits([])
       setHasMore(true)
+      commitsLengthRef.current = 0
+      retryCountRef.current = 0
     }
     loadingRef.current = true
     setError(null)
 
     try {
-      const skip = append ? commits.length : 0
-      console.log('[HistoryTab] calling getLog', { 
-        path: currentWorkspace.path, 
-        limit: PAGE_SIZE, 
-        skip 
+      const skip = append ? commitsLengthRef.current : 0
+      console.log('[HistoryTab] calling getLog', {
+        path: currentWorkspace.path,
+        limit: PAGE_SIZE,
+        skip
       })
-      const result = await getLog(currentWorkspace.path, PAGE_SIZE, skip)
-      console.log('[HistoryTab] getLog result', { count: result.length })
-      
+
+      // 添加超时保护 (30秒超时)
+      const result = await Promise.race([
+        getLogRef.current(currentWorkspace.path, PAGE_SIZE, skip),
+        createTimeoutPromise(30000)
+      ]) as GitCommitType[]
+
+      console.log('[HistoryTab] getLog result', {
+        count: result.length,
+        isArray: Array.isArray(result),
+        append,
+        firstCommitSha: result[0]?.shortSha || 'none',
+        lastCommitSha: result[result.length - 1]?.shortSha || 'none'
+      })
+
+      // 验证数据格式
+      if (!Array.isArray(result)) {
+        console.error('[HistoryTab] ❌ getLog 返回的不是数组', result)
+        throw new Error(`getLog 返回的不是数组，类型: ${typeof result}`)
+      }
+
+      console.log('[HistoryTab] ✅ 数据格式验证通过', {
+        isArray: true,
+        length: result.length,
+        firstItemKeys: result[0] ? Object.keys(result[0]) : []
+      })
+
       if (result.length < PAGE_SIZE) {
         setHasMore(false)
+        console.log('[HistoryTab] 设置 hasMore = false')
       }
-      
-      if (append) {
-        setCommits((prev) => [...prev, ...result])
-      } else {
-        setCommits(result)
-      }
+
+      console.log('[HistoryTab] 准备更新 commits 状态...')
+      setCommits((prev) => {
+        const newCommits = append ? [...prev, ...result] : result
+        commitsLengthRef.current = newCommits.length
+        console.log('[HistoryTab] ✅ commits 状态已更新', {
+          prevCount: prev.length,
+          newCount: newCommits.length,
+          append,
+          hasMore: result.length >= PAGE_SIZE
+        })
+        return newCommits
+      })
+
+      console.log('[HistoryTab] ✅ setCommits 调用完成')
+
+      // 重置重试计数
+      retryCountRef.current = 0
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
-      console.error('[HistoryTab] getLog error', errorMsg)
+      console.error('[HistoryTab] getLog error', {
+        error: errorMsg,
+        retryCount: retryCountRef.current,
+        maxRetries: MAX_RETRIES
+      })
+
+      // 重试逻辑（超时错误不重试）
+      retryCountRef.current++
+      if (retryCountRef.current < MAX_RETRIES && !errorMsg.includes('超时')) {
+        console.log(`[HistoryTab] 重试加载 (${retryCountRef.current}/${MAX_RETRIES})`)
+        setTimeout(() => {
+          loadCommitsRef.current(append)
+        }, 1000 * retryCountRef.current) // 递增延迟
+        return
+      }
+
       setError(errorMsg)
     } finally {
+      console.log('[HistoryTab] finally 块执行')
       setIsLoading(false)
       setIsLoadingMore(false)
       loadingRef.current = false
+      console.log('[HistoryTab] ✅ loadCommits finished', {
+        isLoading: false,
+        commitsLength: commitsLengthRef.current,
+        hasMore
+      })
     }
-  }, [currentWorkspace, getLog, commits.length])
+  }, [currentWorkspace])
 
-  // 初始加载 - 当 currentWorkspace 变化时重新加载
+  // 清理函数 - 组件卸载时重置状态
   useEffect(() => {
-    console.log('[HistoryTab] useEffect triggered', { 
+    return () => {
+      console.log('[HistoryTab] 组件卸载，重置状态')
+      loadingRef.current = false
+      retryCountRef.current = 0
+    }
+  }, [])
+
+  // 使用 ref 存储 loadCommits 函数，避免在 loadMore 和 handleRefresh 中产生依赖问题
+  const loadCommitsRef = useRef(loadCommits)
+  loadCommitsRef.current = loadCommits
+
+  // 初始加载 - 当 currentWorkspace 变化时重新加载（带防抖）
+  useEffect(() => {
+    console.log('[HistoryTab] useEffect triggered', {
       workspacePath: currentWorkspace?.path,
-      workspaceId: currentWorkspace?.id 
+      workspaceId: currentWorkspace?.id
     })
-    loadCommits(false)
-  }, [currentWorkspace?.path, loadCommits])
+
+    if (!currentWorkspace?.path) {
+      console.log('[HistoryTab] No workspace path, skipping load')
+      return
+    }
+
+    // 防抖：延迟300ms再加载
+    const timeoutId = setTimeout(() => {
+      console.log('[HistoryTab] 防抖结束，调用 loadCommitsRef.current(false)')
+      loadCommitsRef.current(false)
+    }, 300)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [currentWorkspace?.path])
 
   // 加载更多
   const loadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && commits.length > 0) {
-      loadCommits(true)
+    if (!isLoadingMore && hasMore && commitsLengthRef.current > 0) {
+      loadCommitsRef.current(true)
     }
-  }, [isLoadingMore, hasMore, commits.length, loadCommits])
+  }, [isLoadingMore, hasMore])
 
   // 手动刷新
   const handleRefresh = useCallback(() => {
-    loadCommits(false)
-  }, [loadCommits])
+    // 重置重试计数
+    retryCountRef.current = 0
+    loadCommitsRef.current(false)
+  }, [])
 
   // 打开 Cherry-pick 确认弹窗
   const handleOpenCherryPick = useCallback((commit: GitCommitType) => {
@@ -146,7 +288,7 @@ export function HistoryTab() {
       if (result.success && !result.hasConflicts) {
         toast.success(t('cherryPick.success'))
         setShowCherryPickDialog(false)
-        loadCommits(false)
+        loadCommitsRef.current(false)
       } else if (result.hasConflicts) {
         toast.warning(t('cherryPick.conflicts'))
       }
@@ -188,7 +330,7 @@ export function HistoryTab() {
       if (result.success && !result.hasConflicts) {
         toast.success(t('cherryPick.success'))
         setShowCherryPickDialog(false)
-        loadCommits(false)
+        loadCommitsRef.current(false)
       } else if (result.hasConflicts) {
         toast.warning(t('cherryPick.stillConflicts'))
       }
@@ -199,6 +341,79 @@ export function HistoryTab() {
       setIsCherryPicking(false)
     }
   }, [currentWorkspace, cherryPickContinue, toast, t, loadCommits])
+
+  // 打开 Revert 确认弹窗
+  const handleOpenRevert = useCallback((commit: GitCommitType) => {
+    setRevertTarget(commit)
+    setRevertResult(null)
+    setShowRevertDialog(true)
+  }, [])
+
+  // 执行 Revert
+  const handleRevert = useCallback(async () => {
+    if (!currentWorkspace || !revertTarget) return
+
+    setIsReverting(true)
+    try {
+      const result = await revert(currentWorkspace.path, revertTarget.sha)
+      setRevertResult(result)
+
+      if (result.success && !result.hasConflicts) {
+        toast.success(t('revert.success'))
+        setShowRevertDialog(false)
+        loadCommitsRef.current(false)
+      } else if (result.hasConflicts) {
+        toast.warning(t('revert.conflicts'))
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      toast.error(t('revert.failed', { error: errorMsg }))
+    } finally {
+      setIsReverting(false)
+    }
+  }, [currentWorkspace, revertTarget, revert, toast, t, loadCommits])
+
+  // 中止 Revert
+  const handleRevertAbort = useCallback(async () => {
+    if (!currentWorkspace) return
+
+    setIsReverting(true)
+    try {
+      await revertAbort(currentWorkspace.path)
+      toast.info(t('revert.aborted'))
+      setShowRevertDialog(false)
+      setRevertResult(null)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      toast.error(t('revert.abortFailed', { error: errorMsg }))
+    } finally {
+      setIsReverting(false)
+    }
+  }, [currentWorkspace, revertAbort, toast, t])
+
+  // 继续 Revert
+  const handleRevertContinue = useCallback(async () => {
+    if (!currentWorkspace) return
+
+    setIsReverting(true)
+    try {
+      const result = await revertContinue(currentWorkspace.path)
+      setRevertResult(result)
+
+      if (result.success && !result.hasConflicts) {
+        toast.success(t('revert.success'))
+        setShowRevertDialog(false)
+        loadCommitsRef.current(false)
+      } else if (result.hasConflicts) {
+        toast.warning(t('revert.stillConflicts'))
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      toast.error(t('revert.continueFailed', { error: errorMsg }))
+    } finally {
+      setIsReverting(false)
+    }
+  }, [currentWorkspace, revertContinue, toast, t, loadCommits])
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp * 1000)
@@ -263,7 +478,7 @@ export function HistoryTab() {
         </div>
       )
     }
-    if (!hasMore && commits.length > 0) {
+    if (!hasMore && commitsLengthRef.current > 0) {
       return (
         <div className="flex items-center justify-center py-4 text-xs text-text-tertiary">
           {t('history.noMore')}
@@ -271,7 +486,7 @@ export function HistoryTab() {
       )
     }
     return null
-  }, [isLoadingMore, hasMore, commits.length, searchQuery, t])
+  }, [isLoadingMore, hasMore, searchQuery, t])
 
   return (
     <div className="flex flex-col h-full">
@@ -319,31 +534,59 @@ export function HistoryTab() {
       )}
 
       <div className="flex-1">
-        {isLoading && commits.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-text-tertiary" />
-          </div>
-        ) : commits.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
-            <GitCommit size={24} className="mb-2 opacity-50" />
-            <span className="text-sm">{t('history.noCommits')}</span>
-          </div>
-        ) : filteredCommits.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
-            <Search size={24} className="mb-2 opacity-50" />
-            <span className="text-sm">{t('history.noSearchResults')}</span>
-          </div>
-        ) : (
-          <Virtuoso
-            data={filteredCommits}
-            endReached={loadMore}
-            itemContent={(_, commit) => <CommitItem commit={commit} />}
-            components={{
-              Footer,
-            }}
-            className="h-full"
-          />
-        )}
+        {(() => {
+          console.log('[HistoryTab] 🎨 渲染判断', {
+            isLoading,
+            commitsLength: commits.length,
+            filteredCommitsLength: filteredCommits.length,
+            hasSearch: !!searchQuery.trim()
+          })
+
+          if (isLoading && commits.length === 0) {
+            console.log('[HistoryTab] 渲染: Loading 状态')
+            return (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={20} className="animate-spin text-text-tertiary" />
+              </div>
+            )
+          }
+
+          if (commits.length === 0) {
+            console.log('[HistoryTab] 渲染: 没有提交')
+            return (
+              <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
+                <GitCommit size={24} className="mb-2 opacity-50" />
+                <span className="text-sm">{t('history.noCommits')}</span>
+              </div>
+            )
+          }
+
+          if (filteredCommits.length === 0) {
+            console.log('[HistoryTab] 渲染: 没有搜索结果')
+            return (
+              <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
+                <Search size={24} className="mb-2 opacity-50" />
+                <span className="text-sm">{t('history.noSearchResults')}</span>
+              </div>
+            )
+          }
+
+          console.log('[HistoryTab] 渲染: Virtuoso 列表', {
+            dataCount: filteredCommits.length
+          })
+
+          return (
+            <Virtuoso
+              data={filteredCommits}
+              endReached={loadMore}
+              itemContent={(_, commit) => <CommitItem commit={commit} />}
+              components={{
+                Footer,
+              }}
+              className="h-full"
+            />
+          )
+        })()}
       </div>
 
       {selectedCommit && (
@@ -353,6 +596,14 @@ export function HistoryTab() {
               {selectedCommit.shortSha}
             </span>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenRevert(selectedCommit)}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-warning/10 text-warning rounded hover:bg-warning/20 transition-colors"
+                title={t('revert.title')}
+              >
+                <RotateCcw size={12} />
+                {t('revert.button')}
+              </button>
               <button
                 onClick={() => handleOpenCherryPick(selectedCommit)}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
@@ -479,6 +730,116 @@ export function HistoryTab() {
                     >
                       {isCherryPicking && <Loader2 size={14} className="animate-spin" />}
                       {t('cherryPick.confirm')}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revert 弹窗 */}
+      {showRevertDialog && revertTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background-surface border border-border-subtle rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+              <h3 className="text-sm font-medium text-text-primary flex items-center gap-2">
+                <RotateCcw size={16} className="text-warning" />
+                {t('revert.title')}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRevertDialog(false)
+                  setRevertResult(null)
+                }}
+                className="text-text-tertiary hover:text-text-primary"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {/* 显示要 revert 的提交信息 */}
+              <div className="mb-4 p-3 bg-background rounded border border-border-subtle">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-mono text-text-tertiary bg-background-surface px-1.5 py-0.5 rounded">
+                    {revertTarget.shortSha}
+                  </span>
+                </div>
+                <div className="text-sm text-text-primary truncate">
+                  {revertTarget.message.split('\n')[0]}
+                </div>
+                <div className="text-xs text-text-tertiary mt-1">
+                  {revertTarget.author}
+                </div>
+              </div>
+
+              {/* 冲突提示 */}
+              {revertResult?.hasConflicts && (
+                <div className="mb-4 p-3 bg-warning/10 border border-warning/20 rounded">
+                  <div className="flex items-center gap-2 text-warning mb-2">
+                    <AlertTriangle size={14} />
+                    <span className="text-sm font-medium">{t('revert.conflictTitle')}</span>
+                  </div>
+                  <div className="text-xs text-text-secondary mb-2">
+                    {t('revert.conflictDesc')}
+                  </div>
+                  {revertResult.conflicts.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto">
+                      <ul className="text-xs text-text-tertiary space-y-1">
+                        {revertResult.conflicts.map((file, idx) => (
+                          <li key={idx} className="font-mono">• {file}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-2">
+                {revertResult?.hasConflicts ? (
+                  <>
+                    <button
+                      onClick={handleRevertAbort}
+                      disabled={isReverting}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs bg-danger/10 text-danger rounded hover:bg-danger/20 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle size={14} />
+                      {t('revert.abort')}
+                    </button>
+                    <button
+                      onClick={handleRevertContinue}
+                      disabled={isReverting}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-white rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      {isReverting ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle size={14} />
+                      )}
+                      {t('revert.continue')}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowRevertDialog(false)
+                        setRevertResult(null)
+                      }}
+                      className="px-3 py-1.5 text-xs text-text-tertiary hover:text-text-primary transition-colors"
+                    >
+                      {t('cancel', { ns: 'common' })}
+                    </button>
+                    <button
+                      onClick={handleRevert}
+                      disabled={isReverting}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs bg-warning text-white rounded hover:bg-warning/90 transition-colors disabled:opacity-50"
+                    >
+                      {isReverting && <Loader2 size={14} className="animate-spin" />}
+                      {t('revert.confirm')}
                     </button>
                   </>
                 )}
