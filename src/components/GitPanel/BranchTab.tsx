@@ -4,7 +4,7 @@
  * 显示本地和远程分支，支持分支切换和创建
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   GitBranch as GitBranchIcon,
@@ -30,6 +30,7 @@ import {
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useToastStore } from '@/stores/toastStore'
+import { formatGitTimestamp } from '@/utils/gitFormat'
 import type { GitBranch, GitMergeResult, GitRebaseResult } from '@/types/git'
 
 type SwitchState =
@@ -438,24 +439,26 @@ export function BranchTab() {
     setShowRebaseDialog(true)
   }, [])
 
-  const localBranches = branches.filter((b) => !b.isRemote)
-  const remoteBranches = branches.filter((b) => b.isRemote)
+  // 优化：使用 useMemo 避免每次渲染都重新计算分支列表
+  const localBranches = useMemo(() =>
+    branches.filter((b) => !b.isRemote),
+    [branches]
+  )
+
+  const remoteBranches = useMemo(() =>
+    branches.filter((b) => b.isRemote),
+    [branches]
+  )
 
   const getChangesCount = () => {
     if (!status) return 0
     return status.staged.length + status.unstaged.length + status.untracked.length
   }
 
+  // 使用共享的时间格式化函数
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return ''
-    const date = new Date(timestamp * 1000)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / 86400000)
-    if (diffDays < 7) {
-      return t('history.daysAgo', { count: diffDays })
-    }
-    return date.toLocaleDateString()
+    return formatGitTimestamp(timestamp, t)
   }
 
   const renderBranchItem = (branch: GitBranch, isRemote = false) => {

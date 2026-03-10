@@ -11,6 +11,7 @@ import { Virtuoso } from 'react-virtuoso'
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useToastStore } from '@/stores/toastStore'
+import { formatGitTimestamp } from '@/utils/gitFormat'
 import type { GitCommit as GitCommitType, GitCherryPickResult, GitRevertResult } from '@/types/git'
 
 const PAGE_SIZE = 50
@@ -362,20 +363,8 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
     }
   }, [currentWorkspace, revertContinue, toast, t, loadCommits])
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp * 1000)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return t('history.justNow')
-    if (diffMins < 60) return t('history.minutesAgo', { count: diffMins })
-    if (diffHours < 24) return t('history.hoursAgo', { count: diffHours })
-    if (diffDays < 7) return t('history.daysAgo', { count: diffDays })
-    return date.toLocaleDateString()
-  }
+  // 使用共享的时间格式化函数
+  const formatTime = (timestamp: number) => formatGitTimestamp(timestamp, t)
 
   // 渲染单个提交项
   const CommitItem = useCallback(({ commit }: { commit: GitCommitType }) => (
@@ -444,7 +433,7 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
             <span className="ml-2 text-xs text-text-tertiary">({commits.length})</span>
           )}
         </span>
-        <div className="flex-1 max-w-[200px]">
+        <div className="flex-1 min-w-[120px] max-w-[240px]">
           <div className="relative">
             <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input
@@ -497,7 +486,6 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
           </div>
         ) : (
           <Virtuoso
-            key={filteredCommits.length}
             data={filteredCommits}
             endReached={loadMore}
             itemContent={(_, commit) => <CommitItem commit={commit} />}
