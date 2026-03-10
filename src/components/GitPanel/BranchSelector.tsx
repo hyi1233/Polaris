@@ -173,7 +173,7 @@ export function BranchSelector() {
         </button>
 
         {isOpen && (
-          <div className="absolute top-full left-0 mt-1 w-80 bg-background-surface border border-border rounded-lg shadow-lg z-50 flex flex-col max-h-[500px]">
+          <div className="absolute top-full left-0 mt-1 w-80 bg-background-surface border border-border rounded-lg shadow-lg z-50 flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
             <div className="px-3 py-2 border-b border-border flex items-center justify-between shrink-0">
               <span className="text-xs font-medium text-text-secondary">
                 {t('branch.switch')}

@@ -36,7 +36,10 @@ interface GitPanelProps {
 export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelProps) {
   const { t } = useTranslation('git')
   const { status, isLoading, error, refreshStatus, getWorktreeFileDiff, getIndexFileDiff, stageFile, unstageFile, discardChanges, initRepository } = useGitStore()
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   const [activeTab, setActiveTab] = useState<TabType>('changes')

@@ -53,7 +53,10 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
   const revert = useGitStore((s) => s.revert)
   const revertAbort = useGitStore((s) => s.revertAbort)
   const revertContinue = useGitStore((s) => s.revertContinue)
-  const currentWorkspace = useWorkspaceStore((s) => s.getCurrentWorkspace())
+  const currentWorkspace = useWorkspaceStore((s) => {
+    const { workspaces, currentWorkspaceId } = s
+    return workspaces.find(w => w.id === currentWorkspaceId) || null
+  })
   const toast = useToastStore()
 
   // 过滤提交（按消息和作者搜索）
@@ -501,7 +504,7 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
             components={{
               Footer,
             }}
-            className="h-full"
+            style={{ height: '100%' }}
           />
         )}
       </div>
