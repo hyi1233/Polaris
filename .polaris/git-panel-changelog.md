@@ -250,3 +250,84 @@ GitPanel UI/UX 优化任务已完成，共修复 12 个问题：
 2. 组件导入优化 (1 处)
 3. UI 一致性修复 (1 处)
 4. 调试语句清理 (7 处)
+
+---
+
+## 2026-03-10 验证检查
+
+### 检查范围
+
+对所有 GitPanel 组件进行了全面验证检查：
+
+1. **TypeScript 类型检查**: ✅ 通过 (`npx tsc --noEmit`)
+2. **console 调试语句**: ✅ 已清理（搜索无匹配）
+3. **国际化**: ✅ 所有组件使用 `useTranslation`
+4. **布局**: ✅ flex 布局，响应式良好
+5. **滚动区域**: ✅ `overflow-y-auto` 设置正确
+6. **弹窗层级**: ✅ 统一使用 `z-50`
+
+### 检查的组件文件
+
+- BlameView.tsx
+- BranchSelector.tsx
+- BranchTab.tsx
+- CommitInput.tsx
+- FileChangesList.tsx
+- GitignoreTab.tsx
+- GitStatusHeader.tsx
+- HistoryTab.tsx
+- index.tsx
+- QuickActions.tsx
+- RemoteTab.tsx
+- StashTab.tsx
+- TagsTab.tsx
+
+### 验证结果
+
+本次验证未发现新问题，所有之前的修复均有效。
+
+
+---
+
+## 2026-03-10 第三轮深度检查
+
+### 检查范围
+
+对所有 GitPanel 组件进行了第三轮全面 UI/UX 检查。
+
+### 检查结果
+
+发现 1 个国际化问题：
+
+#### 13. HistoryTab.tsx 内部错误消息国际化问题
+
+**问题描述**: HistoryTab 组件中存在硬编码的中文错误消息，用于内部错误处理：
+- 超时错误消息：`请求超时 (${timeoutMs}ms)`
+- 数据格式错误消息：`getLog 返回的不是数组，类型: ${typeof result}`
+
+**修改原因**: 
+- 错误消息会通过 `setError(errorMsg)` 显示给用户，应支持国际化
+- 保持代码一致性，所有用户可见文本都应国际化
+
+**修改文件**: 
+- `src/components/GitPanel/HistoryTab.tsx`
+- `src/locales/zh-CN/git.json`
+- `src/locales/en-US/git.json`
+
+**修改内容**:
+1. 使用错误标识符替代硬编码文本：
+   - `请求超时 (${timeoutMs}ms)` → `TIMEOUT_ERROR:${timeoutMs}`
+   - `getLog 返回的不是数组，类型: ${typeof result}` → `INVALID_DATA_FORMAT:${typeof result}`
+2. 在 catch 块中检测错误标识符并翻译为国际化消息
+3. 中文国际化文件添加：
+   - `"timeout": "请求超时 ({{timeout}}ms)"`
+   - `"invalidDataFormat": "数据格式错误，期望数组，实际为: {{type}}"`
+4. 英文国际化文件添加：
+   - `"timeout": "Request timeout ({{timeout}}ms)"`
+   - `"invalidDataFormat": "Invalid data format, expected array, got: {{type}}"`
+
+### 验证结果
+
+- TypeScript 类型检查: ✅ 通过 (`npx tsc --noEmit`)
+- 硬编码文本搜索: ✅ 无遗漏（已验证无中文字符串）
+- console 调试语句搜索: ✅ 无匹配

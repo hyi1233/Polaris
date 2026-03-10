@@ -91,7 +91,7 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
   const createTimeoutPromise = (timeoutMs: number) => {
     return new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`请求超时 (${timeoutMs}ms)`))
+        reject(new Error(`TIMEOUT_ERROR:${timeoutMs}`))
       }, timeoutMs)
     })
   }
@@ -127,7 +127,7 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
 
       // 验证数据格式
       if (!Array.isArray(result)) {
-        throw new Error(`getLog 返回的不是数组，类型: ${typeof result}`)
+        throw new Error(`INVALID_DATA_FORMAT:${typeof result}`)
       }
 
       if (result.length < PAGE_SIZE) {
@@ -143,11 +143,20 @@ export function HistoryTab({ targetCommitSha, onCommitSelected }: HistoryTabProp
       // 重置重试计数
       retryCountRef.current = 0
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
+      let errorMsg = err instanceof Error ? err.message : String(err)
+
+      // 翻译内部错误消息
+      if (errorMsg.startsWith('TIMEOUT_ERROR:')) {
+        const timeoutMs = errorMsg.split(':')[1]
+        errorMsg = t('history.timeout', { timeout: timeoutMs })
+      } else if (errorMsg.startsWith('INVALID_DATA_FORMAT:')) {
+        const type = errorMsg.split(':')[1]
+        errorMsg = t('history.invalidDataFormat', { type })
+      }
 
       // 重试逻辑（超时错误不重试）
       retryCountRef.current++
-      if (retryCountRef.current < MAX_RETRIES && !errorMsg.includes('超时')) {
+      if (retryCountRef.current < MAX_RETRIES && !errorMsg.includes(t('history.timeout', { timeout: '' }).trim())) {
         setTimeout(() => {
           loadCommitsRef.current(append)
         }, 1000 * retryCountRef.current) // 递增延迟

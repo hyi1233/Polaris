@@ -232,7 +232,9 @@
     "daysAgo": "{{count}} 天前",
     "head": "HEAD",
     "searchPlaceholder": "搜索提交...",
-    "noSearchResults": "未找到匹配的提交"
+    "noSearchResults": "未找到匹配的提交",
+    "timeout": "请求超时 ({{timeout}}ms)",
+    "invalidDataFormat": "数据格式错误，期望数组，实际为: {{type}}"
   },
   "sync": {
     "upToDate": "已是最新",
