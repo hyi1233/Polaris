@@ -621,7 +621,7 @@ export function BranchTab() {
           <>
             {/* 本地分支 */}
             <div className="px-4 py-1.5 text-xs font-medium text-text-tertiary bg-background-surface border-b border-border-subtle sticky top-0">
-              {t('branch.local')}
+              {t('branch.local')} ({localBranches.length})
             </div>
             {localBranches.map((branch) => renderBranchItem(branch, false))}
 

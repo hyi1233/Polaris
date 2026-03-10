@@ -53,6 +53,19 @@
 
 ---
 
+#### 4. BranchTab.tsx 本地分支标题不显示数量问题
+
+**问题描述**: BranchTab 组件中，本地分支列表的标题没有显示数量，而远程分支列表标题显示了数量，存在不一致。
+
+**修改原因**: 保持 UI 一致性，让用户清楚知道当前有多少本地分支。
+
+**修改文件**: `src/components/GitPanel/BranchTab.tsx`
+
+**修改内容**:
+- 本地分支标题从 `{t('branch.local')}` 修改为 `{t('branch.local')} ({localBranches.length})`
+
+---
+
 ### 验证结果
 
 - TypeScript 类型检查: ✅ 通过 (`npx tsc --noEmit`)
