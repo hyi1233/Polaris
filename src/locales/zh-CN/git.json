@@ -25,7 +25,8 @@
     "branch": "分支",
     "remote": "远程",
     "tags": "标签",
-    "stash": "Stash"
+    "stash": "Stash",
+    "gitignore": ".gitignore"
   },
 
   "init": {
@@ -319,5 +320,19 @@
   "pull": {
     "conflict": "合并冲突",
     "conflictDesc": "拉取时发现冲突，请手动解决冲突后再提交。"
+  },
+  "gitignore": {
+    "title": ".gitignore 管理",
+    "notFound": ".gitignore 文件不存在",
+    "createFromTemplate": "从模板创建",
+    "addTemplate": "添加忽略模板",
+    "addRule": "添加规则",
+    "save": "保存",
+    "saveSuccess": ".gitignore 保存成功",
+    "unsaved": "未保存",
+    "editorPlaceholder": "# 输入要忽略的文件模式...\n# 例如:\n# node_modules/\n# *.log\n# .env",
+    "quickAddPlaceholder": "快速添加规则（如: node_modules/）",
+    "ruleAdded": "规则已添加",
+    "templateAdded": "已添加 {{name}} 模板规则"
   }
 }

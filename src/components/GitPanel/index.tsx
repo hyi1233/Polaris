@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, GitPullRequest, X, Check, RotateCcw, MoreHorizontal, GitBranch, FolderGit2, FileText, History, Archive, Globe, Tag, GitCommit } from 'lucide-react'
+import { ChevronRight, GitPullRequest, X, Check, RotateCcw, MoreHorizontal, GitBranch, FolderGit2, FileText, History, Archive, Globe, Tag, GitCommit, FileX } from 'lucide-react'
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useToastStore } from '@/stores/toastStore'
@@ -18,13 +18,14 @@ import { StashTab } from './StashTab'
 import { RemoteTab } from './RemoteTab'
 import { TagsTab } from './TagsTab'
 import { BlameView } from './BlameView'
+import { GitignoreTab } from './GitignoreTab'
 import { DiffViewer } from '@/components/Diff/DiffViewer'
 import { Button } from '@/components/Common/Button'
 import { DropdownMenu } from '@/components/Common/DropdownMenu'
 import { logger } from '@/utils/logger'
 import type { GitFileChange, GitDiffEntry } from '@/types'
 
-type TabType = 'changes' | 'history' | 'branch' | 'remote' | 'tags' | 'stash'
+type TabType = 'changes' | 'history' | 'branch' | 'remote' | 'tags' | 'stash' | 'gitignore'
 
 interface GitPanelProps {
   width?: number
@@ -275,6 +276,7 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
     { id: 'remote' as const, icon: Globe, label: t('tabs.remote'), count: 0 },
     { id: 'tags' as const, icon: Tag, label: t('tabs.tags'), count: 0 },
     { id: 'stash' as const, icon: Archive, label: t('tabs.stash'), count: 0 },
+    { id: 'gitignore' as const, icon: FileX, label: t('tabs.gitignore'), count: 0 },
   ]
 
   if (!status) {
@@ -538,6 +540,7 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
           {activeTab === 'remote' && <RemoteTab />}
           {activeTab === 'tags' && <TagsTab />}
           {activeTab === 'stash' && <StashTab />}
+          {activeTab === 'gitignore' && <GitignoreTab />}
           </div>
         </div>
       )}

@@ -25,7 +25,8 @@
     "branch": "Branches",
     "remote": "Remotes",
     "tags": "Tags",
-    "stash": "Stash"
+    "stash": "Stash",
+    "gitignore": ".gitignore"
   },
 
   "init": {
@@ -319,5 +320,19 @@
   "pull": {
     "conflict": "Merge Conflict",
     "conflictDesc": "Conflicts detected during pull. Please resolve conflicts manually."
+  },
+  "gitignore": {
+    "title": ".gitignore Management",
+    "notFound": ".gitignore file does not exist",
+    "createFromTemplate": "Create from template",
+    "addTemplate": "Add Ignore Template",
+    "addRule": "Add Rule",
+    "save": "Save",
+    "saveSuccess": ".gitignore saved successfully",
+    "unsaved": "Unsaved",
+    "editorPlaceholder": "# Enter file patterns to ignore...\n# Example:\n# node_modules/\n# *.log\n# .env",
+    "quickAddPlaceholder": "Quick add rule (e.g. node_modules/)",
+    "ruleAdded": "Rule added",
+    "templateAdded": "Added {{name}} template rules"
   }
 }
