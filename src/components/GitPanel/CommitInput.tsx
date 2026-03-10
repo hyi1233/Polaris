@@ -11,6 +11,7 @@ import { Button } from '@/components/Common/Button'
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores'
 import { generateCommitMessage } from '@/services/commitMessageGenerator'
+import { logger } from '@/utils/logger'
 import type { GitDiffEntry } from '@/types/git'
 
 interface CommitInputProps {
@@ -29,14 +30,14 @@ export function CommitInput({ hasChanges: _hasChanges, selectedFiles }: CommitIn
     if (!message.trim() || !currentWorkspace) return
 
     if (!currentWorkspace.path || currentWorkspace.path.trim() === '') {
-      console.error('[CommitInput] Invalid workspace path')
+      logger.error('[CommitInput] Invalid workspace path')
       return
     }
 
     const reservedNames = ['nul', 'con', 'prn', 'aux', 'com1', 'com2', 'com3', 'com4', 'lpt1', 'lpt2', 'lpt3']
     const pathLower = currentWorkspace.path.toLowerCase()
     if (reservedNames.some(name => pathLower.includes(name))) {
-      console.error('[CommitInput] Path contains Windows reserved name')
+      logger.error('[CommitInput] Path contains Windows reserved name')
       return
     }
 
@@ -48,7 +49,7 @@ export function CommitInput({ hasChanges: _hasChanges, selectedFiles }: CommitIn
       await commitChanges(currentWorkspace.path, message, true, filesToCommit)
       setMessage('')
     } catch (err) {
-      console.error('[CommitInput] Commit failed:', err)
+      logger.error('[CommitInput] Commit failed:', err)
     }
   }, [message, currentWorkspace, selectedFiles, commitChanges])
 
@@ -83,7 +84,7 @@ export function CommitInput({ hasChanges: _hasChanges, selectedFiles }: CommitIn
       })
       setMessage(generatedMessage)
     } catch (err) {
-      console.error('[CommitInput] Failed to generate commit message:', err)
+      logger.error('[CommitInput] Failed to generate commit message:', err)
       if (status?.staged.length) {
         setMessage(`chore: update ${status.staged.length} files`)
       }

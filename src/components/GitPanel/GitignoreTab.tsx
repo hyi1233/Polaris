@@ -10,6 +10,7 @@ import { RefreshCw, Loader2, Inbox, Save, Plus, X, FilePlus } from 'lucide-react
 import { useGitStore } from '@/stores/gitStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useToastStore } from '@/stores/toastStore'
+import { logger } from '@/utils/logger'
 import type { GitIgnoreTemplate } from '@/types/git'
 
 export function GitignoreTab() {
@@ -55,7 +56,7 @@ export function GitignoreTab() {
       const result = await getGitignoreTemplates()
       setTemplates(result)
     } catch (err) {
-      console.error('[GitignoreTab] Failed to load templates:', err)
+      logger.error('[GitignoreTab] Failed to load templates:', err)
     }
   }, [getGitignoreTemplates])
 

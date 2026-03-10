@@ -171,3 +171,34 @@
 
 **修改内容**:
 - 将 handleUntrackedFileClick 函数中的 `console.error` 替换为 `logger.error`（第 184 行）
+
+---
+
+#### 11. CommitInput.tsx 移除调试语句
+
+**问题描述**: CommitInput 组件中存在 4 处 `console.error` 调试语句。
+
+**修改原因**: 清理调试代码，使用项目统一的 logger 工具替代 console。
+
+**修改文件**: `src/components/GitPanel/CommitInput.tsx`
+
+**修改内容**:
+1. 添加 `import { logger } from '@/utils/logger'`
+2. 将 `console.error('[CommitInput] Invalid workspace path')` 替换为 `logger.error`
+3. 将 `console.error('[CommitInput] Path contains Windows reserved name')` 替换为 `logger.error`
+4. 将 `console.error('[CommitInput] Commit failed:', err)` 替换为 `logger.error`
+5. 将 `console.error('[CommitInput] Failed to generate commit message:', err)` 替换为 `logger.error`
+
+---
+
+#### 12. GitignoreTab.tsx 移除调试语句
+
+**问题描述**: GitignoreTab 组件中存在 `console.error` 调试语句。
+
+**修改原因**: 清理调试代码，使用项目统一的 logger 工具替代 console。
+
+**修改文件**: `src/components/GitPanel/GitignoreTab.tsx`
+
+**修改内容**:
+1. 添加 `import { logger } from '@/utils/logger'`
+2. 将 `console.error('[GitignoreTab] Failed to load templates:', err)` 替换为 `logger.error`
