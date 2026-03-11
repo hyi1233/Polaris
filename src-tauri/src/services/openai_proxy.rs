@@ -679,12 +679,28 @@ impl OpenAIProxyService {
             }
             "execute_bash" => {
                 if let Some(command) = args.get("command").and_then(|c| c.as_str()) {
-                    let work_dir = args.get("work_dir").and_then(|d| d.as_str());
+                    // Accept both snake_case and camelCase for compatibility.
+                    let work_dir = args
+                        .get("work_dir")
+                        .and_then(|d| d.as_str())
+                        .or_else(|| args.get("workDir").and_then(|d| d.as_str()));
+
+                    // If work_dir is provided and command starts with `cd ... &&`,
+                    // drop the prefix to avoid shell-specific `cd` issues.
+                    let mut effective_command = command.to_string();
+                    if work_dir.is_some() {
+                        let trimmed = effective_command.trim_start();
+                        if trimmed.to_lowercase().starts_with("cd ") {
+                            if let Some((_, rest)) = trimmed.split_once("&&") {
+                                effective_command = rest.trim_start().to_string();
+                            }
+                        }
+                    }
 
                     #[cfg(windows)]
                     let output = {
                         // Force UTF-8 output from cmd to avoid mojibake.
-                        let wrapped = format!("chcp 65001 >nul & {}", command);
+                        let wrapped = format!("chcp 65001 >nul & {}", effective_command);
                         let mut cmd = StdCommand::new("cmd");
                         cmd.args(["/C", &wrapped]).creation_flags(CREATE_NO_WINDOW);
                         if let Some(dir) = work_dir {
@@ -696,7 +712,7 @@ impl OpenAIProxyService {
                     #[cfg(not(windows))]
                     let output = {
                         let mut cmd = StdCommand::new("sh");
-                        cmd.args(["-c", command]);
+                        cmd.args(["-c", &effective_command]);
                         if let Some(dir) = work_dir {
                             cmd.current_dir(dir);
                         }
