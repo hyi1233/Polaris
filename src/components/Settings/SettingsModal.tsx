@@ -317,7 +317,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
               <div
                 key={provider.id}
                 className={`border-2 rounded-lg transition-all ${
-                  localConfig.defaultEngine === `provider-${provider.id}`
+                  localConfig.defaultEngine === provider.id
                     ? 'border-primary bg-primary/5'
                     : 'border-border bg-surface'
                 }`}
@@ -326,15 +326,15 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 <div className="flex items-center justify-between p-4">
                   <button
                     type="button"
-                    onClick={() => handleEngineChange(`provider-${provider.id}` as any)}
+                    onClick={() => handleEngineChange(provider.id as any)}
                     className="flex-1 text-left flex items-center gap-3"
                   >
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      localConfig.defaultEngine === `provider-${provider.id}`
+                      localConfig.defaultEngine === provider.id
                         ? 'border-primary bg-primary'
                         : 'border-border'
                     }`}>
-                      {localConfig.defaultEngine === `provider-${provider.id}` && (
+                      {localConfig.defaultEngine === provider.id && (
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
@@ -361,7 +361,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                       title="配置"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.996h1.945c.132-1.856 1.724-2.937 2.924-2.937.912 0 1.532.789 2.323 1.506 1.506l.44.44c.578.578.627 1.332.836 2.062.402.73.568 1.438 1.485 1.438 2.344 0 .492-.05.842-.136 1.047-.426.205-.284.402-.688.402-1.187 0-.857.345-1.638.863-2.218.518-.58.578-.974-1.146-1.102-1.738-.207-.832.712-1.728 1.228-2.738 1.228-.646 0-1.31-.09-1.876-.253-.566-.164-1.033-.493-1.393-.329-.329-.584-.57-.778-.868-.194-.298-.445-.55-.757-.841-.313-.293-.548-.552-.746-.848-.198-.296-.372-.555-.521-.772-.149-.217-.288-.437-.415-.67-.127-.232-.237-.492-.327-.776-.09-.285-.153-.605-.153-.927 0-.363.09-.694.27-.99.45-.296.63-.715 1.228-.715 2.206 0 .317.032.636.094.942.063.313.127.628.206.937.08.31.09.652.206.937.08.31.09.652.127.937.206.31.09.628.206.937.08.31.09.652.127.937.206z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     </button>
                     <button

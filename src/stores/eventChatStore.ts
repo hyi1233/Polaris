@@ -59,7 +59,7 @@ interface HistoryEntry {
   title: string
   timestamp: string
   messageCount: number
-  engineId: 'claude-code' | 'iflow' | 'deepseek' | 'codex'
+  engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`
   data: {
     messages: ChatMessage[]
     archivedMessages: ChatMessage[]
@@ -74,7 +74,7 @@ export interface UnifiedHistoryItem {
   title: string
   timestamp: string
   messageCount: number
-  engineId: 'claude-code' | 'iflow' | 'deepseek' | 'codex'
+  engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`
   source: 'local' | 'iflow' | 'claude-code-native' | 'codex'
   fileSize?: number
   inputTokens?: number
@@ -619,7 +619,7 @@ interface EventChatState {
 
   /** 发送消息 */
   sendMessage: (content: string, workspaceDir?: string) => Promise<void>
-  /** 使用前端引擎发送消息（DeepSeek） */
+  /** 使用前端引擎发送消息（OpenAI Provider） */
   sendMessageToFrontendEngine: (content: string, workspaceDir?: string, systemPrompt?: string) => Promise<void>
   /** 继续会话 */
   continueChat: (prompt?: string) => Promise<void>
@@ -645,7 +645,7 @@ interface EventChatState {
   getUnifiedHistory: () => Promise<UnifiedHistoryItem[]>
 
   /** 从历史恢复会话 */
-  restoreFromHistory: (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'deepseek' | 'codex') => Promise<boolean>
+  restoreFromHistory: (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => Promise<boolean>
 
   /** 删除历史会话 */
   deleteHistorySession: (sessionId: string, source?: 'local' | 'iflow' | 'codex') => void
@@ -1314,7 +1314,8 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
       const config = useConfigStore.getState().config
       const currentEngine = config?.defaultEngine || 'claude-code'
 
-      if (currentEngine === 'deepseek') {
+      // 检查是否是 Provider 引擎（格式: provider-{id}）
+      if (currentEngine.startsWith('provider-')) {
         await get().sendMessageToFrontendEngine(
           content,
           actualWorkspaceDir,
@@ -1391,10 +1392,18 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
 
     try {
       const engineId = `provider-${activeProvider.id}` as const
+
+      // 调试：列出所有已注册的引擎
+      const { listEngines } = await import('../core/engine-bootstrap')
+      const allEngines = listEngines()
+      console.log('[EventChatStore] 当前注册的所有引擎:', allEngines.map(e => e.id))
+      console.log('[EventChatStore] 尝试获取引擎 ID:', engineId)
+
       const engine = getEngine(engineId)
 
       if (!engine) {
-        throw new Error('DeepSeek 引擎未注册，请重启应用')
+        console.error('[EventChatStore] 引擎未注册. 期望ID:', engineId, '实际注册的引擎:', allEngines.map(e => e.id))
+        throw new Error(`OpenAI Provider 引擎未注册，请重启应用\n期望ID: ${engineId}\n已注册: ${allEngines.map(e => e.id).join(', ')}`)
       }
 
       const { conversationId, providerSessionCache, currentConversationSeed } = get()
@@ -1656,7 +1665,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
 
       // 获取当前引擎 ID
       const config = useConfigStore.getState().config
-      const engineId: 'claude-code' | 'iflow' | 'deepseek' | 'codex' = (config?.defaultEngine || 'claude-code') as 'claude-code' | 'iflow' | 'deepseek' | 'codex'
+      const engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}` = (config?.defaultEngine || 'claude-code') as 'claude-code' | 'iflow' | 'codex' | `provider-${string}`
 
       // 获取现有历史
       const historyJson = localStorage.getItem(SESSION_HISTORY_KEY)
@@ -1805,7 +1814,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
   /**
    * 从历史恢复会话
    */
-  restoreFromHistory: async (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'deepseek' | 'codex') => {
+  restoreFromHistory: async (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => {
     try {
       set({ isLoadingHistory: true })
 

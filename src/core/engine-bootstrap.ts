@@ -35,8 +35,8 @@ export async function bootstrapOpenAIProviders(
 ): Promise<void> {
   // const registry = getEngineRegistry() // 未使用，保留以供未来扩展
 
-  // 清空旧的 Provider 引擎缓存
-  clearOpenAIProviderEngines()
+  // 清空旧的 Provider 引擎缓存（从全局注册表注销）
+  await clearOpenAIProviderEngines()
 
   // 为每个启用的 Provider 创建引擎
   for (const provider of providers) {

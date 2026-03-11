@@ -17,7 +17,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   const [history, setHistory] = useState<UnifiedHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [restoring, setRestoring] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'claude-code' | 'iflow' | 'deepseek' | 'codex'>('all')
+  const [filter, setFilter] = useState<'all' | 'claude-code' | 'iflow' | 'codex' | 'provider'>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
   const currentWorkspace = useWorkspaceStore(state => state.getCurrentWorkspace())
@@ -40,7 +40,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   }
 
   // 恢复会话
-  const handleRestore = async (sessionId: string, engineId: 'claude-code' | 'iflow' | 'deepseek' | 'codex') => {
+  const handleRestore = async (sessionId: string, engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => {
     setRestoring(sessionId)
     try {
       const success = await useEventChatStore.getState().restoreFromHistory(sessionId, engineId)
@@ -84,7 +84,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   }
 
   // 获取引擎信息
-  const getEngineInfo = (engineId: 'claude-code' | 'iflow' | 'deepseek' | 'codex', source: string) => {
+  const getEngineInfo = (engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`, source: string) => {
     if (source === 'claude-code-native') {
       return {
         name: 'Claude Code',
@@ -109,6 +109,14 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
         icon: Terminal,
       }
     }
+    if (engineId.startsWith('provider-')) {
+      return {
+        name: 'Provider',
+        color: 'text-emerald-500',
+        bgColor: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300',
+        icon: HardDrive,
+      }
+    }
     return {
       name: 'Claude Code',
       color: 'text-blue-500',
@@ -119,7 +127,9 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
 
   // 过滤历史
   const filteredHistory = history.filter(item => {
-    if (filter !== 'all' && item.engineId !== filter) return false
+    // 处理 provider 引擎的过滤
+    if (filter === 'provider' && !item.engineId.startsWith('provider-')) return false
+    if (filter !== 'all' && filter !== 'provider' && item.engineId !== filter) return false
     if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false
     }
@@ -212,6 +222,16 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
           }`}
         >
           Codex
+        </button>
+        <button
+          onClick={() => setFilter('provider')}
+          className={`px-2 py-1 rounded-md text-xs transition-colors ${
+            filter === 'provider'
+              ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'
+              : 'text-text-secondary hover:bg-background-hover'
+          }`}
+        >
+          Provider
         </button>
       </div>
 

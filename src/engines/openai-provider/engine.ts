@@ -390,7 +390,21 @@ export function removeOpenAIProviderEngine(providerId: string): void {
 /**
  * 清空所有引擎实例
  */
-export function clearOpenAIProviderEngines(): void {
+export async function clearOpenAIProviderEngines(): Promise<void> {
+  // 从全局注册表中注销所有 provider 引擎
+  const { getEngineRegistry } = await import('../../ai-runtime/engine-registry')
+  const registry = getEngineRegistry()
+  const allEngines = registry.list()
+
+  // 注销所有 provider 引擎
+  for (const engineDesc of allEngines) {
+    if (engineDesc.id.startsWith('provider-')) {
+      await registry.unregister(engineDesc.id)
+      console.log(`[OpenAIProviderEngine] Unregistered engine: ${engineDesc.id}`)
+    }
+  }
+
+  // 清理本地缓存
   engineCache.forEach((engine) => {
     engine.cleanup()
   })
