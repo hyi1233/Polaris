@@ -143,7 +143,7 @@ const BASH_TOOL: DeepSeekToolSchema = {
   type: 'function',
   function: {
     name: 'bash',
-    description: '执行 shell 命令',
+    description: '执行 shell 命令（工作目录已设置为工作区，避免使用 cd）',
     parameters: {
       type: 'object',
       properties: {
