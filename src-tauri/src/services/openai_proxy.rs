@@ -460,10 +460,15 @@ impl OpenAIProxyService {
             
             buffer.push_str(&chunk_str);
 
-            // 处理完整的 SSE 事件
-            while let Some(pos) = buffer.find("\n\n") {
+            // 处理完整的 SSE 事件（支持 \n\n 和 \r\n\r\n 分隔符）
+            while let Some(pos) = buffer.find("\n\n").or_else(|| buffer.find("\r\n\r\n")) {
+                let sep_len = if buffer[pos..].starts_with("\r\n\r\n") { 4 } else { 2 };
                 let event_data = buffer[..pos].to_string();
-                buffer = buffer[pos + 2..].to_string();
+                buffer = buffer[pos + sep_len..].to_string();
+
+                // 打印原始事件数据
+                tracing::info!("[OpenAIProxy] SSE 事件数据: {}", 
+                    if event_data.len() > 300 { &event_data[..300] } else { &event_data });
 
                 // 跳过空行
                 if event_data.trim().is_empty() {
@@ -505,25 +510,41 @@ impl OpenAIProxyService {
                                                     },
                                                 });
 
-                                            if let Some(id) = &t.id {
-                                                entry.id = id.clone();
-                                            }
-                                            if let Some(name) = &t.function.as_ref().and_then(|f| f.name.clone()) {
-                                                entry.function.name = name.clone();
-                                            }
-                                            if let Some(args) = &t.function.as_ref().and_then(|f| f.arguments.clone()) {
-                                                entry.function.arguments.push_str(args);
+                                                if let Some(id) = &t.id {
+                                                    entry.id = id.clone();
+                                                }
+                                                if let Some(name) = &t.function.as_ref().and_then(|f| f.name.clone()) {
+                                                    entry.function.name = name.clone();
+                                                }
+                                                if let Some(args) = &t.function.as_ref().and_then(|f| f.arguments.clone()) {
+                                                    entry.function.arguments.push_str(args);
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
                             Err(e) => {
                                 tracing::warn!("[OpenAIProxy] SSE 解析失败: {}, data: {}", e, 
                                     if data.len() > 200 { &data[..200] } else { data });
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // 检查 buffer 中是否有剩余数据
+        if !buffer.trim().is_empty() {
+            tracing::warn!("[OpenAIProxy] Buffer 中有未处理的数据: {}", 
+                if buffer.len() > 200 { &buffer[..200] } else { &buffer });
+            
+            // 尝试处理剩余数据
+            for line in buffer.lines() {
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if data != "[DONE]" {
+                        tracing::info!("[OpenAIProxy] 处理剩余数据: {}", 
+                            if data.len() > 100 { &data[..100] } else { data });
                     }
                 }
             }
