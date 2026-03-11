@@ -280,6 +280,7 @@ impl OpenAIProxyService {
         let service = Self::new();
         let ctx_id = context_id.clone();
         let session_id_clone = session_id.clone();
+        let session_id_for_task = session_id.clone();
         let cancel_token = CancellationToken::new();
 
         {
@@ -300,7 +301,7 @@ impl OpenAIProxyService {
             }
 
             if let Ok(mut tasks) = openai_tasks_clone.lock() {
-                tasks.remove(&session_id);
+                tasks.remove(&session_id_for_task);
             }
         });
 

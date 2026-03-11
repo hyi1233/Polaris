@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-03-11T12:23:52.932Z",
+  "updatedAt": "2026-03-11T16:11:02.031Z",
   "todos": [
     {
       "id": "0e7d76c2-2f61-437d-8944-2ec569275b59",
@@ -79,6 +79,15 @@
       "subtasks": [],
       "createdAt": "2026-03-11T12:23:52.932Z",
       "updatedAt": "2026-03-11T12:23:52.932Z"
+    },
+    {
+      "id": "d06e86a6-c51f-4f2c-999f-880d9d39d40b",
+      "content": "连续的工具调用，只会显示第一个，知道后面出现了消息",
+      "status": "pending",
+      "priority": "normal",
+      "subtasks": [],
+      "createdAt": "2026-03-11T16:11:02.031Z",
+      "updatedAt": "2026-03-11T16:11:02.031Z"
     }
   ]
 }
