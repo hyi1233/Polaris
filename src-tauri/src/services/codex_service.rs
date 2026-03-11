@@ -399,25 +399,23 @@ impl CodexService {
 
     /// 构建 Codex resume 命令
     /// 
-    /// 注意：`codex resume` 是独立子命令，支持 -s/--sandbox 和 -a/--ask-for-approval
-    /// 用法: codex resume --last -s workspace-write -a never [PROMPT]
+    /// 正确用法: codex exec resume --last --full-auto --json [PROMPT]
+    /// 注意: exec resume 不支持 -s/-a 参数，只能用 --full-auto 或 --dangerously-bypass
     fn build_codex_resume_command(codex_cmd: &str, work_dir: &str, message: &str, config: &Config) -> Command {
         let mut cmd = Command::new(codex_cmd);
 
-        // resume 是独立子命令，不是 exec 的子命令
-        cmd.arg("resume")
-            .arg("--last");
+        // exec resume 是非交互模式下的恢复命令
+        cmd.arg("exec")
+            .arg("resume")
+            .arg("--last")
+            .arg("--json")  // 输出 JSONL 格式
+            .arg("--skip-git-repo-check");
 
         if config.codex.dangerous_bypass {
             cmd.arg("--dangerously-bypass-approvals-and-sandbox");
         } else {
-            // resume 支持 -s/--sandbox 参数
-            cmd.arg("-s")
-                .arg(&config.codex.sandbox_mode);
-
-            // resume 支持 -a/--ask-for-approval 参数
-            cmd.arg("-a")
-                .arg(&config.codex.approval_policy);
+            // --full-auto 是 -a on-request -s workspace-write 的便捷别名
+            cmd.arg("--full-auto");
         }
 
         // 消息作为参数传递
