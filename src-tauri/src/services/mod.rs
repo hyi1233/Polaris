@@ -4,3 +4,4 @@ pub mod logger;
 pub mod iflow_service;
 pub mod codex_service;
 pub mod dingtalk_service;
+pub mod openai_proxy;

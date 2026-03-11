@@ -53,7 +53,7 @@ const DEFAULT_CONFIG = {
   temperature: 0.7,
   maxTokens: 8192,
   timeout: 300000,
-  supportsTools: false, // 默认不支持工具调用
+  supportsTools: true, // 默认支持工具调用
 }
 
 /**

@@ -61,6 +61,10 @@ pub enum AppError {
     #[error("Operation timed out")]
     Timeout,
 
+    /// 网络错误
+    #[error("Network error: {0}")]
+    NetworkError(String),
+
     /// 其他错误
     #[error("Unknown error: {0}")]
     Unknown(String),
@@ -80,6 +84,7 @@ impl AppError {
             AppError::PermissionDenied(e) => format!("权限被拒绝: {}", e),
             AppError::InvalidPath(path) => format!("无效路径: {}", path),
             AppError::Timeout => "操作超时".to_string(),
+            AppError::NetworkError(e) => format!("网络错误: {}", e),
             AppError::Unknown(e) => format!("未知错误: {}", e),
         }
     }

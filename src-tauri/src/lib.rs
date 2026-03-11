@@ -55,6 +55,7 @@ use commands::dingtalk::{
     start_dingtalk_service, stop_dingtalk_service, send_dingtalk_message,
     is_dingtalk_service_running, get_dingtalk_service_status, test_dingtalk_connection,
 };
+use commands::openai_proxy::start_openai_chat;
 
 
 use std::sync::{Arc, Mutex};
@@ -344,6 +345,8 @@ pub fn run() {
             is_dingtalk_service_running,
             get_dingtalk_service_status,
             test_dingtalk_connection,
+            // OpenAI Proxy 相关
+            start_openai_chat,
 
         ])
         .run(tauri::generate_context!())

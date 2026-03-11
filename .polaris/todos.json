@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-02-02T14:57:14.682Z",
+  "updatedAt": "2026-03-11T12:23:52.932Z",
   "todos": [
     {
       "id": "0e7d76c2-2f61-437d-8944-2ec569275b59",
       "content": "Polaris(Deepseek)",
-      "status": "pending",
+      "status": "completed",
       "priority": "normal",
       "subtasks": [
         {
@@ -46,7 +46,8 @@
         }
       ],
       "createdAt": "2026-02-01T07:09:52.106Z",
-      "updatedAt": "2026-02-01T15:57:45.076Z"
+      "updatedAt": "2026-03-11T12:23:36.382Z",
+      "completedAt": "2026-03-11T12:23:36.382Z"
     },
     {
       "id": "7de8af31-575f-4a36-a1a0-275c3c7ff506",
@@ -69,6 +70,15 @@
       ],
       "createdAt": "2026-02-02T14:57:14.682Z",
       "updatedAt": "2026-02-02T14:57:14.682Z"
+    },
+    {
+      "id": "993b9204-d043-4982-9ec0-4b2b7568404c",
+      "content": "会话完成通知",
+      "status": "pending",
+      "priority": "normal",
+      "subtasks": [],
+      "createdAt": "2026-03-11T12:23:52.932Z",
+      "updatedAt": "2026-03-11T12:23:52.932Z"
     }
   ]
 }
