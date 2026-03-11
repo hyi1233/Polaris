@@ -301,8 +301,13 @@ impl OpenAIProxyService {
         session_id: String,
         context_id: Option<String>,
     ) -> Result<()> {
-        tracing::info!("[OpenAIProxy] 开始聊天循环, session={}, model={}, model={}", session_id, config.model, messages);
-        
+        tracing::info!(
+            "[OpenAIProxy] 开始聊天循环, session={}, model={}, messages={:?}",
+            session_id,
+            config.model,
+            messages
+        );
+
         let mut tool_call_count = 0;
         const MAX_TOOL_CALLS: u32 = 50; // 防止无限循环
 
