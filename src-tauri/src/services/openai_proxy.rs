@@ -301,6 +301,8 @@ impl OpenAIProxyService {
         session_id: String,
         context_id: Option<String>,
     ) -> Result<()> {
+        tracing::info!("[OpenAIProxy] 开始聊天循环, session={}, model={}", session_id, config.model);
+        
         let mut tool_call_count = 0;
         const MAX_TOOL_CALLS: u32 = 50; // 防止无限循环
 
@@ -321,6 +323,8 @@ impl OpenAIProxyService {
                 tools,
             };
 
+            tracing::info!("[OpenAIProxy] 发送 API 请求到 {}", config.api_base);
+
             // 发送请求
             let response = self
                 .client
@@ -330,11 +334,24 @@ impl OpenAIProxyService {
                 .json(&request)
                 .send()
                 .await
-                .map_err(|e| AppError::NetworkError(format!("API 请求失败: {}", e)))?;
+                .map_err(|e| {
+                    tracing::error!("[OpenAIProxy] API 请求失败: {}", e);
+                    AppError::NetworkError(format!("API 请求失败: {}", e))
+                })?;
 
-            if !response.status().is_success() {
-                let status = response.status();
+            let status = response.status();
+            tracing::info!("[OpenAIProxy] API 响应状态: {}", status);
+
+            if !status.is_success() {
                 let body: String = response.text().await.unwrap_or_default();
+                tracing::error!("[OpenAIProxy] API 错误 ({}): {}", status, body);
+                
+                // 发送错误事件到前端
+                self.emit_event(&window, &session_id, &context_id, StreamEvent::Error { 
+                    error: format!("API 错误 ({}): {}", status, body) 
+                });
+                self.emit_event(&window, &session_id, &context_id, StreamEvent::SessionEnd);
+                
                 return Err(AppError::NetworkError(format!(
                     "API 错误 ({}): {}",
                     status, body
@@ -419,15 +436,28 @@ impl OpenAIProxyService {
     ) -> Result<(String, Vec<ToolCall>)> {
         use futures_util::StreamExt;
 
+        tracing::info!("[OpenAIProxy] 开始处理 SSE 流");
+
         let mut content = String::new();
         let mut tool_calls: HashMap<u32, ToolCall> = HashMap::new();
 
         let mut stream = response.bytes_stream();
         let mut buffer = String::new();
+        let mut chunk_count = 0;
 
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| AppError::NetworkError(e.to_string()))?;
+            let chunk = chunk.map_err(|e| {
+                tracing::error!("[OpenAIProxy] 流读取错误: {}", e);
+                AppError::NetworkError(e.to_string())
+            })?;
+            
+            chunk_count += 1;
             let chunk_str = String::from_utf8_lossy(&chunk);
+            
+            if chunk_count <= 3 {
+                tracing::info!("[OpenAIProxy] 收到 chunk #{}: {} bytes", chunk_count, chunk.len());
+            }
+            
             buffer.push_str(&chunk_str);
 
             // 处理完整的 SSE 事件
@@ -444,34 +474,36 @@ impl OpenAIProxyService {
                 for line in event_data.lines() {
                     if let Some(data) = line.strip_prefix("data: ") {
                         if data == "[DONE]" {
+                            tracing::info!("[OpenAIProxy] SSE 流结束 [DONE]");
                             continue;
                         }
 
-                        if let Ok(event) = serde_json::from_str::<SSEEvent>(data) {
-                            for choice in event.choices {
-                                if let Some(delta) = choice.delta {
-                                    // 处理内容
-                                    if let Some(text) = &delta.content {
-                                        content.push_str(text);
-                                        self.emit_event(
-                                            window,
-                                            session_id,
-                                            context_id,
-                                            StreamEvent::TextDelta { text: text.clone() },
-                                        );
-                                    }
+                        match serde_json::from_str::<SSEEvent>(data) {
+                            Ok(event) => {
+                                for choice in event.choices {
+                                    if let Some(delta) = choice.delta {
+                                        // 处理内容
+                                        if let Some(text) = &delta.content {
+                                            content.push_str(text);
+                                            self.emit_event(
+                                                window,
+                                                session_id,
+                                                context_id,
+                                                StreamEvent::TextDelta { text: text.clone() },
+                                            );
+                                        }
 
-                                    // 处理工具调用
-                                    if let Some(tc) = &delta.tool_calls {
-                                        for t in tc {
-                                            let entry = tool_calls.entry(t.index).or_insert(ToolCall {
-                                                id: t.id.clone().unwrap_or_default(),
-                                                call_type: "function".to_string(),
-                                                function: FunctionCall {
-                                                    name: String::new(),
-                                                    arguments: String::new(),
-                                                },
-                                            });
+                                        // 处理工具调用
+                                        if let Some(tc) = &delta.tool_calls {
+                                            for t in tc {
+                                                let entry = tool_calls.entry(t.index).or_insert(ToolCall {
+                                                    id: t.id.clone().unwrap_or_default(),
+                                                    call_type: "function".to_string(),
+                                                    function: FunctionCall {
+                                                        name: String::new(),
+                                                        arguments: String::new(),
+                                                    },
+                                                });
 
                                             if let Some(id) = &t.id {
                                                 entry.id = id.clone();
@@ -487,10 +519,17 @@ impl OpenAIProxyService {
                                 }
                             }
                         }
+                            Err(e) => {
+                                tracing::warn!("[OpenAIProxy] SSE 解析失败: {}, data: {}", e, 
+                                    if data.len() > 200 { &data[..200] } else { data });
+                            }
+                        }
                     }
                 }
             }
         }
+
+        tracing::info!("[OpenAIProxy] SSE 流处理完成, 内容长度: {}, 工具调用数: {}", content.len(), tool_calls.len());
 
         // 转换工具调用
         let mut tool_calls_vec: Vec<ToolCall> = tool_calls.into_values().collect();
@@ -614,7 +653,12 @@ impl OpenAIProxyService {
             .to_string()
         };
 
-        let _ = window.emit("chat-event", event_json);
+        tracing::debug!("[OpenAIProxy] 发送事件: {}", 
+            if event_json.len() > 100 { &event_json[..100] } else { &event_json });
+        
+        if let Err(e) = window.emit("chat-event", &event_json) {
+            tracing::error!("[OpenAIProxy] 发送事件失败: {}", e);
+        }
     }
 }
 
