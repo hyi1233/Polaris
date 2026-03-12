@@ -85,6 +85,23 @@ export interface DingTalkConfig {
   webhookPort: number;
 }
 
+/** 消息显示模式 */
+export type IntegrationDisplayMode = 'chat' | 'separate' | 'both';
+
+/** QQ Bot 集成配置 */
+export interface QQBotConfig {
+  /** 是否启用 QQ Bot 集成 */
+  enabled: boolean;
+  /** 应用 ID */
+  appId: string;
+  /** 应用密钥 */
+  clientSecret: string;
+  /** 是否沙箱环境 */
+  sandbox: boolean;
+  /** 消息显示模式 */
+  displayMode: IntegrationDisplayMode;
+}
+
 /** 应用配置 */
 export interface Config {
   /** 当前选择的引擎 */
@@ -128,6 +145,8 @@ export interface Config {
   baiduTranslate?: BaiduTranslateConfig;
   /** 钉钉集成配置 */
   dingtalk: DingTalkConfig;
+  /** QQ Bot 集成配置 */
+  qqbot: QQBotConfig;
 }
 
 /** 健康状态 */

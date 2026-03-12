@@ -307,6 +307,56 @@ impl Default for DingTalkConfig {
     }
 }
 
+/// QQ Bot 集成配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QQBotConfig {
+    /// 是否启用 QQ Bot 集成
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// 应用 ID
+    #[serde(default)]
+    pub app_id: String,
+
+    /// 应用密钥
+    #[serde(default)]
+    pub client_secret: String,
+
+    /// 是否沙箱环境
+    #[serde(default)]
+    pub sandbox: bool,
+
+    /// 消息显示模式
+    #[serde(default)]
+    pub display_mode: IntegrationDisplayMode,
+}
+
+/// 消息显示模式
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IntegrationDisplayMode {
+    /// 在 AI 对话中显示
+    #[default]
+    Chat,
+    /// 独立面板显示
+    Separate,
+    /// 两处都显示
+    Both,
+}
+
+impl Default for QQBotConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            app_id: String::new(),
+            client_secret: String::new(),
+            sandbox: false,
+            display_mode: IntegrationDisplayMode::default(),
+        }
+    }
+}
+
 impl Default for BaiduTranslateConfig {
     fn default() -> Self {
         Self {
@@ -394,6 +444,10 @@ pub struct Config {
     #[serde(default)]
     pub dingtalk: DingTalkConfig,
 
+    /// QQ Bot 集成配置
+    #[serde(default)]
+    pub qqbot: QQBotConfig,
+
     // === 旧字段，保持向后兼容 ===
     /// @deprecated 请使用 claude_code.cli_path
     #[serde(default)]
@@ -420,6 +474,7 @@ impl Default for Config {
             floating_window: FloatingWindowConfig::default(),
             baidu_translate: None,
             dingtalk: DingTalkConfig::default(),
+            qqbot: QQBotConfig::default(),
             claude_cmd: None,
         }
     }

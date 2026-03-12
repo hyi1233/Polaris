@@ -2,6 +2,7 @@ mod error;
 mod models;
 mod services;
 mod commands;
+mod integrations;
 
 use error::Result;
 use models::config::{Config, HealthStatus};
@@ -56,12 +57,18 @@ use commands::dingtalk::{
     is_dingtalk_service_running, get_dingtalk_service_status, test_dingtalk_connection,
 };
 use commands::openai_proxy::start_openai_chat;
+use commands::integration::{
+    start_integration, stop_integration, get_integration_status,
+    get_all_integration_status, send_integration_message,
+    get_integration_sessions, init_integration,
+};
 
 
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use services::dingtalk_service::DingTalkService;
+use integrations::IntegrationManager;
 
 /// 全局配置状态
 pub struct AppState {
@@ -75,6 +82,8 @@ pub struct AppState {
     pub context_store: Arc<Mutex<ContextMemoryStore>>,
     /// 钉钉服务
     pub dingtalk_service: Mutex<DingTalkService>,
+    /// 集成管理器
+    pub integration_manager: Mutex<IntegrationManager>,
 }
 
 // ============================================================================
@@ -216,6 +225,7 @@ pub fn run() {
             openai_tasks: Arc::new(Mutex::new(HashMap::new())),
             context_store: Arc::new(Mutex::new(ContextMemoryStore::new())),
             dingtalk_service: Mutex::new(DingTalkService::new()),
+            integration_manager: Mutex::new(IntegrationManager::new()),
         })
         .invoke_handler(tauri::generate_handler![
             // 配置相关
@@ -352,6 +362,14 @@ pub fn run() {
             test_dingtalk_connection,
             // OpenAI Proxy 相关
             start_openai_chat,
+            // 集成相关
+            start_integration,
+            stop_integration,
+            get_integration_status,
+            get_all_integration_status,
+            send_integration_message,
+            get_integration_sessions,
+            init_integration,
 
         ])
         .run(tauri::generate_context!())

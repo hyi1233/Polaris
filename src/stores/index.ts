@@ -19,4 +19,12 @@ export { useTabStore } from './tabStore';
 export { useTranslateStore } from './translateStore';
 export { useMessageTranslationStore } from './messageTranslationStore';
 export { useDingTalkStore } from './dingtalkStore';
+export {
+  useIntegrationStore,
+  useIntegrationStatus,
+  useIntegrationMessages,
+  useIntegrationSessions,
+  useIntegrationLoading,
+  useIntegrationError,
+} from './integrationStore';
 export { useToastStore, type Toast, type ToastType } from './toastStore';

@@ -8,6 +8,7 @@ pub mod deepseek_tools;
 pub mod translate;
 pub mod dingtalk;
 pub mod openai_proxy;
+pub mod integration;
 
 // 重新导出命令函数，确保它们在模块级别可见
 pub use chat::{start_chat, continue_chat, interrupt_chat};
@@ -62,3 +63,10 @@ pub use dingtalk::{
 
 // OpenAI Proxy 命令
 pub use openai_proxy::start_openai_chat;
+
+// 集成命令
+pub use integration::{
+    start_integration, stop_integration, get_integration_status,
+    get_all_integration_status, send_integration_message,
+    get_integration_sessions, init_integration,
+};

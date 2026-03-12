@@ -10,3 +10,4 @@ export * from './fileEditor';
 export * from './context';
 export * from './git';
 export * from './todo';
+export * from './integration';

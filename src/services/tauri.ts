@@ -521,3 +521,66 @@ export async function getDingTalkServiceStatus(): Promise<{
 export async function testDingTalkConnection(testMessage: string, conversationId: string): Promise<string> {
   return invoke('test_dingtalk_connection', { testMessage, conversationId });
 }
+
+// ============================================================================
+// 集成相关命令
+// ============================================================================
+
+import type {
+  Platform,
+  IntegrationStatus,
+  IntegrationMessage,
+  IntegrationSession,
+  SendTarget,
+  MessageContent,
+  QQBotConfig,
+} from '../types';
+
+/** 启动集成平台 */
+export async function startIntegration(platform: Platform): Promise<void> {
+  return invoke('start_integration', { platform });
+}
+
+/** 停止集成平台 */
+export async function stopIntegration(platform: Platform): Promise<void> {
+  return invoke('stop_integration', { platform });
+}
+
+/** 获取集成状态 */
+export async function getIntegrationStatus(platform: Platform): Promise<IntegrationStatus | null> {
+  return invoke<IntegrationStatus | null>('get_integration_status', { platform });
+}
+
+/** 获取所有集成状态 */
+export async function getAllIntegrationStatus(): Promise<Record<string, IntegrationStatus>> {
+  return invoke<Record<string, IntegrationStatus>>('get_all_integration_status');
+}
+
+/** 发送集成消息 */
+export async function sendIntegrationMessage(
+  platform: Platform,
+  target: SendTarget,
+  content: MessageContent
+): Promise<void> {
+  return invoke('send_integration_message', { platform, target, content });
+}
+
+/** 获取集成会话列表 */
+export async function getIntegrationSessions(): Promise<IntegrationSession[]> {
+  return invoke<IntegrationSession[]>('get_integration_sessions');
+}
+
+/** 初始化集成管理器 */
+export async function initIntegration(qqbotConfig: QQBotConfig | null): Promise<void> {
+  return invoke('init_integration', { qqbotConfig });
+}
+
+/** 监听集成消息事件 */
+export async function onIntegrationMessage(
+  callback: (message: IntegrationMessage) => void
+): Promise<() => void> {
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen<IntegrationMessage>('integration:message', (event) => {
+    callback(event.payload);
+  });
+}

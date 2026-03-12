@@ -1,0 +1,54 @@
+/**
+ * 平台集成 Trait 定义
+ *
+ * 所有平台适配器必须实现此 Trait。
+ */
+
+use async_trait::async_trait;
+use tokio::sync::mpsc::Sender;
+
+use super::types::{IntegrationMessage, IntegrationStatus, MessageContent, Platform, SendTarget};
+use crate::error::Result;
+
+/// 平台集成 Trait
+///
+/// 所有平台适配器必须实现此 Trait，提供统一的连接、发送、状态接口。
+#[async_trait]
+pub trait PlatformIntegration: Send + Sync {
+    /// 获取平台类型
+    fn platform(&self) -> Platform;
+
+    /// 连接到平台
+    ///
+    /// # Arguments
+    /// * `message_tx` - 消息发送通道，接收到的消息通过此通道发送给 IntegrationManager
+    ///
+    /// # Returns
+    /// 连接成功返回 Ok(())，失败返回错误
+    async fn connect(&mut self, message_tx: Sender<IntegrationMessage>) -> Result<()>;
+
+    /// 断开连接
+    async fn disconnect(&mut self) -> Result<()>;
+
+    /// 发送消息
+    ///
+    /// # Arguments
+    /// * `target` - 发送目标
+    /// * `content` - 消息内容
+    async fn send(&self, target: SendTarget, content: MessageContent) -> Result<()>;
+
+    /// 获取当前状态
+    fn status(&self) -> IntegrationStatus;
+
+    /// 是否已连接
+    fn is_connected(&self) -> bool {
+        self.status().connected
+    }
+
+    /// 平台名称
+    fn platform_name(&self) -> &'static str {
+        match self.platform() {
+            Platform::QQBot => "QQ Bot",
+        }
+    }
+}
