@@ -1,0 +1,21 @@
+/**
+ * 统一 AI 引擎模块
+ *
+ * 提供统一的 AI 引擎接口，支持多种 AI CLI 工具：
+ * - Claude Code
+ * - IFlow
+ * - Codex
+ * - OpenAI 兼容 API
+ */
+
+mod traits;
+mod types;
+mod session;
+mod registry;
+mod engine;
+
+pub use traits::{AIEngine, EngineId, SessionOptions};
+pub use types::{EngineStatus, EngineDescriptor};
+pub use session::SessionManager;
+pub use registry::EngineRegistry;
+pub use engine::{ClaudeEngine, IFlowEngine, CodexEngine};

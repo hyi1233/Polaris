@@ -3,6 +3,7 @@ mod models;
 mod services;
 mod commands;
 mod integrations;
+mod ai;
 
 use error::Result;
 use models::config::{Config, HealthStatus};
@@ -70,11 +71,12 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 use services::dingtalk_service::DingTalkService;
 use integrations::IntegrationManager;
+use ai::EngineRegistry;
 
 /// 全局配置状态
 pub struct AppState {
     pub config_store: Mutex<ConfigStore>,
-    /// 保存会话 ID 到进程 PID 的映射
+    /// 保存会话 ID 到进程 PID 的映射（保留向后兼容）
     /// 使用 PID 而不是 Child，因为 Child 会在读取输出时被消费
     pub sessions: Arc<Mutex<HashMap<String, u32>>>,
     /// OpenAIProxy 任务的取消控制
@@ -85,6 +87,8 @@ pub struct AppState {
     pub dingtalk_service: Mutex<DingTalkService>,
     /// 集成管理器 (使用 tokio::sync::Mutex 支持异步操作)
     pub integration_manager: AsyncMutex<IntegrationManager>,
+    /// AI 引擎注册表（使用 tokio::sync::Mutex 支持异步操作）
+    pub engine_registry: AsyncMutex<EngineRegistry>,
 }
 
 // ============================================================================
@@ -216,6 +220,20 @@ pub fn run() {
     // 生产: RUST_LOG=polaris=info
     let _logger_guard = Logger::init(true);
 
+    // 初始化 AI 引擎注册表
+    let config = config_store.get().clone();
+    let mut engine_registry = EngineRegistry::new();
+
+    // 注册引擎
+    engine_registry.register(ai::ClaudeEngine::new(config.clone()));
+    engine_registry.register(ai::IFlowEngine::new(config.clone()));
+    engine_registry.register(ai::CodexEngine::new(config.clone()));
+
+    // 设置默认引擎
+    let default_engine = ai::EngineId::from_str(&config.default_engine)
+        .unwrap_or(ai::EngineId::ClaudeCode);
+    let _ = engine_registry.set_default(default_engine);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -227,6 +245,7 @@ pub fn run() {
             context_store: Arc::new(Mutex::new(ContextMemoryStore::new())),
             dingtalk_service: Mutex::new(DingTalkService::new()),
             integration_manager: AsyncMutex::new(IntegrationManager::new()),
+            engine_registry: AsyncMutex::new(engine_registry),
         })
         .invoke_handler(tauri::generate_handler![
             // 配置相关
