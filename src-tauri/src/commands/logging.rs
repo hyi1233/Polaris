@@ -7,6 +7,12 @@ use crate::services::logger;
 use crate::services::config_store::ConfigStore;
 use crate::AppState;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 获取日志目录
 #[tauri::command]
 pub fn get_log_dir() -> PathBuf {
@@ -36,6 +42,7 @@ pub fn open_log_dir() -> Result<()> {
     {
         std::process::Command::new("explorer")
             .arg(&log_dir)
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e: io::Error| AppError::Unknown(e.to_string()))?;
     }

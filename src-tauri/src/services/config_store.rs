@@ -5,6 +5,13 @@ use std::env;
 use std::process::Command;
 use serde::{Deserialize, Serialize};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Windows 进程创建标志：不创建新窗口
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 配置存储管理器
 pub struct ConfigStore {
     config: Config,
@@ -62,6 +69,7 @@ impl ConfigStore {
             // Windows 上先尝试 PowerShell 的 Get-Command
             let ps_output = Command::new("powershell")
                 .args(["-Command", "Get-Command claude -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .ok();
 
@@ -84,6 +92,7 @@ impl ConfigStore {
             // 后备：使用 where 命令
             let output = Command::new("cmd")
                 .args(["/C", "where", "claude"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .ok()?;
 
@@ -201,6 +210,13 @@ impl ConfigStore {
         let cmd = self.config.get_claude_cmd();
         eprintln!("[detect_claude] 尝试执行: {} --version", cmd);
 
+        #[cfg(windows)]
+        let output = Command::new(&cmd)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
         let output = Command::new(&cmd)
             .arg("--version")
             .output();
@@ -242,6 +258,13 @@ impl ConfigStore {
 
         eprintln!("[detect_iflow] 尝试执行: {} --version", iflow_cmd);
 
+        #[cfg(windows)]
+        let output = Command::new(&iflow_cmd)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
         let output = Command::new(&iflow_cmd)
             .arg("--version")
             .output();
@@ -275,7 +298,11 @@ impl ConfigStore {
     pub fn find_iflow_path() -> Option<String> {
         // 1. 尝试 which/where 命令
         #[cfg(windows)]
-        if let Ok(output) = Command::new("where").arg("iflow").output() {
+        if let Ok(output) = Command::new("where")
+            .arg("iflow")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
             if output.status.success() {
                 if let Some(path) = String::from_utf8_lossy(&output.stdout).lines().next() {
                     eprintln!("[find_iflow_path] 找到: {}", path);
@@ -454,11 +481,22 @@ impl ConfigStore {
 
     /// 验证路径是否为有效的 Claude CLI
     fn validate_path(path: &str) -> bool {
-        Command::new(path)
+        #[cfg(windows)]
+        let result = Command::new(path)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+
+        #[cfg(not(windows))]
+        let result = Command::new(path)
             .arg("--version")
             .output()
             .map(|output| output.status.success())
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        result
     }
 
     /// 验证指定路径并返回详细信息
@@ -471,7 +509,18 @@ impl ConfigStore {
         }
 
         // 尝试执行 --version
-        match Command::new(&path).arg("--version").output() {
+        #[cfg(windows)]
+        let output = Command::new(&path)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
+        let output = Command::new(&path)
+            .arg("--version")
+            .output();
+
+        match output {
             Ok(output) => {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout)
@@ -553,6 +602,7 @@ impl ConfigStore {
             // Windows 上先尝试 PowerShell 的 Get-Command
             let ps_output = Command::new("powershell")
                 .args(["-Command", "Get-Command iflow -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .ok();
 
@@ -575,6 +625,7 @@ impl ConfigStore {
             // 后备：使用 where 命令
             let output = Command::new("where")
                 .args(["iflow"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .ok()?;
 
@@ -622,11 +673,22 @@ impl ConfigStore {
 
     /// 验证路径是否为有效的 IFlow CLI（内部辅助函数）
     fn validate_iflow_path_exists(path: &str) -> bool {
-        Command::new(path)
+        #[cfg(windows)]
+        let result = Command::new(path)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+
+        #[cfg(not(windows))]
+        let result = Command::new(path)
             .arg("--version")
             .output()
             .map(|output| output.status.success())
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        result
     }
 
     /// 验证指定路径是否为有效的 IFlow CLI
@@ -639,7 +701,18 @@ impl ConfigStore {
         }
 
         // 尝试执行 --version
-        match Command::new(&path).arg("--version").output() {
+        #[cfg(windows)]
+        let output = Command::new(&path)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
+        let output = Command::new(&path)
+            .arg("--version")
+            .output();
+
+        match output {
             Ok(output) => {
                 if output.status.success() {
                     let version = String::from_utf8_lossy(&output.stdout)

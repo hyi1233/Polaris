@@ -13,6 +13,12 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn, error, instrument};
 use bitflags::bitflags;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 最大内联 Diff 大小 (2MB)
 const MAX_INLINE_DIFF_BYTES: usize = 2 * 1024 * 1024;
 
@@ -1622,6 +1628,14 @@ impl GitService {
         let total_steps = commits_to_rebase.len();
 
         // 执行变基操作（使用 git CLI，因为 git2 的 rebase API 较复杂）
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["rebase", source_branch])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["rebase", source_branch])
             .current_dir(path)
@@ -1653,6 +1667,14 @@ impl GitService {
                 let mut conflict_list = Vec::new();
                 
                 // 使用 git diff --name-only --diff-filter=U 获取冲突文件
+                #[cfg(windows)]
+                let diff_output = std::process::Command::new("git")
+                    .args(["diff", "--name-only", "--diff-filter=U"])
+                    .current_dir(path)
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output()?;
+
+                #[cfg(not(windows))]
                 let diff_output = std::process::Command::new("git")
                     .args(["diff", "--name-only", "--diff-filter=U"])
                     .current_dir(path)
@@ -1706,6 +1728,14 @@ impl GitService {
 
     /// 中止变基操作
     pub fn rebase_abort(path: &Path) -> Result<(), GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["rebase", "--abort"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["rebase", "--abort"])
             .current_dir(path)
@@ -1721,6 +1751,14 @@ impl GitService {
 
     /// 继续变基操作
     pub fn rebase_continue(path: &Path) -> Result<GitRebaseResult, GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["rebase", "--continue"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["rebase", "--continue"])
             .current_dir(path)
@@ -1800,6 +1838,14 @@ impl GitService {
         }
 
         // 执行 cherry-pick 操作
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["cherry-pick", commit_sha])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["cherry-pick", commit_sha])
             .current_dir(path)
@@ -1847,6 +1893,14 @@ impl GitService {
                 let mut conflict_list = Vec::new();
 
                 // 使用 git diff --name-only --diff-filter=U 获取冲突文件
+                #[cfg(windows)]
+                let diff_output = std::process::Command::new("git")
+                    .args(["diff", "--name-only", "--diff-filter=U"])
+                    .current_dir(path)
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output()?;
+
+                #[cfg(not(windows))]
                 let diff_output = std::process::Command::new("git")
                     .args(["diff", "--name-only", "--diff-filter=U"])
                     .current_dir(path)
@@ -1885,6 +1939,14 @@ impl GitService {
 
     /// 中止 Cherry-pick 操作
     pub fn cherry_pick_abort(path: &Path) -> Result<(), GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["cherry-pick", "--abort"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["cherry-pick", "--abort"])
             .current_dir(path)
@@ -1900,6 +1962,14 @@ impl GitService {
 
     /// 继续 Cherry-pick 操作
     pub fn cherry_pick_continue(path: &Path) -> Result<GitCherryPickResult, GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["cherry-pick", "--continue"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["cherry-pick", "--continue"])
             .current_dir(path)
@@ -1993,6 +2063,14 @@ impl GitService {
         }
 
         // 执行 revert 操作
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["revert", commit_sha, "--no-edit"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["revert", commit_sha, "--no-edit"])
             .current_dir(path)
@@ -2040,6 +2118,14 @@ impl GitService {
                 let mut conflict_list = Vec::new();
 
                 // 使用 git diff --name-only --diff-filter=U 获取冲突文件
+                #[cfg(windows)]
+                let diff_output = std::process::Command::new("git")
+                    .args(["diff", "--name-only", "--diff-filter=U"])
+                    .current_dir(path)
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output()?;
+
+                #[cfg(not(windows))]
                 let diff_output = std::process::Command::new("git")
                     .args(["diff", "--name-only", "--diff-filter=U"])
                     .current_dir(path)
@@ -2078,6 +2164,14 @@ impl GitService {
 
     /// 中止 Revert 操作
     pub fn revert_abort(path: &Path) -> Result<(), GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["revert", "--abort"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["revert", "--abort"])
             .current_dir(path)
@@ -2093,6 +2187,14 @@ impl GitService {
 
     /// 继续 Revert 操作
     pub fn revert_continue(path: &Path) -> Result<GitRevertResult, GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["revert", "--continue", "--no-edit"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["revert", "--continue", "--no-edit"])
             .current_dir(path)
@@ -2477,6 +2579,17 @@ impl GitService {
         remote_name: &str,
         force: bool,
     ) -> Result<(), GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .arg("push")
+            .arg(remote_name)
+            .arg(branch_name)
+            .arg(if force { "--force" } else { "--force-with-lease" })
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .arg("push")
             .arg(remote_name)
@@ -2499,6 +2612,17 @@ impl GitService {
         branch_name: &str,
         remote_name: &str,
     ) -> Result<(), GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .arg("push")
+            .arg("-u")
+            .arg(remote_name)
+            .arg(branch_name)
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .arg("push")
             .arg("-u")
@@ -2554,6 +2678,13 @@ impl GitService {
         options: &CreatePROptions,
     ) -> Result<PullRequest, GitServiceError> {
         // 检查 gh 是否可用
+        #[cfg(windows)]
+        let check = std::process::Command::new("gh")
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
         let check = std::process::Command::new("gh")
             .arg("--version")
             .output();
@@ -2573,6 +2704,9 @@ impl GitService {
             .arg(&options.head_branch)
             .arg("--json")
             .arg("number,state,title,body,url,headRefName,baseRefName,createdAt,mergedAt,closedAt,author,additions,deletions,changedFiles");
+
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
 
         if let Some(body) = &options.body {
             cmd.arg("--body").arg(body);
@@ -2715,6 +2849,18 @@ impl GitService {
         path: &Path,
         pr_number: u64,
     ) -> Result<PullRequest, GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("gh")
+            .arg("pr")
+            .arg("view")
+            .arg(pr_number.to_string())
+            .arg("--json")
+            .arg("number,state,title,body,url,headRefName,baseRefName,createdAt,mergedAt,closedAt,author,additions,deletions,changedFiles,reviews")
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("gh")
             .arg("pr")
             .arg("view")
@@ -2825,6 +2971,9 @@ impl GitService {
         }
 
         cmd.arg("--no-edit");
+
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
 
         let output = cmd.current_dir(path).output()?;
 
@@ -3041,6 +3190,9 @@ impl GitService {
             cmd.arg("--include-untracked");
         }
 
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
         let output = cmd.current_dir(path).output()?;
 
         if !output.status.success() {
@@ -3053,6 +3205,14 @@ impl GitService {
 
     /// 获取 Stash 列表
     pub fn stash_list(path: &Path) -> Result<Vec<GitStashEntry>, GitServiceError> {
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["stash", "list", "--format=%gd|%gs|%h|%ct"])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["stash", "list", "--format=%gd|%gs|%h|%ct"])
             .current_dir(path)
@@ -3084,6 +3244,14 @@ impl GitService {
             .map(|i| format!("stash@{{{}}}", i))
             .unwrap_or_else(|| "stash@{0}".to_string());
 
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["stash", "pop", &stash_ref])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["stash", "pop", &stash_ref])
             .current_dir(path)
@@ -3100,6 +3268,14 @@ impl GitService {
     pub fn stash_drop(path: &Path, index: usize) -> Result<(), GitServiceError> {
         let stash_ref = format!("stash@{{{}}}", index);
 
+        #[cfg(windows)]
+        let output = std::process::Command::new("git")
+            .args(["stash", "drop", &stash_ref])
+            .current_dir(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()?;
+
+        #[cfg(not(windows))]
         let output = std::process::Command::new("git")
             .args(["stash", "drop", &stash_ref])
             .current_dir(path)

@@ -15,6 +15,12 @@ use std::process::Command;
 use serde_json::Value;
 use crate::error::{Result, AppError};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /**
  * Bash 执行结果
  */
@@ -59,6 +65,9 @@ pub async fn execute_bash(
     if let Some(dir) = work_dir {
         cmd.current_dir(dir);
     }
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
 
     let output = cmd.output().map_err(|e| {
         tracing::error!("[DeepSeek] Command execution failed: {}", e);
@@ -209,6 +218,17 @@ pub async fn list_directory(
 pub async fn git_status_deepseek() -> Result<Value> {
     tracing::info!("[DeepSeek] Getting git status");
 
+    #[cfg(windows)]
+    let output = Command::new("git")
+        .args(["status", "--porcelain"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| {
+            tracing::error!("[DeepSeek] Git status failed: {}", e);
+            AppError::Unknown(e.to_string())
+        })?;
+
+    #[cfg(not(windows))]
     let output = Command::new("git")
         .args(["status", "--porcelain"])
         .output()
@@ -257,6 +277,9 @@ pub async fn git_diff_deepseek(
         cmd.arg(p);
     }
 
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
     let output = cmd.output().map_err(|e| {
         tracing::error!("[DeepSeek] Git diff failed: {}", e);
         AppError::Unknown(e.to_string())
@@ -276,6 +299,17 @@ pub async fn git_log_deepseek(
 
     let count = max_count.unwrap_or(10).to_string();
 
+    #[cfg(windows)]
+    let output = Command::new("git")
+        .args(["log", "-n", &count, "--pretty=format:%H|%an|%ad|%s", "--date=iso"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| {
+            tracing::error!("[DeepSeek] Git log failed: {}", e);
+            AppError::Unknown(e.to_string())
+        })?;
+
+    #[cfg(not(windows))]
     let output = Command::new("git")
         .args(["log", "-n", &count, "--pretty=format:%H|%an|%ad|%s", "--date=iso"])
         .output()

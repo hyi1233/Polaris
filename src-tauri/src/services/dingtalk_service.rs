@@ -4,6 +4,12 @@ use tauri::{Window, Emitter};
 use serde_json::{Value, json};
 use crate::models::config::DingTalkConfig;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 钉钉消息结构
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DingTalkMessage {
@@ -66,8 +72,8 @@ impl DingTalkService {
         println!("  端口: {}", config.webhook_port);
 
         // 启动桥接进程
-        let mut child = Command::new(&node_cmd)
-            .arg(&bridge_script)
+        let mut cmd = Command::new(&node_cmd);
+        cmd.arg(&bridge_script)
             .arg("--app-key")
             .arg(&config.app_key)
             .arg("--app-secret")
@@ -76,8 +82,12 @@ impl DingTalkService {
             .arg(config.webhook_port.to_string())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .stdin(Stdio::piped())
-            .spawn()
+            .stdin(Stdio::piped());
+
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let mut child = cmd.spawn()
             .map_err(|e| format!("启动桥接进程失败: {}", e))?;
 
         let pid = child.id();
@@ -236,7 +246,18 @@ impl DingTalkService {
         };
 
         for cmd in commands {
-            if let Ok(output) = Command::new(cmd).arg("--version").output() {
+            #[cfg(windows)]
+            let output = Command::new(cmd)
+                .arg("--version")
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+
+            #[cfg(not(windows))]
+            let output = Command::new(cmd)
+                .arg("--version")
+                .output();
+
+            if let Ok(output) = output {
                 if output.status.success() {
                     return Some(cmd.to_string());
                 }

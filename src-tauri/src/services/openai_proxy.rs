@@ -1095,11 +1095,13 @@ impl OpenAIProxyService {
                 let pattern = args.get("pattern").and_then(|p| p.as_str()).unwrap_or("");
                 let path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
                 let command = format!("rg \"{}\" \"{}\"", pattern, path);
-                let output = if cfg!(windows) {
-                    StdCommand::new("cmd").args(["/C", &command]).output()
-                } else {
-                    StdCommand::new("sh").args(["-c", &command]).output()
-                };
+                #[cfg(windows)]
+                let output = StdCommand::new("cmd")
+                    .args(["/C", &command])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+                #[cfg(not(windows))]
+                let output = StdCommand::new("sh").args(["-c", &command]).output();
                 match output {
                     Ok(output) => {
                         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1118,7 +1120,10 @@ impl OpenAIProxyService {
                     format!("find \"{}\" -name \"{}\"", path, pattern)
                 };
                 let output = if cfg!(windows) {
-                    StdCommand::new("cmd").args(["/C", &command]).output()
+                    StdCommand::new("cmd")
+                        .args(["/C", &command])
+                        .creation_flags(CREATE_NO_WINDOW)
+                        .output()
                 } else {
                     StdCommand::new("sh").args(["-c", &command]).output()
                 };
@@ -1136,7 +1141,10 @@ impl OpenAIProxyService {
                 let path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
                 let command = format!("rg \"{}\" \"{}\"", query, path);
                 let output = if cfg!(windows) {
-                    StdCommand::new("cmd").args(["/C", &command]).output()
+                    StdCommand::new("cmd")
+                        .args(["/C", &command])
+                        .creation_flags(CREATE_NO_WINDOW)
+                        .output()
                 } else {
                     StdCommand::new("sh").args(["-c", &command]).output()
                 };
@@ -1158,7 +1166,10 @@ impl OpenAIProxyService {
                     format!("find \"{}\" -name \"{}\"", path, pattern)
                 };
                 let output = if cfg!(windows) {
-                    StdCommand::new("cmd").args(["/C", &command]).output()
+                    StdCommand::new("cmd")
+                        .args(["/C", &command])
+                        .creation_flags(CREATE_NO_WINDOW)
+                        .output()
                 } else {
                     StdCommand::new("sh").args(["-c", &command]).output()
                 };
@@ -1186,11 +1197,13 @@ impl OpenAIProxyService {
             }
             "run_shell_command" => {
                 if let Some(command) = args.get("command").and_then(|c| c.as_str()) {
-                    let output = if cfg!(windows) {
-                        StdCommand::new("cmd").args(["/C", command]).output()
-                    } else {
-                        StdCommand::new("sh").args(["-c", command]).output()
-                    };
+                    #[cfg(windows)]
+                    let output = StdCommand::new("cmd")
+                        .args(["/C", command])
+                        .creation_flags(CREATE_NO_WINDOW)
+                        .output();
+                    #[cfg(not(windows))]
+                    let output = StdCommand::new("sh").args(["-c", command]).output();
                     match output {
                         Ok(output) => {
                             let stdout = String::from_utf8_lossy(&output.stdout);

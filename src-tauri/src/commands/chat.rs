@@ -67,6 +67,7 @@ fn find_node_exe(npm_dir: &Path) -> Result<String> {
     // 2. 使用 where 命令查找系统中的 node.exe
     let output = Command::new("where")
         .args(["node"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| AppError::ProcessError(format!("查找 node.exe 失败: {}", e)))?;
 
@@ -1033,6 +1034,7 @@ fn terminate_process(pid: u32) {
         // 使用 /T 参数终止进程树
         let result = Command::new("taskkill")
             .args(["/F", "/T", "/PID", &pid.to_string()])
+            .creation_flags(CREATE_NO_WINDOW)
             .output();
 
         match result {
