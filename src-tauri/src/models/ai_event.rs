@@ -537,4 +537,30 @@ impl AIEvent {
     pub fn assistant_message(content: impl Into<String>, is_delta: bool) -> Self {
         AIEvent::AssistantMessage(AssistantMessageEvent::new(content, is_delta))
     }
+
+    /// 从事件中提取文本内容
+    ///
+    /// 用于将 AI 响应发送到外部平台（如 QQ Bot）
+    pub fn extract_text(&self) -> Option<String> {
+        match self {
+            AIEvent::Token(e) => Some(e.value.clone()),
+            AIEvent::AssistantMessage(e) => Some(e.content.clone()),
+            AIEvent::Result(e) => {
+                // 尝试从 output 中提取文本
+                e.output.as_str().map(|s| s.to_string())
+            }
+            AIEvent::Progress(e) => e.message.clone(),
+            _ => None,
+        }
+    }
+
+    /// 判断是否为会话结束事件
+    pub fn is_session_end(&self) -> bool {
+        matches!(self, AIEvent::SessionEnd(_))
+    }
+
+    /// 判断是否为错误事件
+    pub fn is_error(&self) -> bool {
+        matches!(self, AIEvent::Error(_))
+    }
 }

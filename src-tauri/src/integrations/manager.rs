@@ -2,17 +2,19 @@
  * 集成管理器
  *
  * 统一管理所有平台集成，提供消息路由和状态管理。
+ * 集成 EngineRegistry 实现 AI 自动回复。
  */
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use tauri::{AppHandle, Emitter};
 
 use super::common::SessionManager;
 use super::qqbot::QQBotAdapter;
 use super::traits::PlatformIntegration;
 use super::types::*;
+use crate::ai::EngineRegistry;
 use crate::error::Result;
 use crate::models::config::QQBotConfig;
 
@@ -32,6 +34,10 @@ pub struct IntegrationManager {
     running: bool,
     /// 消息处理任务句柄
     message_task: Option<tokio::task::JoinHandle<()>>,
+    /// AI 引擎注册表引用
+    engine_registry: Option<Arc<Mutex<EngineRegistry>>>,
+    /// 会话 ID 映射 (conversation_id -> ai_session_id)
+    session_map: HashMap<String, String>,
 }
 
 impl IntegrationManager {
@@ -45,7 +51,20 @@ impl IntegrationManager {
             app_handle: None,
             running: false,
             message_task: None,
+            engine_registry: None,
+            session_map: HashMap::new(),
         }
+    }
+
+    /// 设置 AI 引擎注册表
+    pub fn with_engine_registry(mut self, registry: Arc<Mutex<EngineRegistry>>) -> Self {
+        self.engine_registry = Some(registry);
+        self
+    }
+
+    /// 设置 AI 引擎注册表（可变引用）
+    pub fn set_engine_registry(&mut self, registry: Arc<Mutex<EngineRegistry>>) {
+        self.engine_registry = Some(registry);
     }
 
     /// 初始化
@@ -85,8 +104,16 @@ impl IntegrationManager {
 
         // 启动消息处理任务（如果还没有启动）
         if self.message_task.is_none() {
-            if let (Some(rx), Some(app_handle)) = (self.message_rx.take(), self.app_handle.clone()) {
+            let rx = self.message_rx.take();
+            let app_handle = self.app_handle.clone();
+            let engine_registry = self.engine_registry.clone();
+
+            if let (Some(rx), Some(app_handle)) = (rx, app_handle) {
                 tracing::info!("[IntegrationManager] 🚀 启动消息处理任务");
+
+                // 克隆 adapters 用于发送消息
+                // 注意：这里需要重新设计，因为 PlatformIntegration 不能简单克隆
+                // 解决方案：在任务中通过 app_handle 调用 Tauri command 发送消息
 
                 let task = tokio::spawn(async move {
                     tracing::info!("[IntegrationManager] 📨 消息处理任务已启动，等待消息...");
@@ -100,11 +127,25 @@ impl IntegrationManager {
                             msg.conversation_id
                         );
 
-                        // 发送到前端
+                        // 1. 发送到前端
                         if let Err(e) = app_handle.emit("integration:message", &msg) {
                             tracing::error!("[IntegrationManager] ❌ 发送消息到前端失败: {}", e);
                         } else {
                             tracing::info!("[IntegrationManager] ✅ 消息已发送到前端");
+                        }
+
+                        // 2. 调用 AI 生成回复
+                        if let Some(ref registry) = engine_registry {
+                            if let Some(text) = msg.content.as_text() {
+                                if !text.is_empty() {
+                                    Self::process_ai_message(
+                                        registry.clone(),
+                                        msg.conversation_id.clone(),
+                                        text.to_string(),
+                                        app_handle.clone(),
+                                    ).await;
+                                }
+                            }
                         }
                     }
 
@@ -118,6 +159,82 @@ impl IntegrationManager {
         }
 
         Ok(())
+    }
+
+    /// 处理 AI 消息
+    async fn process_ai_message(
+        engine_registry: Arc<Mutex<EngineRegistry>>,
+        conversation_id: String,
+        message: String,
+        app_handle: AppHandle,
+    ) {
+        tracing::info!("[IntegrationManager] 🤖 开始 AI 回复: conversation={}", conversation_id);
+
+        // 用于累积回复文本
+        let accumulated_text = Arc::new(Mutex::new(String::new()));
+        let conversation_id_clone = conversation_id.clone();
+        let accumulated_text_clone = accumulated_text.clone();
+        let app_handle_for_callback = app_handle.clone();
+
+        // 创建事件回调
+        let callback = move |event: crate::models::AIEvent| {
+            // 提取文本
+            if let Some(text) = event.extract_text() {
+                tracing::debug!("[IntegrationManager] AI 文本: {}", text);
+
+                // 累积文本
+                if let Ok(mut accumulated) = accumulated_text_clone.lock() {
+                    accumulated.push_str(&text);
+                }
+
+                // 发送增量更新到前端
+                let _ = app_handle_for_callback.emit("integration:ai:delta", serde_json::json!({
+                    "conversationId": conversation_id_clone,
+                    "text": text,
+                    "isDelta": true
+                }));
+            }
+
+            // 检查会话结束
+            if event.is_session_end() {
+                tracing::info!("[IntegrationManager] AI 会话结束");
+            }
+
+            // 检查错误
+            if event.is_error() {
+                tracing::error!("[IntegrationManager] AI 会话出错");
+            }
+        };
+
+        // 调用 AI 引擎
+        let result = {
+            let mut registry = engine_registry.lock().unwrap();
+            let options = crate::ai::SessionOptions::new(callback)
+                .with_system_prompt("你是一个友好的助手，通过 QQ 回复用户消息。回复简洁、有帮助。");
+
+            registry.start_session(None, &message, options)
+        };
+
+        match result {
+            Ok(session_id) => {
+                tracing::info!("[IntegrationManager] AI 会话创建: session_id={}", session_id);
+
+                // 发送完整回复事件
+                let final_text = accumulated_text.lock().unwrap().clone();
+                let _ = app_handle.emit("integration:ai:complete", serde_json::json!({
+                    "conversationId": conversation_id,
+                    "sessionId": session_id,
+                    "text": final_text
+                }));
+            }
+            Err(e) => {
+                tracing::error!("[IntegrationManager] AI 会话创建失败: {:?}", e);
+                let _ = app_handle.emit("integration:ai:error", serde_json::json!({
+                    "conversationId": conversation_id,
+                    "error": e.to_string()
+                }));
+            }
+        }
     }
 
     /// 停止指定平台

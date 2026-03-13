@@ -69,7 +69,7 @@ pub async fn start_chat(
         options = options.with_system_prompt(prompt.clone());
     }
 
-    let mut registry = state.engine_registry.lock().await;
+    let mut registry = state.engine_registry.lock().map_err(|e| AppError::StateError(e.to_string()))?;
     registry.start_session(Some(engine), &message, options)
 }
 
@@ -121,7 +121,7 @@ pub async fn continue_chat(
         options = options.with_system_prompt(prompt.clone());
     }
 
-    let mut registry = state.engine_registry.lock().await;
+    let mut registry = state.engine_registry.lock().map_err(|e| AppError::StateError(e.to_string()))?;
     registry.continue_session(engine, &session_id, &message, options)
 }
 
@@ -136,7 +136,7 @@ pub async fn interrupt_chat(
 
     let engine = engine_id.as_ref().and_then(|id| EngineId::from_str(id));
 
-    let mut registry = state.engine_registry.lock().await;
+    let mut registry = state.engine_registry.lock().map_err(|e| AppError::StateError(e.to_string()))?;
 
     if let Some(engine) = engine {
         registry.interrupt(engine, &session_id)?;

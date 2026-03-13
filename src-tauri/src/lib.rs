@@ -88,8 +88,8 @@ pub struct AppState {
     pub dingtalk_service: Mutex<DingTalkService>,
     /// 集成管理器 (使用 tokio::sync::Mutex 支持异步操作)
     pub integration_manager: AsyncMutex<IntegrationManager>,
-    /// AI 引擎注册表（使用 tokio::sync::Mutex 支持异步操作）
-    pub engine_registry: AsyncMutex<EngineRegistry>,
+    /// AI 引擎注册表（使用 Arc<Mutex> 支持共享）
+    pub engine_registry: Arc<Mutex<EngineRegistry>>,
 }
 
 // ============================================================================
@@ -235,6 +235,13 @@ pub fn run() {
         .unwrap_or(ai::EngineId::ClaudeCode);
     let _ = engine_registry.set_default(default_engine);
 
+    // 使用 Arc 共享 engine_registry
+    let engine_registry_arc = Arc::new(Mutex::new(engine_registry));
+
+    // 初始化 IntegrationManager，共享 engine_registry
+    let integration_manager = IntegrationManager::new()
+        .with_engine_registry(engine_registry_arc.clone());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -245,8 +252,8 @@ pub fn run() {
             openai_tasks: Arc::new(Mutex::new(HashMap::new())),
             context_store: Arc::new(Mutex::new(ContextMemoryStore::new())),
             dingtalk_service: Mutex::new(DingTalkService::new()),
-            integration_manager: AsyncMutex::new(IntegrationManager::new()),
-            engine_registry: AsyncMutex::new(engine_registry),
+            integration_manager: AsyncMutex::new(integration_manager),
+            engine_registry: engine_registry_arc,
         })
         .invoke_handler(tauri::generate_handler![
             // 配置相关
