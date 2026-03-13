@@ -584,3 +584,54 @@ export async function onIntegrationMessage(
     callback(event.payload);
   });
 }
+
+// ==================== 实例管理 ====================
+
+import type { PlatformInstance, InstanceId } from '../types';
+
+/** 添加集成实例 */
+export async function addIntegrationInstance(
+  instance: PlatformInstance
+): Promise<InstanceId> {
+  return invoke<InstanceId>('add_integration_instance', { instance });
+}
+
+/** 移除集成实例 */
+export async function removeIntegrationInstance(
+  instanceId: InstanceId
+): Promise<PlatformInstance | null> {
+  return invoke<PlatformInstance | null>('remove_integration_instance', { instanceId });
+}
+
+/** 获取所有集成实例 */
+export async function listIntegrationInstances(): Promise<PlatformInstance[]> {
+  return invoke<PlatformInstance[]>('list_integration_instances');
+}
+
+/** 按平台获取实例列表 */
+export async function listIntegrationInstancesByPlatform(
+  platform: Platform
+): Promise<PlatformInstance[]> {
+  return invoke<PlatformInstance[]>('list_integration_instances_by_platform', { platform });
+}
+
+/** 获取当前激活的实例 */
+export async function getActiveIntegrationInstance(
+  platform: Platform
+): Promise<PlatformInstance | null> {
+  return invoke<PlatformInstance | null>('get_active_integration_instance', { platform });
+}
+
+/** 切换实例 */
+export async function switchIntegrationInstance(
+  instanceId: InstanceId
+): Promise<void> {
+  return invoke('switch_integration_instance', { instanceId });
+}
+
+/** 断开当前实例 */
+export async function disconnectIntegrationInstance(
+  platform: Platform
+): Promise<void> {
+  return invoke('disconnect_integration_instance', { platform });
+}

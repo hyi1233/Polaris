@@ -545,24 +545,48 @@ impl PlatformIntegration for QQBotAdapter {
     }
 
     async fn disconnect(&mut self) -> Result<()> {
-        // 发送关闭信号
+        tracing::info!("[QQBot] 🔌 开始断开连接...");
+
+        // 1. 发送关闭信号
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
+            tracing::debug!("[QQBot] 关闭信号已发送");
         }
 
-        // 等待任务结束
+        // 2. 等待任务结束（带超时）
         if let Some(task) = self.ws_task.take() {
-            task.abort();
+            // 给任务一点时间优雅关闭
+            let result = tokio::time::timeout(
+                tokio::time::Duration::from_secs(3),
+                task
+            ).await;
+
+            match result {
+                Ok(Ok(())) => {
+                    tracing::debug!("[QQBot] WebSocket 任务已正常结束");
+                }
+                Ok(Err(_)) => {
+                    tracing::debug!("[QQBot] WebSocket 任务已结束");
+                }
+                Err(_) => {
+                    tracing::warn!("[QQBot] WebSocket 任务超时，已强制终止");
+                }
+            }
         }
 
+        // 3. 清理状态
         self.status = self.status.clone().disconnected();
         self.message_tx = None;
+        self.dedup.clear();
 
-        tracing::info!("[QQBot] Disconnected");
+        tracing::info!("[QQBot] ✅ 已断开连接");
         Ok(())
     }
 
-    async fn send(&self, target: SendTarget, content: MessageContent) -> Result<()> {
+    async fn send(&mut self, target: SendTarget, content: MessageContent) -> Result<()> {
+        // 关键：发送前确保 Token 有效
+        self.ensure_valid_token().await?;
+
         let text = content.as_text().ok_or_else(|| {
             AppError::ValidationError("目前只支持发送文本消息".to_string())
         })?;
@@ -574,7 +598,7 @@ impl PlatformIntegration for QQBotAdapter {
         let client = reqwest::Client::new();
 
         match target {
-            SendTarget::User(openid) => {
+            SendTarget::User(ref openid) => {
                 // C2C 私信
                 let url = format!("{}/v2/users/{}/messages", self.api_base(), openid);
 
@@ -589,12 +613,20 @@ impl PlatformIntegration for QQBotAdapter {
 
                 if !response.status().is_success() {
                     let error = response.text().await.unwrap_or_default();
+                    // 检查是否是 Token 过期错误
+                    if error.contains("token") || error.contains("expire") {
+                        tracing::warn!("[QQBot] Token 可能已过期，尝试刷新后重试");
+                        self.get_access_token().await?;
+                        // 重试一次 - clone target for recursive call
+                        let target_clone = SendTarget::User(openid.clone());
+                        return self.send(target_clone, content).await;
+                    }
                     return Err(AppError::ApiError(format!("发送 C2C 消息失败: {}", error)));
                 }
 
                 tracing::debug!("[QQBot] C2C message sent to {}", openid);
             }
-            SendTarget::Channel(channel_id) => {
+            SendTarget::Channel(ref channel_id) => {
                 // 频道消息
                 let url = format!("{}/channels/{}/messages", self.api_base(), channel_id);
 
@@ -609,18 +641,26 @@ impl PlatformIntegration for QQBotAdapter {
 
                 if !response.status().is_success() {
                     let error = response.text().await.unwrap_or_default();
+                    // 检查是否是 Token 过期错误
+                    if error.contains("token") || error.contains("expire") {
+                        tracing::warn!("[QQBot] Token 可能已过期，尝试刷新后重试");
+                        self.get_access_token().await?;
+                        // 重试一次
+                        let target_clone = SendTarget::Channel(channel_id.clone());
+                        return self.send(target_clone, content).await;
+                    }
                     return Err(AppError::ApiError(format!("发送频道消息失败: {}", error)));
                 }
 
                 tracing::debug!("[QQBot] Channel message sent to {}", channel_id);
             }
-            SendTarget::Conversation(conv_id) => {
+            SendTarget::Conversation(ref conv_id) => {
                 // 自动判断类型
                 if conv_id.starts_with("c2c_") {
                     let openid = conv_id.strip_prefix("c2c_").unwrap();
                     return self.send(SendTarget::User(openid.to_string()), content).await;
                 } else {
-                    return self.send(SendTarget::Channel(conv_id), content).await;
+                    return self.send(SendTarget::Channel(conv_id.clone()), content).await;
                 }
             }
             SendTarget::Webhook(_) => {

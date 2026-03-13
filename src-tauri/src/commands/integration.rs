@@ -9,6 +9,7 @@ use tauri::State;
 
 use crate::error::Result;
 use crate::integrations::types::*;
+use crate::integrations::instance_registry::{PlatformInstance, InstanceId};
 use crate::models::config::QQBotConfig;
 
 /// 启动集成平台
@@ -102,4 +103,87 @@ pub async fn init_integration(
     let mut manager = state.integration_manager.lock().await;
     manager.init(qqbot_config, app_handle).await;
     Ok(())
+}
+
+// ==================== 实例管理命令 ====================
+
+/// 添加实例
+#[tauri::command]
+pub async fn add_integration_instance(
+    instance: PlatformInstance,
+    state: State<'_, crate::AppState>,
+) -> Result<InstanceId> {
+    let manager = state.integration_manager.lock().await;
+    Ok(manager.add_instance(instance).await)
+}
+
+/// 移除实例
+#[tauri::command]
+pub async fn remove_integration_instance(
+    instance_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<PlatformInstance>> {
+    let manager = state.integration_manager.lock().await;
+    Ok(manager.remove_instance(&instance_id).await)
+}
+
+/// 获取所有实例
+#[tauri::command]
+pub async fn list_integration_instances(
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<PlatformInstance>> {
+    let manager = state.integration_manager.lock().await;
+    Ok(manager.list_instances().await)
+}
+
+/// 按平台获取实例列表
+#[tauri::command]
+pub async fn list_integration_instances_by_platform(
+    platform: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<PlatformInstance>> {
+    let platform: Platform = platform
+        .parse()
+        .map_err(|e: String| crate::error::AppError::ValidationError(e))?;
+
+    let manager = state.integration_manager.lock().await;
+    Ok(manager.list_instances_by_platform(platform).await)
+}
+
+/// 获取当前激活的实例
+#[tauri::command]
+pub async fn get_active_integration_instance(
+    platform: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<PlatformInstance>> {
+    let platform: Platform = platform
+        .parse()
+        .map_err(|e: String| crate::error::AppError::ValidationError(e))?;
+
+    let manager = state.integration_manager.lock().await;
+    Ok(manager.get_active_instance(platform).await)
+}
+
+/// 切换实例
+#[tauri::command]
+pub async fn switch_integration_instance(
+    instance_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<()> {
+    let mut manager = state.integration_manager.lock().await;
+    manager.switch_instance(&instance_id).await
+}
+
+/// 断开当前实例
+#[tauri::command]
+pub async fn disconnect_integration_instance(
+    platform: String,
+    state: State<'_, crate::AppState>,
+) -> Result<()> {
+    let platform: Platform = platform
+        .parse()
+        .map_err(|e: String| crate::error::AppError::ValidationError(e))?;
+
+    let mut manager = state.integration_manager.lock().await;
+    manager.disconnect_instance(platform).await
 }

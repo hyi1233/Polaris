@@ -5,6 +5,39 @@
 /** 平台类型 */
 export type Platform = 'qqbot' | 'wechat' | 'telegram';
 
+/** 实例 ID */
+export type InstanceId = string;
+
+/** 实例配置枚举 */
+export interface InstanceConfig {
+  type: 'qqbot';
+  // QQ Bot 配置字段
+  enabled: boolean;
+  appId: string;
+  clientSecret: string;
+  sandbox: boolean;
+  displayMode: 'chat' | 'separate' | 'both';
+  autoConnect: boolean;
+}
+
+/** 平台实例 */
+export interface PlatformInstance {
+  /** 实例 ID */
+  id: InstanceId;
+  /** 显示名称 */
+  name: string;
+  /** 平台类型 */
+  platform: Platform;
+  /** 实例配置 */
+  config: InstanceConfig;
+  /** 创建时间 */
+  createdAt: string;
+  /** 最后活跃时间 */
+  lastActive?: string;
+  /** 是否启用 */
+  enabled: boolean;
+}
+
 /** 消息内容类型 */
 export interface TextContent {
   type: 'text';

@@ -16,6 +16,7 @@ use super::qqbot::QQBotAdapter;
 use super::traits::PlatformIntegration;
 use super::types::*;
 use super::commands::{BotCommand, CommandParser, get_help_text, PromptMode};
+use super::instance_registry::{InstanceRegistry, PlatformInstance, InstanceConfig, InstanceId};
 use crate::ai::{EngineRegistry, SessionOptions, EngineId};
 use crate::error::Result;
 use crate::models::config::QQBotConfig;
@@ -44,6 +45,8 @@ pub struct IntegrationManager {
     session_map: HashMap<String, String>,
     /// 活跃的 AI 会话句柄（用于中断）
     active_sessions: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
+    /// 实例注册表（多配置管理）
+    instance_registry: Arc<Mutex<InstanceRegistry>>,
 }
 
 impl IntegrationManager {
@@ -61,6 +64,7 @@ impl IntegrationManager {
             engine_registry: None,
             session_map: HashMap::new(),
             active_sessions: Arc::new(Mutex::new(HashMap::new())),
+            instance_registry: Arc::new(Mutex::new(InstanceRegistry::new())),
         }
     }
 
@@ -686,6 +690,159 @@ impl IntegrationManager {
     pub async fn register(&mut self, platform: Platform, adapter: Box<dyn PlatformIntegration>) {
         let mut adapters = self.adapters.lock().await;
         adapters.insert(platform, adapter);
+    }
+
+    // ==================== 实例管理方法 ====================
+
+    /// 添加实例配置
+    pub async fn add_instance(&self, instance: PlatformInstance) -> InstanceId {
+        let mut registry = self.instance_registry.lock().await;
+        registry.add(instance)
+    }
+
+    /// 移除实例配置
+    pub async fn remove_instance(&self, instance_id: &str) -> Option<PlatformInstance> {
+        let mut registry = self.instance_registry.lock().await;
+        registry.remove(instance_id)
+    }
+
+    /// 获取所有实例
+    pub async fn list_instances(&self) -> Vec<PlatformInstance> {
+        let registry = self.instance_registry.lock().await;
+        registry.all().to_vec()
+    }
+
+    /// 按平台获取实例列表
+    pub async fn list_instances_by_platform(&self, platform: Platform) -> Vec<PlatformInstance> {
+        let registry = self.instance_registry.lock().await;
+        registry.get_by_platform(platform).into_iter().cloned().collect()
+    }
+
+    /// 获取当前激活的实例
+    pub async fn get_active_instance(&self, platform: Platform) -> Option<PlatformInstance> {
+        let registry = self.instance_registry.lock().await;
+        registry.get_active(platform).cloned()
+    }
+
+    /// 检查实例是否激活
+    pub async fn is_instance_active(&self, instance_id: &str) -> bool {
+        let registry = self.instance_registry.lock().await;
+        registry.is_active(instance_id)
+    }
+
+    /// 检查平台是否有激活实例
+    pub async fn has_active_instance(&self, platform: Platform) -> bool {
+        let registry = self.instance_registry.lock().await;
+        registry.has_active(platform)
+    }
+
+    /// 切换实例（核心方法）
+    ///
+    /// 切换流程：
+    /// 1. 检查目标实例是否存在
+    /// 2. 断开当前连接
+    /// 3. 创建新的 Adapter
+    /// 4. 建立连接
+    pub async fn switch_instance(&mut self, instance_id: &str) -> Result<()> {
+        tracing::info!("[IntegrationManager] 🔄 切换实例: {}", instance_id);
+
+        // 1. 获取实例配置
+        let instance = {
+            let registry = self.instance_registry.lock().await;
+            registry.get(instance_id).cloned()
+        };
+
+        let instance = match instance {
+            Some(i) => i,
+            None => {
+                return Err(crate::error::AppError::ValidationError(format!(
+                    "实例不存在: {}",
+                    instance_id
+                )));
+            }
+        };
+
+        let platform = instance.platform;
+
+        // 2. 检查是否已有激活实例（同类型平台互斥）
+        {
+            let registry = self.instance_registry.lock().await;
+            if registry.is_active(instance_id) {
+                tracing::info!("[IntegrationManager] 实例已激活，无需切换");
+                return Ok(());
+            }
+        }
+
+        // 3. 断开当前连接（销毁旧 Adapter）
+        {
+            let mut adapters = self.adapters.lock().await;
+            if let Some(mut adapter) = adapters.remove(&platform) {
+                tracing::info!("[IntegrationManager] 断开当前连接...");
+                adapter.disconnect().await?;
+            }
+        }
+
+        // 4. 创建新的 Adapter
+        let adapter: Box<dyn PlatformIntegration> = match &instance.config {
+            InstanceConfig::QQBot(config) => {
+                tracing::info!("[IntegrationManager] 创建新的 QQBot Adapter: {}", instance.name);
+                Box::new(QQBotAdapter::new(config.clone()))
+            }
+        };
+
+        // 5. 注册新 Adapter
+        {
+            let mut adapters = self.adapters.lock().await;
+            adapters.insert(platform, adapter);
+        }
+
+        // 6. 激活实例
+        {
+            let mut registry = self.instance_registry.lock().await;
+            registry.activate(instance_id);
+        }
+
+        // 7. 建立连接
+        let tx = self.message_tx.as_ref()
+            .ok_or_else(|| crate::error::AppError::StateError("消息通道未初始化".to_string()))?
+            .clone();
+
+        {
+            let mut adapters = self.adapters.lock().await;
+            if let Some(adapter) = adapters.get_mut(&platform) {
+                adapter.connect(tx).await?;
+            }
+        }
+
+        tracing::info!("[IntegrationManager] ✅ 实例切换成功: {}", instance.name);
+        Ok(())
+    }
+
+    /// 断开当前实例
+    pub async fn disconnect_instance(&mut self, platform: Platform) -> Result<()> {
+        tracing::info!("[IntegrationManager] 断开平台 {} 的连接", platform);
+
+        // 1. 断开连接
+        {
+            let mut adapters = self.adapters.lock().await;
+            if let Some(mut adapter) = adapters.remove(&platform) {
+                adapter.disconnect().await?;
+            }
+        }
+
+        // 2. 清除激活状态
+        {
+            let mut registry = self.instance_registry.lock().await;
+            registry.deactivate(platform);
+        }
+
+        tracing::info!("[IntegrationManager] ✅ 已断开平台 {}", platform);
+        Ok(())
+    }
+
+    /// 获取实例注册表引用
+    pub fn instance_registry(&self) -> Arc<Mutex<InstanceRegistry>> {
+        self.instance_registry.clone()
     }
 }
 

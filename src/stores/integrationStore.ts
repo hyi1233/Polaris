@@ -2,6 +2,7 @@
  * 集成状态管理 Store
  *
  * 管理平台集成的连接状态、消息收发等。
+ * 支持多实例管理。
  */
 
 import { create } from 'zustand';
@@ -13,6 +14,8 @@ import type {
   SendTarget,
   MessageContent,
   QQBotConfig,
+  PlatformInstance,
+  InstanceId,
 } from '../types';
 import {
   startIntegration,
@@ -23,6 +26,13 @@ import {
   getIntegrationSessions,
   initIntegration,
   onIntegrationMessage,
+  // 实例管理
+  addIntegrationInstance,
+  removeIntegrationInstance,
+  listIntegrationInstances,
+  listIntegrationInstancesByPlatform,
+  switchIntegrationInstance,
+  disconnectIntegrationInstance,
 } from '../services/tauri';
 
 interface IntegrationState {
@@ -36,7 +46,11 @@ interface IntegrationState {
   // 保存配置以便重新初始化
   _qqbotConfig: QQBotConfig | null;
 
-  // Actions
+  // 实例管理状态
+  instances: PlatformInstance[];
+  activeInstances: Record<Platform, InstanceId | null>;
+
+  // Actions - 基础
   initialize: (qqbotConfig: QQBotConfig | null) => Promise<void>;
   startPlatform: (platform: Platform, qqbotConfig?: QQBotConfig) => Promise<void>;
   stopPlatform: (platform: Platform) => Promise<void>;
@@ -47,6 +61,16 @@ interface IntegrationState {
   clearMessages: () => void;
   _addMessage: (message: IntegrationMessage) => void;
   _updateStatus: (platform: Platform, status: IntegrationStatus) => void;
+
+  // Actions - 实例管理
+  loadInstances: () => Promise<void>;
+  loadInstancesByPlatform: (platform: Platform) => Promise<void>;
+  addInstance: (instance: PlatformInstance) => Promise<InstanceId>;
+  removeInstance: (instanceId: InstanceId) => Promise<void>;
+  switchInstance: (instanceId: InstanceId) => Promise<void>;
+  disconnectInstance: (platform: Platform) => Promise<void>;
+  getActiveInstance: (platform: Platform) => PlatformInstance | null;
+  setActiveInstance: (platform: Platform, instanceId: InstanceId | null) => void;
 }
 
 export const useIntegrationStore = create<IntegrationState>((set, get) => ({
@@ -58,6 +82,9 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
   loading: false,
   error: null,
   _qqbotConfig: null,
+  // 实例管理初始状态
+  instances: [],
+  activeInstances: {} as Record<Platform, InstanceId | null>,
 
   // 初始化
   initialize: async (qqbotConfig) => {
@@ -237,6 +264,151 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
       },
     }));
   },
+
+  // ==================== 实例管理 Actions ====================
+
+  // 加载所有实例
+  loadInstances: async () => {
+    try {
+      const instances = await listIntegrationInstances();
+      set({ instances });
+      console.log('[IntegrationStore] Loaded instances:', instances.length);
+    } catch (error) {
+      console.error('[IntegrationStore] Load instances error:', error);
+    }
+  },
+
+  // 按平台加载实例
+  loadInstancesByPlatform: async (platform) => {
+    try {
+      const instances = await listIntegrationInstancesByPlatform(platform);
+      set((state) => ({
+        instances: [
+          ...state.instances.filter((i) => i.platform !== platform),
+          ...instances,
+        ],
+      }));
+      console.log(`[IntegrationStore] Loaded ${platform} instances:`, instances.length);
+    } catch (error) {
+      console.error(`[IntegrationStore] Load ${platform} instances error:`, error);
+    }
+  },
+
+  // 添加实例
+  addInstance: async (instance) => {
+    try {
+      const id = await addIntegrationInstance(instance);
+      set((state) => ({
+        instances: [...state.instances, { ...instance, id }],
+      }));
+      console.log('[IntegrationStore] Added instance:', id);
+      return id;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '添加实例失败' });
+      console.error('[IntegrationStore] Add instance error:', error);
+      throw error;
+    }
+  },
+
+  // 移除实例
+  removeInstance: async (instanceId) => {
+    try {
+      await removeIntegrationInstance(instanceId);
+      set((state) => {
+        const newActiveInstances = { ...state.activeInstances };
+        // 找到被移除实例的平台，清除其激活状态
+        const removedInstance = state.instances.find((i) => i.id === instanceId);
+        if (removedInstance) {
+          newActiveInstances[removedInstance.platform] = null;
+        }
+        return {
+          instances: state.instances.filter((i) => i.id !== instanceId),
+          activeInstances: newActiveInstances,
+        };
+      });
+      console.log('[IntegrationStore] Removed instance:', instanceId);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '移除实例失败' });
+      console.error('[IntegrationStore] Remove instance error:', error);
+      throw error;
+    }
+  },
+
+  // 切换实例
+  switchInstance: async (instanceId) => {
+    set({ loading: true, error: null });
+    try {
+      await switchIntegrationInstance(instanceId);
+
+      // 更新激活状态
+      const instance = get().instances.find((i) => i.id === instanceId);
+      if (instance) {
+        set((state) => ({
+          activeInstances: {
+            ...state.activeInstances,
+            [instance.platform]: instanceId,
+          },
+        }));
+      }
+
+      // 刷新状态
+      if (instance) {
+        await get().refreshStatus(instance.platform);
+      }
+
+      set({ loading: false });
+      console.log('[IntegrationStore] Switched to instance:', instanceId);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '切换实例失败',
+        loading: false,
+      });
+      console.error('[IntegrationStore] Switch instance error:', error);
+      throw error;
+    }
+  },
+
+  // 断开实例
+  disconnectInstance: async (platform) => {
+    set({ loading: true, error: null });
+    try {
+      await disconnectIntegrationInstance(platform);
+      set((state) => ({
+        activeInstances: {
+          ...state.activeInstances,
+          [platform]: null,
+        },
+      }));
+      await get().refreshStatus(platform);
+      set({ loading: false });
+      console.log('[IntegrationStore] Disconnected instance:', platform);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '断开实例失败',
+        loading: false,
+      });
+      console.error('[IntegrationStore] Disconnect instance error:', error);
+      throw error;
+    }
+  },
+
+  // 获取激活的实例
+  getActiveInstance: (platform) => {
+    const { instances, activeInstances } = get();
+    const activeId = activeInstances[platform];
+    if (!activeId) return null;
+    return instances.find((i) => i.id === activeId) || null;
+  },
+
+  // 设置激活的实例
+  setActiveInstance: (platform, instanceId) => {
+    set((state) => ({
+      activeInstances: {
+        ...state.activeInstances,
+        [platform]: instanceId,
+      },
+    }));
+  },
 }));
 
 // 选择器
@@ -254,3 +426,29 @@ export const useIntegrationLoading = () =>
 
 export const useIntegrationError = () =>
   useIntegrationStore((state) => state.error);
+
+// 获取激活实例的 ID（稳定值）
+export const useActiveInstanceId = (platform: Platform) =>
+  useIntegrationStore((state) => state.activeInstances[platform] ?? null);
+
+// 实例管理选择器 - 使用浅比较避免无限循环
+export const useIntegrationInstances = (platform?: Platform) => {
+  const allInstances = useIntegrationStore((state) => state.instances);
+  // 使用 useMemo 缓存过滤结果
+  return platform
+    ? allInstances.filter((i) => i.platform === platform)
+    : allInstances;
+};
+
+// 获取激活实例 - 通过 ID 查找，避免对象引用变化
+export const useActiveIntegrationInstance = (platform: Platform) => {
+  const activeId = useActiveInstanceId(platform);
+  const instances = useIntegrationStore((state) => state.instances);
+
+  // 直接返回找到的实例或 null
+  if (!activeId) return null;
+  return instances.find((i) => i.id === activeId) ?? null;
+};
+
+export const useHasActiveInstance = (platform: Platform) =>
+  useIntegrationStore((state) => !!state.activeInstances[platform]);

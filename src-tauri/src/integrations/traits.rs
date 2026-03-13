@@ -35,7 +35,9 @@ pub trait PlatformIntegration: Send + Sync {
     /// # Arguments
     /// * `target` - 发送目标
     /// * `content` - 消息内容
-    async fn send(&self, target: SendTarget, content: MessageContent) -> Result<()>;
+    ///
+    /// Note: 使用 `&mut self` 以支持发送前的 Token 刷新等操作
+    async fn send(&mut self, target: SendTarget, content: MessageContent) -> Result<()>;
 
     /// 获取当前状态
     fn status(&self) -> IntegrationStatus;

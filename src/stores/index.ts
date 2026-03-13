@@ -25,5 +25,9 @@ export {
   useIntegrationSessions,
   useIntegrationLoading,
   useIntegrationError,
+  // 实例管理选择器
+  useIntegrationInstances,
+  useActiveIntegrationInstance,
+  useHasActiveInstance,
 } from './integrationStore';
 export { useToastStore, type Toast, type ToastType } from './toastStore';

@@ -55,6 +55,10 @@ use commands::integration::{
     start_integration, stop_integration, get_integration_status,
     get_all_integration_status, send_integration_message,
     get_integration_sessions, init_integration,
+    add_integration_instance, remove_integration_instance,
+    list_integration_instances, list_integration_instances_by_platform,
+    get_active_integration_instance, switch_integration_instance,
+    disconnect_integration_instance,
 };
 
 
@@ -374,6 +378,14 @@ pub fn run() {
             send_integration_message,
             get_integration_sessions,
             init_integration,
+            // 实例管理
+            add_integration_instance,
+            remove_integration_instance,
+            list_integration_instances,
+            list_integration_instances_by_platform,
+            get_active_integration_instance,
+            switch_integration_instance,
+            disconnect_integration_instance,
 
         ])
         .run(tauri::generate_context!())
