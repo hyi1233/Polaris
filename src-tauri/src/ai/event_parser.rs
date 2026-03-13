@@ -156,7 +156,7 @@ impl EventParser {
         let message = if let Some(ref subtype) = subtype {
             // 使用表情替代文字，更简洁直观
             let message_map = HashMap::from([
-                ("init", "🔄"),        // 初始化会话
+                ("init", "💬"),        // 初始化会话
                 ("reading", "📖"),     // 读取文件
                 ("writing", "✏️"),     // 写入文件
                 ("thinking", "🤔"),    // 思考中

@@ -339,6 +339,18 @@ impl IntegrationManager {
                         match adapter.send(target, content).await {
                             Ok(_) => {
                                 tracing::info!("[IntegrationManager] ✅ 回复已发送到 QQ");
+
+                                // 发送完成消息（包含处理时间）
+                                let elapsed = start_time.elapsed();
+                                let elapsed_secs = elapsed.as_secs_f32();
+                                let complete_msg = format!("✅ 处理完成（⏰ {:.1}s）", elapsed_secs);
+
+                                let target = SendTarget::Conversation(conversation_id.clone());
+                                let complete_content = MessageContent::text(&complete_msg);
+
+                                if let Err(e) = adapter.send(target, complete_content).await {
+                                    tracing::error!("[IntegrationManager] ❌ 发送完成消息失败: {:?}", e);
+                                }
                             }
                             Err(e) => {
                                 tracing::error!("[IntegrationManager] ❌ 发送回复失败: {:?}", e);
