@@ -105,7 +105,11 @@ impl QQBotAdapter {
         // 提前 5 分钟过期
         self.token_expire_at = chrono::Utc::now().timestamp() + expires_in - 300;
 
-        tracing::info!("[QQBot] Access token obtained, expires in {}s", expires_in);
+        // 打印 token 信息（只显示前8个字符）
+        if let Some(ref token) = self.access_token {
+            let token_preview = if token.len() > 8 { &token[..8] } else { token };
+            tracing::info!("[QQBot] ✅ Access token obtained: {}..., expires in {}s", token_preview, expires_in);
+        }
 
         if self.access_token.is_none() {
             return Err(AppError::AuthError("响应中没有 access_token".to_string()));
@@ -151,6 +155,33 @@ impl QQBotAdapter {
             .json()
             .await
             .map_err(|e| AppError::ParseError(e.to_string()))?;
+
+        // 打印完整响应用于调试
+        tracing::info!("[QQBot] 📋 Gateway 响应: {}", serde_json::to_string(&data).unwrap_or_default());
+
+        // 检查 session_start_limit
+        if let Some(limit) = data.get("session_start_limit") {
+            let total = limit.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
+            let remaining = limit.get("remaining").and_then(|v| v.as_i64()).unwrap_or(0);
+            let reset_after = limit.get("reset_after").and_then(|v| v.as_i64()).unwrap_or(0);
+
+            tracing::info!(
+                "[QQBot] 📊 Session 限制: total={}, remaining={}, reset_after={}ms",
+                total, remaining, reset_after
+            );
+
+            if remaining <= 0 {
+                return Err(AppError::ApiError(format!(
+                    "会话启动次数已用完，{}ms 后重置",
+                    reset_after
+                )));
+            }
+        }
+
+        // 检查 shards 配置
+        if let Some(shards) = data.get("shards").and_then(|v| v.as_i64()) {
+            tracing::info!("[QQBot] 📊 建议的 shards 数量: {}", shards);
+        }
 
         data.get("url")
             .and_then(|v| v.as_str())
@@ -485,6 +516,44 @@ impl PlatformIntegration for QQBotAdapter {
                                     }
                                     Some(Ok(WsMessage::Close(frame))) => {
                                         tracing::warn!("[QQBot] Connection closed: {:?}", frame);
+
+                                        // 诊断常见错误码
+                                        if let Some(close_frame) = &frame {
+                                            let code = close_frame.code.into();
+                                            tracing::error!(
+                                                "[QQBot] ❌ 关闭码: {} ({})",
+                                                code,
+                                                close_frame.reason
+                                            );
+
+                                            match code {
+                                                4903 => {
+                                                    tracing::error!(
+                                                        "[QQBot] 诊断: 4903 错误通常是以下原因之一:\n\
+                                                        1. 并发连接限制 - 同一个 Bot 只能有一个 WebSocket 连接\n\
+                                                        2. Token 无效或过期\n\
+                                                        3. 应用未开通所请求的 intents 权限\n\
+                                                        4. Shard 配置与 Gateway 返回的不匹配"
+                                                    );
+                                                }
+                                                4004 => {
+                                                    tracing::error!("[QQBot] 诊断: Token 无效");
+                                                }
+                                                4010 => {
+                                                    tracing::error!("[QQBot] 诊断: 无效的 Shard 配置");
+                                                }
+                                                4011 => {
+                                                    tracing::error!("[QQBot] 诊断: Shard 数量超过限制");
+                                                }
+                                                4012 => {
+                                                    tracing::error!("[QQBot] 诊断: 无效的 Intents");
+                                                }
+                                                4013 => {
+                                                    tracing::error!("[QQBot] 诊断: Intents 超出白名单范围");
+                                                }
+                                                _ => {}
+                                            }
+                                        }
                                         break;
                                     }
                                     Some(Ok(WsMessage::Pong(_))) => {
