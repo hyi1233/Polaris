@@ -6,8 +6,8 @@
  */
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 use super::common::SessionManager;
@@ -24,8 +24,8 @@ pub struct IntegrationManager {
     message_rx: Option<mpsc::Receiver<IntegrationMessage>>,
     /// 消息发送通道
     message_tx: Option<mpsc::Sender<IntegrationMessage>>,
-    /// 平台适配器
-    adapters: HashMap<Platform, Box<dyn PlatformIntegration>>,
+    /// 平台适配器 (共享，用于消息处理任务发送回复)
+    adapters: Arc<Mutex<HashMap<Platform, Box<dyn PlatformIntegration>>>>,
     /// 会话管理
     sessions: SessionManager,
     /// App Handle (用于发送事件到前端)
@@ -46,7 +46,7 @@ impl IntegrationManager {
         Self {
             message_rx: None,
             message_tx: None,
-            adapters: HashMap::new(),
+            adapters: Arc::new(Mutex::new(HashMap::new())),
             sessions: SessionManager::new(),
             app_handle: None,
             running: false,
@@ -68,7 +68,7 @@ impl IntegrationManager {
     }
 
     /// 初始化
-    pub fn init(&mut self, qqbot_config: Option<QQBotConfig>, app_handle: AppHandle) {
+    pub async fn init(&mut self, qqbot_config: Option<QQBotConfig>, app_handle: AppHandle) {
         self.app_handle = Some(app_handle);
 
         // 创建消息通道
@@ -80,7 +80,8 @@ impl IntegrationManager {
         if let Some(config) = qqbot_config {
             if config.enabled && !config.app_id.is_empty() && !config.client_secret.is_empty() {
                 let adapter = QQBotAdapter::new(config);
-                self.adapters.insert(Platform::QQBot, Box::new(adapter));
+                let mut adapters = self.adapters.lock().await;
+                adapters.insert(Platform::QQBot, Box::new(adapter));
                 tracing::info!("[IntegrationManager] QQBot adapter registered");
             }
         }
@@ -92,14 +93,18 @@ impl IntegrationManager {
             .ok_or_else(|| crate::error::AppError::StateError("消息通道未初始化".to_string()))?
             .clone();
 
-        if let Some(adapter) = self.adapters.get_mut(&platform) {
-            adapter.connect(tx).await?;
-            tracing::info!("[IntegrationManager] {} started", platform);
-        } else {
-            return Err(crate::error::AppError::ValidationError(format!(
-                "平台 {} 未注册",
-                platform
-            )));
+        // 连接适配器
+        {
+            let mut adapters = self.adapters.lock().await;
+            if let Some(adapter) = adapters.get_mut(&platform) {
+                adapter.connect(tx).await?;
+                tracing::info!("[IntegrationManager] {} started", platform);
+            } else {
+                return Err(crate::error::AppError::ValidationError(format!(
+                    "平台 {} 未注册",
+                    platform
+                )));
+            }
         }
 
         // 启动消息处理任务（如果还没有启动）
@@ -107,13 +112,10 @@ impl IntegrationManager {
             let rx = self.message_rx.take();
             let app_handle = self.app_handle.clone();
             let engine_registry = self.engine_registry.clone();
+            let adapters = self.adapters.clone();
 
             if let (Some(rx), Some(app_handle)) = (rx, app_handle) {
                 tracing::info!("[IntegrationManager] 🚀 启动消息处理任务");
-
-                // 克隆 adapters 用于发送消息
-                // 注意：这里需要重新设计，因为 PlatformIntegration 不能简单克隆
-                // 解决方案：在任务中通过 app_handle 调用 Tauri command 发送消息
 
                 let task = tokio::spawn(async move {
                     tracing::info!("[IntegrationManager] 📨 消息处理任务已启动，等待消息...");
@@ -138,11 +140,18 @@ impl IntegrationManager {
                         if let Some(ref registry) = engine_registry {
                             if let Some(text) = msg.content.as_text() {
                                 if !text.is_empty() {
+                                    let platform = msg.platform;
+                                    let conversation_id = msg.conversation_id.clone();
+                                    let adapters_clone = adapters.clone();
+                                    let app_handle_clone = app_handle.clone();
+
                                     Self::process_ai_message(
                                         registry.clone(),
-                                        msg.conversation_id.clone(),
+                                        conversation_id,
                                         text.to_string(),
-                                        app_handle.clone(),
+                                        app_handle_clone,
+                                        platform,
+                                        adapters_clone,
                                     ).await;
                                 }
                             }
@@ -167,6 +176,8 @@ impl IntegrationManager {
         conversation_id: String,
         message: String,
         app_handle: AppHandle,
+        platform: Platform,
+        adapters: Arc<Mutex<HashMap<Platform, Box<dyn PlatformIntegration>>>>,
     ) {
         tracing::info!("[IntegrationManager] 🤖 开始 AI 回复: conversation={}", conversation_id);
 
@@ -182,8 +193,8 @@ impl IntegrationManager {
             if let Some(text) = event.extract_text() {
                 tracing::debug!("[IntegrationManager] AI 文本: {}", text);
 
-                // 累积文本
-                if let Ok(mut accumulated) = accumulated_text_clone.lock() {
+                // 累积文本 (使用 try_lock 避免阻塞)
+                if let Ok(mut accumulated) = accumulated_text_clone.try_lock() {
                     accumulated.push_str(&text);
                 }
 
@@ -208,7 +219,7 @@ impl IntegrationManager {
 
         // 调用 AI 引擎
         let result = {
-            let mut registry = engine_registry.lock().unwrap();
+            let mut registry = engine_registry.lock().await;
             let options = crate::ai::SessionOptions::new(callback)
                 .with_system_prompt("你是一个友好的助手，通过 QQ 回复用户消息。回复简洁、有帮助。");
 
@@ -219,13 +230,37 @@ impl IntegrationManager {
             Ok(session_id) => {
                 tracing::info!("[IntegrationManager] AI 会话创建: session_id={}", session_id);
 
-                // 发送完整回复事件
-                let final_text = accumulated_text.lock().unwrap().clone();
+                // 获取完整回复文本
+                let final_text = accumulated_text.lock().await.clone();
+
+                // 发送完整回复事件到前端
                 let _ = app_handle.emit("integration:ai:complete", serde_json::json!({
                     "conversationId": conversation_id,
                     "sessionId": session_id,
                     "text": final_text
                 }));
+
+                // 发送回复到 QQ
+                if !final_text.is_empty() {
+                    tracing::info!("[IntegrationManager] 📤 发送回复到 {}: {}", platform, conversation_id);
+
+                    let mut adapters_guard = adapters.lock().await;
+                    if let Some(adapter) = adapters_guard.get_mut(&platform) {
+                        let target = SendTarget::Conversation(conversation_id.clone());
+                        let content = MessageContent::text(&final_text);
+
+                        match adapter.send(target, content).await {
+                            Ok(_) => {
+                                tracing::info!("[IntegrationManager] ✅ 回复已发送到 QQ");
+                            }
+                            Err(e) => {
+                                tracing::error!("[IntegrationManager] ❌ 发送回复失败: {:?}", e);
+                            }
+                        }
+                    } else {
+                        tracing::warn!("[IntegrationManager] ⚠️ 未找到 {} 适配器", platform);
+                    }
+                }
             }
             Err(e) => {
                 tracing::error!("[IntegrationManager] AI 会话创建失败: {:?}", e);
@@ -239,7 +274,8 @@ impl IntegrationManager {
 
     /// 停止指定平台
     pub async fn stop(&mut self, platform: Platform) -> Result<()> {
-        if let Some(adapter) = self.adapters.get_mut(&platform) {
+        let mut adapters = self.adapters.lock().await;
+        if let Some(adapter) = adapters.get_mut(&platform) {
             adapter.disconnect().await?;
             tracing::info!("[IntegrationManager] {} stopped", platform);
         }
@@ -248,7 +284,10 @@ impl IntegrationManager {
 
     /// 启动所有平台
     pub async fn start_all(&mut self) -> Result<()> {
-        let platforms: Vec<Platform> = self.adapters.keys().copied().collect();
+        let platforms: Vec<Platform> = {
+            let adapters = self.adapters.lock().await;
+            adapters.keys().copied().collect()
+        };
 
         for platform in platforms {
             if let Err(e) = self.start(platform).await {
@@ -262,7 +301,10 @@ impl IntegrationManager {
 
     /// 停止所有平台
     pub async fn stop_all(&mut self) -> Result<()> {
-        let platforms: Vec<Platform> = self.adapters.keys().copied().collect();
+        let platforms: Vec<Platform> = {
+            let adapters = self.adapters.lock().await;
+            adapters.keys().copied().collect()
+        };
 
         for platform in platforms {
             let _ = self.stop(platform).await;
@@ -279,7 +321,8 @@ impl IntegrationManager {
         target: SendTarget,
         content: MessageContent,
     ) -> Result<()> {
-        if let Some(adapter) = self.adapters.get(&platform) {
+        let mut adapters = self.adapters.lock().await;
+        if let Some(adapter) = adapters.get_mut(&platform) {
             adapter.send(target, content).await
         } else {
             Err(crate::error::AppError::ValidationError(format!(
@@ -290,13 +333,15 @@ impl IntegrationManager {
     }
 
     /// 获取平台状态
-    pub fn status(&self, platform: Platform) -> Option<IntegrationStatus> {
-        self.adapters.get(&platform).map(|a| a.status())
+    pub async fn status(&self, platform: Platform) -> Option<IntegrationStatus> {
+        let adapters = self.adapters.lock().await;
+        adapters.get(&platform).map(|a| a.status())
     }
 
     /// 获取所有状态
-    pub fn all_status(&self) -> HashMap<Platform, IntegrationStatus> {
-        self.adapters
+    pub async fn all_status(&self) -> HashMap<Platform, IntegrationStatus> {
+        let adapters = self.adapters.lock().await;
+        adapters
             .iter()
             .map(|(p, a)| (*p, a.status()))
             .collect()
@@ -338,8 +383,9 @@ impl IntegrationManager {
     }
 
     /// 注册平台
-    pub fn register(&mut self, platform: Platform, adapter: Box<dyn PlatformIntegration>) {
-        self.adapters.insert(platform, adapter);
+    pub async fn register(&mut self, platform: Platform, adapter: Box<dyn PlatformIntegration>) {
+        let mut adapters = self.adapters.lock().await;
+        adapters.insert(platform, adapter);
     }
 }
 

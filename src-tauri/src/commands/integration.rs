@@ -51,7 +51,7 @@ pub async fn get_integration_status(
         .map_err(|e: String| crate::error::AppError::ValidationError(e))?;
 
     let manager = state.integration_manager.lock().await;
-    Ok(manager.status(platform))
+    Ok(manager.status(platform).await)
 }
 
 /// 获取所有集成状态
@@ -62,6 +62,7 @@ pub async fn get_all_integration_status(
     let manager = state.integration_manager.lock().await;
     Ok(manager
         .all_status()
+        .await
         .into_iter()
         .map(|(p, s)| (p.to_string(), s))
         .collect())
@@ -100,6 +101,6 @@ pub async fn init_integration(
     state: State<'_, crate::AppState>,
 ) -> Result<()> {
     let mut manager = state.integration_manager.lock().await;
-    manager.init(qqbot_config, app_handle);
+    manager.init(qqbot_config, app_handle).await;
     Ok(())
 }

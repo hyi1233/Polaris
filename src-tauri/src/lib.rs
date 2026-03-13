@@ -88,8 +88,8 @@ pub struct AppState {
     pub dingtalk_service: Mutex<DingTalkService>,
     /// 集成管理器 (使用 tokio::sync::Mutex 支持异步操作)
     pub integration_manager: AsyncMutex<IntegrationManager>,
-    /// AI 引擎注册表（使用 Arc<Mutex> 支持共享）
-    pub engine_registry: Arc<Mutex<EngineRegistry>>,
+    /// AI 引擎注册表（使用 tokio::sync::Mutex 支持异步操作和共享）
+    pub engine_registry: Arc<AsyncMutex<EngineRegistry>>,
 }
 
 // ============================================================================
@@ -235,8 +235,8 @@ pub fn run() {
         .unwrap_or(ai::EngineId::ClaudeCode);
     let _ = engine_registry.set_default(default_engine);
 
-    // 使用 Arc 共享 engine_registry
-    let engine_registry_arc = Arc::new(Mutex::new(engine_registry));
+    // 使用 Arc 共享 engine_registry (使用 tokio::sync::Mutex 支持异步)
+    let engine_registry_arc = Arc::new(AsyncMutex::new(engine_registry));
 
     // 初始化 IntegrationManager，共享 engine_registry
     let integration_manager = IntegrationManager::new()
