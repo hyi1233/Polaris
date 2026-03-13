@@ -160,11 +160,17 @@ impl SessionManager {
     }
 
     /// 终止进程
+    ///
+    /// 返回值：
+    /// - Ok(true): 会话存在，已处理（kill 成功或进程已结束）
+    /// - Ok(false): 会话不存在
     pub fn kill_process(&self, session_id: &str) -> Result<bool> {
-        // 获取 PID
-        let pid = self.get_pid(session_id);
+        // 获取会话信息
+        let info = self.get(session_id);
 
-        if let Some(pid) = pid {
+        if let Some(info) = info {
+            let pid = info.pid;
+
             #[cfg(windows)]
             {
                 let output = std::process::Command::new("taskkill")
@@ -173,19 +179,22 @@ impl SessionManager {
 
                 match output {
                     Ok(o) if o.status.success() => {
-                        // 移除会话（包括所有别名）
-                        self.remove(session_id);
-                        return Ok(true);
+                        tracing::info!("[SessionManager] 进程 {} 已终止", pid);
                     }
                     Ok(o) => {
-                        tracing::warn!("[SessionManager] taskkill 失败: {}", String::from_utf8_lossy(&o.stderr));
-                        return Ok(false);
+                        // taskkill 失败通常意味着进程已结束
+                        let stderr = String::from_utf8_lossy(&o.stderr);
+                        tracing::debug!("[SessionManager] taskkill 失败 (进程可能已结束): {}", stderr);
                     }
                     Err(e) => {
-                        tracing::error!("[SessionManager] taskkill 执行失败: {}", e);
-                        return Ok(false);
+                        tracing::warn!("[SessionManager] taskkill 执行失败: {}", e);
                     }
                 }
+
+                // 无论 taskkill 是否成功，都移除会话并返回 true
+                // 因为进程可能已经结束了
+                self.remove(session_id);
+                return Ok(true);
             }
 
             #[cfg(not(windows))]
@@ -197,14 +206,19 @@ impl SessionManager {
 
                 match output {
                     Ok(o) if o.status.success() => {
-                        self.remove(session_id);
-                        return Ok(true);
+                        tracing::info!("[SessionManager] 进程 {} 已终止", pid);
                     }
-                    _ => return Ok(false),
+                    _ => {
+                        tracing::debug!("[SessionManager] kill 失败 (进程可能已结束)");
+                    }
                 }
+
+                self.remove(session_id);
+                return Ok(true);
             }
         }
 
+        // 会话不存在
         Ok(false)
     }
 }

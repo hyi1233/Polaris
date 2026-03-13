@@ -373,24 +373,28 @@ impl AIEngine for ClaudeEngine {
     ) -> Result<()> {
         tracing::info!("[ClaudeEngine] 继续会话: {}, 消息长度: {}", session_id, message.len());
 
-        // 获取旧会话的 PID 并终止
-        if let Some(info) = self.sessions.get(session_id) {
-            tracing::info!("[ClaudeEngine] 终止旧进程 PID: {}", info.pid);
+        // 获取会话信息，找到真实的 session_id
+        let real_session_id = if let Some(info) = self.sessions.get(session_id) {
+            tracing::info!("[ClaudeEngine] 找到会话，真实 ID: {}, PID: {}", info.id, info.pid);
             // 终止旧进程
+            tracing::info!("[ClaudeEngine] 终止旧进程 PID: {}", info.pid);
             let _ = self.sessions.kill_process(session_id);
-            // 等待进程完全退出
             std::thread::sleep(std::time::Duration::from_millis(100));
-        }
+            info.id.clone() // 使用真实 ID
+        } else {
+            tracing::warn!("[ClaudeEngine] 未找到会话信息，使用传入的 session_id");
+            session_id.to_string()
+        };
 
         // 确定工作目录
         let work_dir = options.work_dir.clone()
             .or_else(|| self.config.work_dir.as_ref().map(|p| p.to_string_lossy().to_string()));
 
         tracing::info!("[ClaudeEngine] 工作目录: {:?}", work_dir);
-        tracing::info!("[ClaudeEngine] 使用 --resume 参数，session_id: {}", session_id);
+        tracing::info!("[ClaudeEngine] 使用 --resume 参数，session_id: {}", real_session_id);
 
-        // 构建命令（带 --resume）
-        let mut cmd = self.build_command(message, options.system_prompt.as_deref(), Some(session_id))?;
+        // 构建命令（带 --resume，使用真实 session_id）
+        let mut cmd = self.build_command(message, options.system_prompt.as_deref(), Some(&real_session_id))?;
         self.configure_command(&mut cmd, work_dir.as_deref());
 
         tracing::info!("[ClaudeEngine] 命令构建完成，准备启动进程...");
@@ -403,11 +407,11 @@ impl AIEngine for ClaudeEngine {
 
         tracing::info!("[ClaudeEngine] 进程启动，PID: {}", pid);
 
-        // 更新会话 PID（使用传入的 session_id，因为 --resume 使用这个 ID）
-        self.sessions.register(session_id.to_string(), pid, "claude".to_string())?;
+        // 更新会话 PID（使用真实 session_id）
+        self.sessions.register(real_session_id.clone(), pid, "claude".to_string())?;
 
         // 启动事件读取
-        self.spawn_event_reader(child, session_id.to_string(), pid, options);
+        self.spawn_event_reader(child, real_session_id.clone(), pid, options);
 
         Ok(())
     }
