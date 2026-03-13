@@ -368,13 +368,22 @@ impl AIEngine for ClaudeEngine {
 
         // 获取旧会话的 PID 并终止
         if let Some(info) = self.sessions.get(session_id) {
+            tracing::info!("[ClaudeEngine] 终止旧进程 PID: {}", info.pid);
             // 终止旧进程
             let _ = self.sessions.kill_process(session_id);
+            // 等待进程完全退出
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
+
+        // 确定工作目录
+        let work_dir = options.work_dir.clone()
+            .or_else(|| self.config.work_dir.as_ref().map(|p| p.to_string_lossy().to_string()));
+
+        tracing::info!("[ClaudeEngine] 工作目录: {:?}", work_dir);
 
         // 构建命令（带 --resume）
         let mut cmd = self.build_command(message, options.system_prompt.as_deref(), Some(session_id))?;
-        self.configure_command(&mut cmd, options.work_dir.as_deref());
+        self.configure_command(&mut cmd, work_dir.as_deref());
 
         // 启动进程
         let child = cmd.spawn()

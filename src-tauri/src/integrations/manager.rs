@@ -454,9 +454,12 @@ impl IntegrationManager {
 
         // 创建事件回调
         let callback = move |event: crate::models::AIEvent| {
+            // 记录事件类型
+            tracing::debug!("[IntegrationManager] 收到事件: {:?}", std::mem::discriminant(&event));
+
             // 提取文本
             if let Some(text) = event.extract_text() {
-                tracing::debug!("[IntegrationManager] AI 文本: {}", text);
+                tracing::info!("[IntegrationManager] AI 文本 (len={}): {}", text.len(), if text.len() > 100 { &text[..100] } else { &text });
 
                 // 累积文本
                 if let Ok(mut accumulated) = accumulated_text_clone.try_lock() {
@@ -484,7 +487,7 @@ impl IntegrationManager {
             }
 
             if event.is_error() {
-                tracing::error!("[IntegrationManager] AI 会话出错");
+                tracing::error!("[IntegrationManager] AI 会话出错: {:?}", event);
             }
         };
 
