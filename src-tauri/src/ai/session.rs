@@ -2,6 +2,7 @@
  * 会话管理
  *
  * 管理引擎的活动会话，追踪进程 PID 以支持中断等操作。
+ * 支持临时 session_id 到真实 session_id 的别名映射。
  */
 
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use crate::error::{AppError, Result};
 /// 会话信息
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
-    /// 会话 ID
+    /// 会话 ID（真实 ID）
     pub id: String,
     /// 进程 PID
     pub pid: u32,
@@ -19,6 +20,8 @@ pub struct SessionInfo {
     pub engine_id: String,
     /// 创建时间
     pub created_at: i64,
+    /// 别名列表（临时 ID -> 真实 ID 的映射）
+    pub aliases: Vec<String>,
 }
 
 /// 会话管理器
@@ -42,6 +45,7 @@ impl SessionManager {
             pid,
             engine_id,
             created_at: chrono::Utc::now().timestamp(),
+            aliases: Vec::new(),
         };
 
         let mut sessions = self.sessions.lock()
@@ -52,16 +56,28 @@ impl SessionManager {
     }
 
     /// 更新会话 ID（当引擎返回真实 session_id 时）
+    ///
+    /// 保留旧 ID 作为别名，这样用临时 ID 也能找到会话
     pub fn update_session_id(&self, old_id: &str, new_id: &str) -> Result<()> {
         let mut sessions = self.sessions.lock()
             .map_err(|e| AppError::Unknown(format!("锁获取失败: {}", e)))?;
 
-        if let Some(info) = sessions.remove(old_id) {
-            let updated = SessionInfo {
-                id: new_id.to_string(),
-                ..info
-            };
-            sessions.insert(new_id.to_string(), updated);
+        if let Some(mut info) = sessions.remove(old_id) {
+            // 将旧 ID 添加到别名列表
+            if !info.aliases.contains(&old_id.to_string()) {
+                info.aliases.push(old_id.to_string());
+            }
+
+            // 更新为新的真实 ID
+            info.id = new_id.to_string();
+
+            // 插入新 ID 映射
+            sessions.insert(new_id.to_string(), info.clone());
+
+            // 同时为所有别名创建指向同一 SessionInfo 的引用
+            for alias in &info.aliases {
+                sessions.insert(alias.clone(), info.clone());
+            }
         }
 
         Ok(())
@@ -79,16 +95,32 @@ impl SessionManager {
         sessions.get(session_id).map(|info| info.pid)
     }
 
-    /// 移除会话
+    /// 移除会话（同时移除所有别名）
     pub fn remove(&self, session_id: &str) -> Option<SessionInfo> {
         let mut sessions = self.sessions.lock().ok()?;
-        sessions.remove(session_id)
+
+        // 先获取会话信息，以获取所有别名
+        let info = sessions.get(session_id).cloned()?;
+
+        // 移除真实 ID
+        sessions.remove(&info.id);
+
+        // 移除所有别名
+        for alias in &info.aliases {
+            sessions.remove(alias);
+        }
+
+        Some(info)
     }
 
-    /// 获取活动会话数量
+    /// 获取活动会话数量（按真实 ID 计数）
     pub fn count(&self) -> usize {
         let sessions = self.sessions.lock().ok();
-        sessions.map(|s| s.len()).unwrap_or(0)
+        sessions.map(|s| {
+            s.values()
+                .filter(|info| info.id == *s.keys().find(|k| s.get(*k).map(|i| i.id == **k).unwrap_or(false)).unwrap_or(&String::new()))
+                .count()
+        }).unwrap_or(0)
     }
 
     /// 获取会话管理器的共享引用
@@ -97,6 +129,8 @@ impl SessionManager {
     }
 
     /// 通过共享引用更新 session_id（用于后台线程）
+    ///
+    /// 保留旧 ID 作为别名，这样用临时 ID 也能找到会话
     pub fn update_session_id_shared(
         sessions: &Arc<Mutex<HashMap<String, SessionInfo>>>,
         old_id: &str,
@@ -105,19 +139,29 @@ impl SessionManager {
         engine_id: &str,
     ) {
         if let Ok(mut s) = sessions.lock() {
-            s.remove(old_id);
+            // 创建新的 SessionInfo，将 old_id 作为别名
+            let mut aliases = Vec::new();
+            aliases.push(old_id.to_string());
+
             let info = SessionInfo {
                 id: new_id.to_string(),
                 pid,
                 engine_id: engine_id.to_string(),
                 created_at: chrono::Utc::now().timestamp(),
+                aliases: aliases.clone(),
             };
-            s.insert(new_id.to_string(), info);
+
+            // 插入新 ID 映射
+            s.insert(new_id.to_string(), info.clone());
+
+            // 为旧 ID（临时 ID）也创建映射
+            s.insert(old_id.to_string(), info);
         }
     }
 
     /// 终止进程
     pub fn kill_process(&self, session_id: &str) -> Result<bool> {
+        // 获取 PID
         let pid = self.get_pid(session_id);
 
         if let Some(pid) = pid {
@@ -129,10 +173,18 @@ impl SessionManager {
 
                 match output {
                     Ok(o) if o.status.success() => {
+                        // 移除会话（包括所有别名）
                         self.remove(session_id);
                         return Ok(true);
                     }
-                    _ => return Ok(false),
+                    Ok(o) => {
+                        tracing::warn!("[SessionManager] taskkill 失败: {}", String::from_utf8_lossy(&o.stderr));
+                        return Ok(false);
+                    }
+                    Err(e) => {
+                        tracing::error!("[SessionManager] taskkill 执行失败: {}", e);
+                        return Ok(false);
+                    }
                 }
             }
 

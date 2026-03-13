@@ -503,9 +503,11 @@ impl AIEngine for CodexEngine {
 
         if self.sessions.kill_process(session_id)? {
             tracing::info!("[CodexEngine] 会话已中断: {}", session_id);
+            Ok(())
+        } else {
+            // 找不到会话，返回错误让调用者尝试其他引擎
+            Err(AppError::ProcessError(format!("会话不存在: {}", session_id)))
         }
-
-        Ok(())
     }
 
     fn active_session_count(&self) -> usize {

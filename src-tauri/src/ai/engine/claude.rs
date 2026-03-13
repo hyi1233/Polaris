@@ -244,7 +244,8 @@ impl ClaudeEngine {
             std::thread::spawn(move || {
                 let reader = BufReader::new(stderr);
                 for line in reader.lines().flatten() {
-                    tracing::debug!("[claude stderr] {}", line);
+                    // 使用 warn 级别，确保 stderr 错误被记录
+                    tracing::warn!("[ClaudeEngine] stderr: {}", line);
                 }
             });
 
@@ -386,10 +387,13 @@ impl AIEngine for ClaudeEngine {
             .or_else(|| self.config.work_dir.as_ref().map(|p| p.to_string_lossy().to_string()));
 
         tracing::info!("[ClaudeEngine] 工作目录: {:?}", work_dir);
+        tracing::info!("[ClaudeEngine] 使用 --resume 参数，session_id: {}", session_id);
 
         // 构建命令（带 --resume）
         let mut cmd = self.build_command(message, options.system_prompt.as_deref(), Some(session_id))?;
         self.configure_command(&mut cmd, work_dir.as_deref());
+
+        tracing::info!("[ClaudeEngine] 命令构建完成，准备启动进程...");
 
         // 启动进程
         let child = cmd.spawn()
@@ -399,7 +403,7 @@ impl AIEngine for ClaudeEngine {
 
         tracing::info!("[ClaudeEngine] 进程启动，PID: {}", pid);
 
-        // 更新会话 PID
+        // 更新会话 PID（使用传入的 session_id，因为 --resume 使用这个 ID）
         self.sessions.register(session_id.to_string(), pid, "claude".to_string())?;
 
         // 启动事件读取
@@ -413,9 +417,11 @@ impl AIEngine for ClaudeEngine {
 
         if self.sessions.kill_process(session_id)? {
             tracing::info!("[ClaudeEngine] 会话已中断: {}", session_id);
+            Ok(())
+        } else {
+            // 找不到会话，返回错误让调用者尝试其他引擎
+            Err(AppError::ProcessError(format!("会话不存在: {}", session_id)))
         }
-
-        Ok(())
     }
 
     fn active_session_count(&self) -> usize {

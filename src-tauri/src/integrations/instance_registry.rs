@@ -85,6 +85,8 @@ pub struct InstanceRegistry {
     /// 所有实例
     instances: Vec<PlatformInstance>,
     /// 当前激活的实例（按平台）
+    /// 注意：激活状态不持久化，因为 WebSocket 连接无法持久化
+    #[serde(skip)]
     active_instances: HashMap<String, InstanceId>,
 }
 

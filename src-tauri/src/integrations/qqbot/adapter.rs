@@ -107,7 +107,7 @@ impl QQBotAdapter {
 
         // 打印 token 信息（只显示前8个字符）
         if let Some(ref token) = self.access_token {
-            let token_preview = if token.len() > 8 { &token[..8] } else { token };
+            let token_preview: String = token.chars().take(8).collect();
             tracing::info!("[QQBot] ✅ Access token obtained: {}..., expires in {}s", token_preview, expires_in);
         }
 
@@ -329,12 +329,15 @@ impl QQBotAdapter {
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
+        // 使用字符安全的截断方式
+        let content_preview: String = content.chars().take(50).collect();
+        let content_preview = if content_preview.len() < content.len() { format!("{}...", content_preview) } else { content_preview };
         tracing::info!(
             "[QQBot] 📝 消息详情: type={}, sender={}, conversation={}, content={}",
             msg_type,
             sender_name,
             conversation_id,
-            if content.len() > 50 { &content[..50] } else { content }
+            content_preview
         );
 
         // 构造消息

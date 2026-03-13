@@ -7,6 +7,7 @@
  */
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, oneshot};
 use tauri::{AppHandle, Emitter};
@@ -47,6 +48,8 @@ pub struct IntegrationManager {
     active_sessions: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
     /// 实例注册表（多配置管理）
     instance_registry: Arc<Mutex<InstanceRegistry>>,
+    /// 实例数据存储路径
+    instances_path: Option<PathBuf>,
 }
 
 impl IntegrationManager {
@@ -65,6 +68,7 @@ impl IntegrationManager {
             session_map: HashMap::new(),
             active_sessions: Arc::new(Mutex::new(HashMap::new())),
             instance_registry: Arc::new(Mutex::new(InstanceRegistry::new())),
+            instances_path: None,
         }
     }
 
@@ -81,20 +85,83 @@ impl IntegrationManager {
 
     /// 初始化
     pub async fn init(&mut self, qqbot_config: Option<QQBotConfig>, app_handle: AppHandle) {
-        self.app_handle = Some(app_handle);
+        self.app_handle = Some(app_handle.clone());
+
+        // 初始化实例存储路径
+        if let Some(config_dir) = dirs::config_dir() {
+            let data_dir = config_dir.join("claude-code-pro");
+            if let Err(e) = std::fs::create_dir_all(&data_dir) {
+                tracing::warn!("[IntegrationManager] 无法创建数据目录: {}", e);
+            }
+            self.instances_path = Some(data_dir.join("instances.json"));
+            tracing::info!("[IntegrationManager] 实例存储路径: {:?}", self.instances_path);
+        }
 
         // 创建消息通道
         let (tx, rx) = mpsc::channel(100);
         self.message_tx = Some(tx);
         self.message_rx = Some(rx);
 
-        // 初始化 QQ Bot
-        if let Some(config) = qqbot_config {
-            if config.enabled && !config.app_id.is_empty() && !config.client_secret.is_empty() {
-                let adapter = QQBotAdapter::new(config);
-                let mut adapters = self.adapters.lock().await;
-                adapters.insert(Platform::QQBot, Box::new(adapter));
-                tracing::info!("[IntegrationManager] QQBot adapter registered");
+        // 加载已保存的实例
+        self.load_instances_from_file();
+
+        // 初始化 QQ Bot（仅当没有已保存的实例时使用传入的配置）
+        if self.instance_registry.lock().await.count() == 0 {
+            if let Some(config) = qqbot_config {
+                if config.enabled && !config.app_id.is_empty() && !config.client_secret.is_empty() {
+                    let adapter = QQBotAdapter::new(config);
+                    let mut adapters = self.adapters.lock().await;
+                    adapters.insert(Platform::QQBot, Box::new(adapter));
+                    tracing::info!("[IntegrationManager] QQBot adapter registered");
+                }
+            }
+        }
+    }
+
+    /// 从文件加载实例
+    fn load_instances_from_file(&mut self) {
+        if let Some(ref path) = self.instances_path {
+            if path.exists() {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => {
+                        match InstanceRegistry::from_json(&content) {
+                            Ok(registry) => {
+                                let count = registry.count();
+                                // 同步更新实例注册表
+                                if let Ok(mut instance_registry) = self.instance_registry.try_lock() {
+                                    *instance_registry = registry;
+                                    tracing::info!("[IntegrationManager] ✅ 已加载 {} 个实例", count);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("[IntegrationManager] 解析实例文件失败: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("[IntegrationManager] 读取实例文件失败: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    /// 保存实例到文件
+    fn save_instances_to_file(&self) {
+        if let Some(ref path) = self.instances_path {
+            if let Ok(registry) = self.instance_registry.try_lock() {
+                match registry.to_json() {
+                    Ok(json) => {
+                        if let Err(e) = std::fs::write(path, json) {
+                            tracing::warn!("[IntegrationManager] 保存实例文件失败: {}", e);
+                        } else {
+                            tracing::debug!("[IntegrationManager] ✅ 已保存 {} 个实例", registry.count());
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("[IntegrationManager] 序列化实例失败: {}", e);
+                    }
+                }
             }
         }
     }
@@ -120,56 +187,7 @@ impl IntegrationManager {
         }
 
         // 启动消息处理任务（如果还没有启动）
-        if self.message_task.is_none() {
-            let rx = self.message_rx.take();
-            let app_handle = self.app_handle.clone();
-            let engine_registry = self.engine_registry.clone();
-            let adapters = self.adapters.clone();
-            let conversation_states = self.conversation_states.clone();
-            let active_sessions = self.active_sessions.clone();
-
-            if let (Some(rx), Some(app_handle)) = (rx, app_handle) {
-                tracing::info!("[IntegrationManager] 🚀 启动消息处理任务");
-
-                let task = tokio::spawn(async move {
-                    tracing::info!("[IntegrationManager] 📨 消息处理任务已启动，等待消息...");
-                    let mut rx = rx;
-
-                    while let Some(msg) = rx.recv().await {
-                        tracing::info!(
-                            "[IntegrationManager] 📩 收到消息: id={}, platform={}, conversation={}",
-                            msg.id,
-                            msg.platform,
-                            msg.conversation_id
-                        );
-
-                        // 发送到前端
-                        if let Err(e) = app_handle.emit("integration:message", &msg) {
-                            tracing::error!("[IntegrationManager] ❌ 发送消息到前端失败: {}", e);
-                        } else {
-                            tracing::info!("[IntegrationManager] ✅ 消息已发送到前端");
-                        }
-
-                        // 处理消息
-                        Self::handle_message(
-                            msg,
-                            app_handle.clone(),
-                            platform,
-                            adapters.clone(),
-                            engine_registry.clone(),
-                            conversation_states.clone(),
-                            active_sessions.clone(),
-                        ).await;
-                    }
-
-                    tracing::warn!("[IntegrationManager] ⚠️ 消息处理任务结束");
-                });
-
-                self.message_task = Some(task);
-            } else {
-                tracing::error!("[IntegrationManager] ❌ 无法启动消息处理任务: message_rx 或 app_handle 为空");
-            }
-        }
+        self.start_message_processing_task(platform);
 
         Ok(())
     }
@@ -257,7 +275,11 @@ impl IntegrationManager {
                 state.prompt_mode = if replace_mode { PromptMode::Replace } else { PromptMode::Append };
 
                 let prompt_info = match custom_prompt {
-                    Some(p) => format!("（提示词: {}）", if p.len() > 20 { &p[..20] } else { &p }),
+                    Some(p) => {
+                        let preview: String = p.chars().take(20).collect();
+                        let preview = if preview.len() < p.len() { format!("{}...", preview) } else { preview };
+                        format!("（提示词: {}）", preview)
+                    }
                     None => "".to_string(),
                 };
                 Some(format!("✅ 已切换到 {} 模型{}", provider, prompt_info))
@@ -459,7 +481,10 @@ impl IntegrationManager {
 
             // 提取文本
             if let Some(text) = event.extract_text() {
-                tracing::info!("[IntegrationManager] AI 文本 (len={}): {}", text.len(), if text.len() > 100 { &text[..100] } else { &text });
+                // 使用字符安全的截断方式，避免在多字节 UTF-8 字符中间切割
+                let preview: String = text.chars().take(100).collect();
+                let preview = if preview.len() < text.len() { format!("{}...", preview) } else { preview };
+                tracing::info!("[IntegrationManager] AI 文本 (len={}): {}", text.len(), preview);
 
                 // 累积文本
                 if let Ok(mut accumulated) = accumulated_text_clone.try_lock() {
@@ -768,13 +793,23 @@ impl IntegrationManager {
     /// 添加实例配置
     pub async fn add_instance(&self, instance: PlatformInstance) -> InstanceId {
         let mut registry = self.instance_registry.lock().await;
-        registry.add(instance)
+        let id = registry.add(instance);
+        drop(registry); // 释放锁后再保存
+        self.save_instances_to_file();
+        tracing::info!("[IntegrationManager] ✅ 实例已添加并保存: {}", id);
+        id
     }
 
     /// 移除实例配置
     pub async fn remove_instance(&self, instance_id: &str) -> Option<PlatformInstance> {
         let mut registry = self.instance_registry.lock().await;
-        registry.remove(instance_id)
+        let removed = registry.remove(instance_id);
+        drop(registry); // 释放锁后再保存
+        self.save_instances_to_file();
+        if removed.is_some() {
+            tracing::info!("[IntegrationManager] ✅ 实例已移除并保存: {}", instance_id);
+        }
+        removed
     }
 
     /// 获取所有实例
@@ -885,8 +920,71 @@ impl IntegrationManager {
             }
         }
 
+        // 8. 启动消息处理任务（如果还没有启动）
+        self.start_message_processing_task(platform);
+
+        // 保存激活状态
+        self.save_instances_to_file();
+
         tracing::info!("[IntegrationManager] ✅ 实例切换成功: {}", instance.name);
         Ok(())
+    }
+
+    /// 启动消息处理任务
+    fn start_message_processing_task(&mut self, platform: Platform) {
+        if self.message_task.is_some() {
+            tracing::debug!("[IntegrationManager] 消息处理任务已在运行");
+            return;
+        }
+
+        let rx = self.message_rx.take();
+        let app_handle = self.app_handle.clone();
+        let engine_registry = self.engine_registry.clone();
+        let adapters = self.adapters.clone();
+        let conversation_states = self.conversation_states.clone();
+        let active_sessions = self.active_sessions.clone();
+
+        if let (Some(rx), Some(app_handle)) = (rx, app_handle) {
+            tracing::info!("[IntegrationManager] 🚀 启动消息处理任务");
+
+            let task = tokio::spawn(async move {
+                tracing::info!("[IntegrationManager] 📨 消息处理任务已启动，等待消息...");
+                let mut rx = rx;
+
+                while let Some(msg) = rx.recv().await {
+                    tracing::info!(
+                        "[IntegrationManager] 📩 收到消息: id={}, platform={}, conversation={}",
+                        msg.id,
+                        msg.platform,
+                        msg.conversation_id
+                    );
+
+                    // 发送到前端
+                    if let Err(e) = app_handle.emit("integration:message", &msg) {
+                        tracing::error!("[IntegrationManager] ❌ 发送消息到前端失败: {}", e);
+                    } else {
+                        tracing::info!("[IntegrationManager] ✅ 消息已发送到前端");
+                    }
+
+                    // 处理消息
+                    Self::handle_message(
+                        msg,
+                        app_handle.clone(),
+                        platform,
+                        adapters.clone(),
+                        engine_registry.clone(),
+                        conversation_states.clone(),
+                        active_sessions.clone(),
+                    ).await;
+                }
+
+                tracing::warn!("[IntegrationManager] ⚠️ 消息处理任务结束");
+            });
+
+            self.message_task = Some(task);
+        } else {
+            tracing::error!("[IntegrationManager] ❌ 无法启动消息处理任务: message_rx 或 app_handle 为空");
+        }
     }
 
     /// 断开当前实例
@@ -906,6 +1004,9 @@ impl IntegrationManager {
             let mut registry = self.instance_registry.lock().await;
             registry.deactivate(platform);
         }
+
+        // 保存状态
+        self.save_instances_to_file();
 
         tracing::info!("[IntegrationManager] ✅ 已断开平台 {}", platform);
         Ok(())
@@ -936,6 +1037,9 @@ impl IntegrationManager {
                 )));
             }
         }
+
+        // 保存到文件
+        self.save_instances_to_file();
 
         // 如果是当前激活的实例，需要重新创建 Adapter
         {

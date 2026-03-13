@@ -796,10 +796,10 @@ impl OpenAIProxyService {
                 buffer = buffer[pos + sep_len..].to_string();
 
                 // 打印原始事件数据
-                tracing::info!(
-                    "[OpenAIProxy] SSE 事件数据: {}",
-                    truncate_for_log(&event_data, 300)
-                );
+                // tracing::info!(
+                //     "[OpenAIProxy] SSE 事件数据: {}",
+                //     truncate_for_log(&event_data, 300)
+                // );
 
                 // 跳过空行
                 if event_data.trim().is_empty() {
