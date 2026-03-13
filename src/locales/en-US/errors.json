@@ -11,6 +11,12 @@
   "configLoadFailed": "Failed to load config",
   "configSaveFailed": "Failed to save config",
   "networkError": "Network error",
+  "validation": {
+    "fileNotFound": "File not found",
+    "executionFailed": "Execution failed",
+    "validationError": "Error during validation",
+    "invalidPath": "Invalid path"
+  },
   "translateErrors": {
     "52000": "Success",
     "52001": "Request timeout",

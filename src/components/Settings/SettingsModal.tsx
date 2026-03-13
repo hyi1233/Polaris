@@ -13,6 +13,7 @@ import { useConfigStore, useToastStore } from '../../stores';
 import { Button } from '../Common';
 import { SettingsSidebar, type SettingsTabId } from './SettingsSidebar';
 import { AIEngineTab } from './tabs/AIEngineTab';
+import { GeneralTab } from './tabs/GeneralTab';
 import { OpenAIProvidersTab } from './OpenAIProvidersTab';
 import { TranslateTab } from './tabs/TranslateTab';
 import { QQBotTab } from './tabs/QQBotTab';
@@ -26,6 +27,7 @@ interface SettingsModalProps {
 
 // Tab 标题映射
 const TAB_TITLES: Record<SettingsTabId, string> = {
+  'general': '通用',
   'ai-engine': 'AI 引擎',
   'openai-providers': 'OpenAI Providers',
   'translate': '翻译',
@@ -43,7 +45,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const [localConfig, setLocalConfig] = useState<Config | null>(config);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('ai-engine');
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('general');
   const [searchQuery, setSearchQuery] = useState('');
 
   // 同步远程配置到本地
@@ -147,6 +149,14 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
               {activeTab === 'ai-engine' && (
                 <AIEngineTab
+                  config={localConfig}
+                  onConfigChange={setLocalConfig}
+                  loading={loading}
+                />
+              )}
+
+              {activeTab === 'general' && (
+                <GeneralTab
                   config={localConfig}
                   onConfigChange={setLocalConfig}
                   loading={loading}

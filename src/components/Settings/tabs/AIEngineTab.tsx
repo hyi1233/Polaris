@@ -192,41 +192,6 @@ export function AIEngineTab({ config, onConfigChange, loading }: AIEngineTabProp
           </div>
         </div>
       )}
-
-      {/* 语言设置 */}
-      <div className="p-4 bg-surface rounded-lg border border-border">
-        <h3 className="text-sm font-medium text-text-primary mb-3">{t('language.title')}</h3>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm text-text-primary">{t('language.current')}</div>
-            <div className="text-xs text-text-secondary">{t('language.hint')}</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onConfigChange({ ...config, language: 'zh-CN' })}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                (config.language || 'zh-CN') === 'zh-CN'
-                  ? 'bg-primary text-white'
-                  : 'bg-background-surface border border-border text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              中文
-            </button>
-            <button
-              type="button"
-              onClick={() => onConfigChange({ ...config, language: 'en-US' })}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                config.language === 'en-US'
-                  ? 'bg-primary text-white'
-                  : 'bg-background-surface border border-border text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              English
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

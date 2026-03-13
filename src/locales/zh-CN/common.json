@@ -16,6 +16,11 @@
     "newFolder": "新建文件夹",
     "selectAll": "全选"
   },
+  "actions": {
+    "cancel": "取消",
+    "save": "保存",
+    "saveAndClose": "保存并关闭"
+  },
   "status": {
     "loading": "加载中...",
     "saving": "保存中...",

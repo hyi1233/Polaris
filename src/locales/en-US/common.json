@@ -16,6 +16,11 @@
     "newFolder": "New Folder",
     "selectAll": "Select All"
   },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "saveAndClose": "Save & Close"
+  },
   "status": {
     "loading": "Loading...",
     "saving": "Saving...",

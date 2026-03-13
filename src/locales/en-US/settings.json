@@ -3,6 +3,7 @@
   "search": "Search settings...",
   "aiEngine": "AI Engine",
   "nav": {
+    "general": "General",
     "aiEngine": "AI Engine",
     "openaiProviders": "OpenAI Providers",
     "translate": "Translate",
@@ -17,10 +18,16 @@
   },
   "engines": {
     "claudeCode": {
+      "name": "Claude Code",
       "description": "Official Anthropic CLI tool"
     },
     "iflow": {
+      "name": "IFlow",
       "description": "Smart coding assistant CLI tool"
+    },
+    "codex": {
+      "name": "Codex",
+      "description": "OpenAI Codex CLI tool"
     }
   },
   "claudeCode": {
@@ -80,5 +87,11 @@
       "placeholder": "Enter the full path to IFlow CLI",
       "example": "e.g., C:\\Users\\[Username]\\AppData\\Roaming\\npm\\iflow.cmd"
     }
+  },
+  "validation": {
+    "fileNotFound": "File not found",
+    "executionFailed": "Execution failed",
+    "validationError": "Error during validation",
+    "invalidPath": "Invalid path"
   }
 }

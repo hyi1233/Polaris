@@ -3,8 +3,20 @@
  */
 
 import { useTranslation } from 'react-i18next';
+import {
+  IconAIEngine,
+  IconAPI,
+  IconTranslate,
+  IconBot,
+  IconWindow,
+  IconSettings,
+  IconSearch,
+  IconGeneral,
+} from '../Common/Icons';
+import type { ReactNode } from 'react';
 
 export type SettingsTabId =
+  | 'general'
   | 'ai-engine'
   | 'openai-providers'
   | 'translate'
@@ -14,7 +26,7 @@ export type SettingsTabId =
 
 export interface SettingsNavItem {
   id: SettingsTabId;
-  icon: string;
+  icon: ReactNode;
   labelKey: string;
 }
 
@@ -26,12 +38,13 @@ interface SettingsSidebarProps {
 }
 
 const NAV_ITEMS: SettingsNavItem[] = [
-  { id: 'ai-engine', icon: '🤖', labelKey: 'nav.aiEngine' },
-  { id: 'openai-providers', icon: '📡', labelKey: 'nav.openaiProviders' },
-  { id: 'translate', icon: '🌐', labelKey: 'nav.translate' },
-  { id: 'qqbot', icon: '🤖', labelKey: 'nav.qqbot' },
-  { id: 'floating-window', icon: '🪟', labelKey: 'nav.floatingWindow' },
-  { id: 'advanced', icon: '⚙️', labelKey: 'nav.advanced' },
+  { id: 'general', icon: <IconGeneral size={16} />, labelKey: 'nav.general' },
+  { id: 'ai-engine', icon: <IconAIEngine size={16} />, labelKey: 'nav.aiEngine' },
+  { id: 'openai-providers', icon: <IconAPI size={16} />, labelKey: 'nav.openaiProviders' },
+  { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },
+  { id: 'qqbot', icon: <IconBot size={16} />, labelKey: 'nav.qqbot' },
+  { id: 'floating-window', icon: <IconWindow size={16} />, labelKey: 'nav.floatingWindow' },
+  { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
 ];
 
 export function SettingsSidebar({ activeTab, onTabChange, searchQuery, onSearchChange }: SettingsSidebarProps) {
@@ -47,10 +60,10 @@ export function SettingsSidebar({ activeTab, onTabChange, searchQuery, onSearchC
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('search')}
-            className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary"
           />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted">
-            🔍
+            <IconSearch size={14} />
           </span>
         </div>
       </div>
@@ -67,7 +80,7 @@ export function SettingsSidebar({ activeTab, onTabChange, searchQuery, onSearchC
                 : 'text-text-secondary hover:bg-surface hover:text-text-primary'
             }`}
           >
-            <span className="text-base">{item.icon}</span>
+            <span className="flex-shrink-0">{item.icon}</span>
             <span>{t(item.labelKey)}</span>
           </button>
         ))}

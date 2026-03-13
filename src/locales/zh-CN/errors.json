@@ -11,6 +11,12 @@
   "configLoadFailed": "加载配置失败",
   "configSaveFailed": "保存配置失败",
   "networkError": "网络错误",
+  "validation": {
+    "fileNotFound": "文件不存在",
+    "executionFailed": "执行失败",
+    "validationError": "验证过程中发生错误",
+    "invalidPath": "路径无效"
+  },
   "translateErrors": {
     "52000": "成功",
     "52001": "请求超时",

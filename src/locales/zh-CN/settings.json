@@ -3,6 +3,7 @@
   "search": "搜索设置...",
   "aiEngine": "AI 引擎",
   "nav": {
+    "general": "通用",
     "aiEngine": "AI 引擎",
     "openaiProviders": "OpenAI Providers",
     "translate": "翻译",
@@ -17,10 +18,16 @@
   },
   "engines": {
     "claudeCode": {
+      "name": "Claude Code",
       "description": "Anthropic 官方 CLI 工具"
     },
     "iflow": {
+      "name": "IFlow",
       "description": "智能编程助手 CLI 工具"
+    },
+    "codex": {
+      "name": "Codex",
+      "description": "OpenAI Codex CLI 工具"
     }
   },
   "claudeCode": {
@@ -80,5 +87,11 @@
       "placeholder": "请输入 IFlow CLI 的完整路径",
       "example": "例如: C:\\Users\\[用户名]\\AppData\\Roaming\\npm\\iflow.cmd"
     }
+  },
+  "validation": {
+    "fileNotFound": "文件不存在",
+    "executionFailed": "执行失败",
+    "validationError": "验证过程中发生错误",
+    "invalidPath": "路径无效"
   }
 }

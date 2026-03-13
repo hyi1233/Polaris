@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as tauri from '../../services/tauri';
+import { mapErrorMessage } from '../../utils/errorMapping';
 
 type EngineType = 'claude-code' | 'iflow' | 'codex';
 
@@ -99,10 +100,10 @@ export function ClaudePathSelector({
         result = { valid: true };
       }
       setIsValid(result.valid);
-      setValidationError(result.error || null);
+      setValidationError(mapErrorMessage(result.error));
     } catch (e) {
       setIsValid(false);
-      setValidationError(e instanceof Error ? e.message : '验证失败');
+      setValidationError(e instanceof Error ? mapErrorMessage(e.message) : t('validation.validationError'));
     } finally {
       setValidating(false);
     }
