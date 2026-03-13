@@ -510,6 +510,17 @@ impl IntegrationManager {
         let task_conversation_states = conversation_states.clone();
         let task_active_sessions = active_sessions.clone();
 
+        // 创建 session_id 更新回调
+        let task_conversation_id_for_update = conversation_id.clone();
+        let conversation_states_for_update = conversation_states.clone();
+        let session_id_update_callback = Arc::new(move |new_session_id: String| {
+            tracing::info!("[IntegrationManager] 📌 Session ID 更新回调: {}", &new_session_id[..8.min(new_session_id.len())]);
+            // 注意：这里不能使用 async，需要使用 try_lock
+            if let Ok(mut states) = conversation_states_for_update.try_lock() {
+                states.set_ai_session(&task_conversation_id_for_update, new_session_id);
+            }
+        });
+
         let task = tokio::spawn(async move {
             // 调用 AI 引擎（根据是否已有会话决定创建新会话还是继续会话）
             let session_id_for_response: String;
@@ -524,6 +535,7 @@ impl IntegrationManager {
                     let mut options = SessionOptions::new(callback)
                         .with_system_prompt(&system_prompt)
                         .with_on_complete(complete_callback);
+                    options.on_session_id_update = Some(session_id_update_callback.clone());
 
                     if let Some(ref dir) = work_dir {
                         options = options.with_work_dir(dir);
@@ -559,6 +571,7 @@ impl IntegrationManager {
                     let mut options = SessionOptions::new(callback)
                         .with_system_prompt(&system_prompt)
                         .with_on_complete(complete_callback);
+                    options.on_session_id_update = Some(session_id_update_callback.clone());
 
                     if let Some(ref dir) = work_dir {
                         options = options.with_work_dir(dir);

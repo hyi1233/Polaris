@@ -58,6 +58,8 @@ pub struct SessionOptions {
     pub on_complete: Option<Arc<dyn Fn(i32) + Send + Sync>>,
     /// 错误回调
     pub on_error: Option<Arc<dyn Fn(String) + Send + Sync>>,
+    /// Session ID 更新回调（当引擎返回真实 session_id 时调用）
+    pub on_session_id_update: Option<Arc<dyn Fn(String) + Send + Sync>>,
 }
 
 impl SessionOptions {
@@ -72,6 +74,7 @@ impl SessionOptions {
             event_callback: Arc::new(event_callback),
             on_complete: None,
             on_error: None,
+            on_session_id_update: None,
         }
     }
 
@@ -102,6 +105,15 @@ impl SessionOptions {
         F: Fn(String) + Send + Sync + 'static,
     {
         self.on_error = Some(Arc::new(callback));
+        self
+    }
+
+    /// 设置 Session ID 更新回调
+    pub fn with_on_session_id_update<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(String) + Send + Sync + 'static,
+    {
+        self.on_session_id_update = Some(Arc::new(callback));
         self
     }
 }
