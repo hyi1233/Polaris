@@ -1,6 +1,21 @@
 {
   "title": "设置",
+  "search": "搜索设置...",
   "aiEngine": "AI 引擎",
+  "nav": {
+    "aiEngine": "AI 引擎",
+    "openaiProviders": "OpenAI Providers",
+    "translate": "翻译",
+    "dingtalk": "钉钉集成",
+    "qqbot": "QQ Bot",
+    "floatingWindow": "悬浮窗",
+    "advanced": "高级"
+  },
+  "messages": {
+    "saved": "已保存",
+    "configSavedDesc": "配置已成功保存",
+    "saveFailed": "保存失败"
+  },
   "engines": {
     "claudeCode": {
       "description": "Anthropic 官方 CLI 工具"

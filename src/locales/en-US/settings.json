@@ -1,6 +1,21 @@
 {
   "title": "Settings",
+  "search": "Search settings...",
   "aiEngine": "AI Engine",
+  "nav": {
+    "aiEngine": "AI Engine",
+    "openaiProviders": "OpenAI Providers",
+    "translate": "Translate",
+    "dingtalk": "DingTalk",
+    "qqbot": "QQ Bot",
+    "floatingWindow": "Floating Window",
+    "advanced": "Advanced"
+  },
+  "messages": {
+    "saved": "Saved",
+    "configSavedDesc": "Configuration saved successfully",
+    "saveFailed": "Save failed"
+  },
   "engines": {
     "claudeCode": {
       "description": "Official Anthropic CLI tool"

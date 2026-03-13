@@ -8,45 +8,22 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useConfigStore } from '../../stores'
 import { Button } from '../Common'
-import type { OpenAIProvider } from '../../types/config'
+import type { Config, OpenAIProvider } from '../../types'
 import { clsx } from 'clsx'
 
 interface OpenAIProvidersTabProps {
-  onClose?: () => void
+  config: Config
+  onConfigChange: (config: Config) => void
+  loading: boolean
 }
 
-export function OpenAIProvidersTab({ onClose }: OpenAIProvidersTabProps) {
-  const { config, updateConfig } = useConfigStore()
-  const [providers, setProviders] = useState<OpenAIProvider[]>([])
-  const [activeProviderId, setActiveProviderId] = useState<string>()
+export function OpenAIProvidersTab({ config, onConfigChange, loading }: OpenAIProvidersTabProps) {
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Map<string, boolean>>(new Map())
 
-  // 初始化：从配置加载 Providers
-  useEffect(() => {
-    if (config?.openaiProviders) {
-      setProviders(config.openaiProviders)
-      setActiveProviderId(config.activeProviderId)
-    }
-  }, [config])
-
-  // 保存配置
-  const handleSave = async () => {
-    if (!config) return
-
-    try {
-      await updateConfig({
-        ...config,
-        openaiProviders: providers,
-        activeProviderId: activeProviderId,
-      })
-      onClose?.()
-    } catch (error) {
-      console.error('Failed to save config:', error)
-    }
-  }
+  const providers = config.openaiProviders || []
+  const activeProviderId = config.activeProviderId
 
   // 添加新 Provider
   const addProvider = () => {
@@ -61,19 +38,22 @@ export function OpenAIProvidersTab({ onClose }: OpenAIProvidersTabProps) {
       enabled: true,
       supportsTools: true,
     }
-    setProviders([...providers, newProvider])
+    onConfigChange({
+      ...config,
+      openaiProviders: [...providers, newProvider]
+    })
   }
 
   // 删除 Provider
   const removeProvider = (id: string) => {
     const updatedProviders = providers.filter(p => p.id !== id)
 
-    // 如果删除的是当前选中的，清空选中状态
-    if (activeProviderId === id) {
-      setActiveProviderId(undefined)
-    }
+    onConfigChange({
+      ...config,
+      openaiProviders: updatedProviders,
+      activeProviderId: activeProviderId === id ? undefined : activeProviderId
+    })
 
-    setProviders(updatedProviders)
     // 清除测试结果
     setTestResults(prev => {
       const next = new Map(prev)
@@ -84,7 +64,10 @@ export function OpenAIProvidersTab({ onClose }: OpenAIProvidersTabProps) {
 
   // 更新 Provider
   const updateProvider = (id: string, updates: Partial<OpenAIProvider>) => {
-    setProviders(providers.map(p => p.id === id ? { ...p, ...updates } : p))
+    onConfigChange({
+      ...config,
+      openaiProviders: providers.map(p => p.id === id ? { ...p, ...updates } : p)
+    })
   }
 
   // 测试连接
@@ -121,21 +104,30 @@ export function OpenAIProvidersTab({ onClose }: OpenAIProvidersTabProps) {
       name: `${provider.name} (Copy)`,
       enabled: false, // 默认禁用复制的 Provider
     }
-    setProviders([...providers, duplicated])
+    onConfigChange({
+      ...config,
+      openaiProviders: [...providers, duplicated]
+    })
+  }
+
+  // 设为当前活跃 Provider
+  const setActiveProvider = (id: string) => {
+    onConfigChange({
+      ...config,
+      activeProviderId: id,
+      defaultEngine: id
+    })
   }
 
   return (
-    <div className="space-y-6">
-      {/* 标题和说明 */}
-      <div>
-        <h3 className="text-lg font-semibold mb-2">OpenAI Providers</h3>
-        <p className="text-sm text-text-secondary">
-          配置多个 OpenAI 协议兼容的 API 服务。支持 OpenAI 官方、DeepSeek、Ollama 本地等。
-        </p>
-      </div>
+    <div className="space-y-4">
+      {/* 说明 */}
+      <p className="text-sm text-text-secondary mb-4">
+        配置多个 OpenAI 协议兼容的 API 服务。支持 OpenAI 官方、DeepSeek、Ollama 本地等。
+      </p>
 
       {/* Provider 列表 */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {providers.map(provider => (
           <ProviderCard
             key={provider.id}
@@ -143,36 +135,27 @@ export function OpenAIProvidersTab({ onClose }: OpenAIProvidersTabProps) {
             isActive={provider.id === activeProviderId}
             isTesting={testingProviderId === provider.id}
             testResult={testResults.get(provider.id)}
+            disabled={loading}
             onUpdate={(updates) => updateProvider(provider.id, updates)}
             onRemove={() => removeProvider(provider.id)}
             onDuplicate={() => duplicateProvider(provider)}
             onTest={() => testConnection(provider)}
-            onSelectActive={() => setActiveProviderId(provider.id)}
+            onSelectActive={() => setActiveProvider(provider.id)}
           />
         ))}
       </div>
 
       {/* 添加按钮 */}
-      <Button
+      <button
         onClick={addProvider}
-        className="w-full"
-        variant="secondary"
+        disabled={loading}
+        className="w-full text-left p-4 rounded-lg border-2 border-dashed border-border-subtle text-text-tertiary hover:border-primary/50 hover:text-primary transition-all flex items-center justify-center gap-2"
       >
-        + 添加 Provider
-      </Button>
-
-      {/* 保存按钮 */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button
-          onClick={onClose}
-          variant="secondary"
-        >
-          取消
-        </Button>
-        <Button onClick={handleSave}>
-          保存配置
-        </Button>
-      </div>
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        <span className="text-sm">添加 OpenAI Provider</span>
+      </button>
     </div>
   )
 }
@@ -185,6 +168,7 @@ interface ProviderCardProps {
   isActive: boolean
   isTesting: boolean
   testResult?: boolean
+  disabled: boolean
   onUpdate: (updates: Partial<OpenAIProvider>) => void
   onRemove: () => void
   onDuplicate: () => void
@@ -197,6 +181,7 @@ function ProviderCard({
   isActive,
   isTesting,
   testResult,
+  disabled,
   onUpdate,
   onRemove,
   onDuplicate,
@@ -209,11 +194,11 @@ function ProviderCard({
     <div
       className={clsx(
         "border rounded-lg overflow-hidden transition-all",
-        isActive ? "border-primary-500 bg-primary-faint" : "border-border-subtle"
+        isActive ? "border-primary bg-primary/5" : "border-border-subtle"
       )}
     >
       {/* 头部 */}
-      <div className="flex items-center justify-between p-4 bg-background-secondary">
+      <div className="flex items-center justify-between p-4 bg-surface">
         <div className="flex items-center gap-3 flex-1">
           {/* 启用开关 */}
           <label className="flex items-center gap-2">
@@ -221,6 +206,7 @@ function ProviderCard({
               type="checkbox"
               checked={provider.enabled}
               onChange={(e) => onUpdate({ enabled: e.target.checked })}
+              disabled={disabled}
               className="w-4 h-4"
             />
             <span className="text-sm text-text-secondary">启用</span>
@@ -231,10 +217,11 @@ function ProviderCard({
             type="text"
             value={provider.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
+            disabled={disabled}
             placeholder="Provider 名称"
             className={clsx(
-              "flex-1 px-3 py-1.5 rounded border bg-background",
-              isActive ? "border-primary-500" : "border-border-subtle focus:border-primary-500"
+              "flex-1 px-3 py-1.5 rounded border bg-background text-sm",
+              isActive ? "border-primary" : "border-border-subtle focus:border-primary"
             )}
           />
 
@@ -253,23 +240,26 @@ function ProviderCard({
           {!isActive && provider.enabled && (
             <button
               onClick={onSelectActive}
-              className="px-3 py-1 text-xs rounded border border-primary-500 text-primary-500 hover:bg-primary-faint"
+              disabled={disabled}
+              className="px-3 py-1 text-xs rounded border border-primary text-primary hover:bg-primary/10"
             >
               设为当前
             </button>
           )}
 
           {isActive && (
-            <span className="px-3 py-1 text-xs rounded bg-primary-500 text-white">
+            <span className="px-3 py-1 text-xs rounded bg-primary text-white">
               当前
             </span>
           )}
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 text-text-subtle hover:text-text transition-colors"
+            className="p-1 text-text-muted hover:text-text transition-colors"
           >
-            {isExpanded ? '▼' : '▶'}
+            <svg className={clsx("w-4 h-4 transition-transform", isExpanded && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
         </div>
       </div>
@@ -279,39 +269,42 @@ function ProviderCard({
         <div className="p-4 space-y-3 border-t border-border-subtle">
           {/* API Key */}
           <div>
-            <label className="block text-sm font-medium mb-1">API Key</label>
+            <label className="block text-xs text-text-secondary mb-1">API Key</label>
             <input
               type="password"
               value={provider.apiKey}
               onChange={(e) => onUpdate({ apiKey: e.target.value })}
+              disabled={disabled}
               placeholder="sk-..."
-              className="w-full px-3 py-2 rounded border border-border-subtle bg-background"
+              className="w-full px-3 py-2 rounded border border-border bg-background text-sm"
             />
           </div>
 
           {/* API Base URL */}
           <div>
-            <label className="block text-sm font-medium mb-1">API Base URL</label>
+            <label className="block text-xs text-text-secondary mb-1">API Base URL</label>
             <input
               type="text"
               value={provider.apiBase}
               onChange={(e) => onUpdate({ apiBase: e.target.value })}
+              disabled={disabled}
               placeholder="https://api.openai.com/v1"
-              className="w-full px-3 py-2 rounded border border-border-subtle bg-background"
+              className="w-full px-3 py-2 rounded border border-border bg-background text-sm"
             />
           </div>
 
           {/* 模型名称 */}
           <div>
-            <label className="block text-sm font-medium mb-1">模型名称</label>
+            <label className="block text-xs text-text-secondary mb-1">模型名称</label>
             <input
               type="text"
               value={provider.model}
               onChange={(e) => onUpdate({ model: e.target.value })}
+              disabled={disabled}
               placeholder="gpt-4o-mini"
-              className="w-full px-3 py-2 rounded border border-border-subtle bg-background"
+              className="w-full px-3 py-2 rounded border border-border bg-background text-sm"
             />
-            <p className="text-xs text-text-subtle mt-1">
+            <p className="text-xs text-text-tertiary mt-1">
               完全由您决定，可以是任意模型名称
             </p>
           </div>
@@ -319,7 +312,7 @@ function ProviderCard({
           {/* 温度和 Token 数 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">温度 (0-2)</label>
+              <label className="block text-xs text-text-secondary mb-1">温度 (0-2)</label>
               <input
                 type="number"
                 min="0"
@@ -327,17 +320,19 @@ function ProviderCard({
                 step="0.1"
                 value={provider.temperature}
                 onChange={(e) => onUpdate({ temperature: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 rounded border border-border-subtle bg-background"
+                disabled={disabled}
+                className="w-full px-3 py-2 rounded border border-border bg-background text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">最大 Token 数</label>
+              <label className="block text-xs text-text-secondary mb-1">最大 Token 数</label>
               <input
                 type="number"
                 min="1"
                 value={provider.maxTokens}
                 onChange={(e) => onUpdate({ maxTokens: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 rounded border border-border-subtle bg-background"
+                disabled={disabled}
+                className="w-full px-3 py-2 rounded border border-border bg-background text-sm"
               />
             </div>
           </div>
@@ -347,12 +342,12 @@ function ProviderCard({
             <div className="flex gap-2">
               <button
                 onClick={onTest}
-                disabled={isTesting || !provider.apiKey}
+                disabled={isTesting || !provider.apiKey || disabled}
                 className={clsx(
                   "px-4 py-2 text-sm rounded border",
                   isTesting
                     ? "bg-disabled text-text-muted cursor-wait"
-                    : "border-primary-500 text-primary-500 hover:bg-primary-fight"
+                    : "border-primary text-primary hover:bg-primary/10"
                 )}
               >
                 {isTesting ? '测试中...' : '测试连接'}
@@ -360,7 +355,8 @@ function ProviderCard({
 
               <button
                 onClick={onDuplicate}
-                className="px-4 py-2 text-sm rounded border border-border-subtle hover:bg-background-hover"
+                disabled={disabled}
+                className="px-4 py-2 text-sm rounded border border-border hover:bg-background-hover"
               >
                 复制
               </button>
@@ -368,7 +364,8 @@ function ProviderCard({
 
             <button
               onClick={onRemove}
-              className="px-4 py-2 text-sm rounded border border-error/30 text-error hover:bg-error-faint"
+              disabled={disabled}
+              className="px-4 py-2 text-sm rounded border border-danger/30 text-danger hover:bg-danger/10"
             >
               删除
             </button>

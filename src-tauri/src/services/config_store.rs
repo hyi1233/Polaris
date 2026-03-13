@@ -153,10 +153,13 @@ impl ConfigStore {
         }
     }
 
-    /// 保存配置到文件
+    /// 保存配置到文件（原子写入）
     pub fn save(&self) -> Result<()> {
+        // 原子写入：先写临时文件，再重命名
+        let temp_path = self.config_path.with_extension("json.tmp");
         let content = serde_json::to_string_pretty(&self.config)?;
-        std::fs::write(&self.config_path, content)?;
+        std::fs::write(&temp_path, content)?;
+        std::fs::rename(&temp_path, &self.config_path)?;
         Ok(())
     }
 
@@ -165,10 +168,24 @@ impl ConfigStore {
         &self.config
     }
 
-    /// 更新配置
+    /// 更新配置（带回滚机制）
     pub fn update(&mut self, config: Config) -> Result<()> {
+        // 保存旧配置以便回滚
+        let old_config = self.config.clone();
         self.config = config;
-        self.save()
+
+        match self.save() {
+            Ok(()) => {
+                eprintln!("[ConfigStore] 配置保存成功");
+                Ok(())
+            }
+            Err(e) => {
+                // 保存失败，恢复旧配置
+                eprintln!("[ConfigStore] 配置保存失败，回滚: {:?}", e);
+                self.config = old_config;
+                Err(e)
+            }
+        }
     }
 
     /// 设置工作目录

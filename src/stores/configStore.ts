@@ -70,10 +70,12 @@ export const useConfigStore = create<ConfigState>((set) => ({
     set({ loading: true, error: null });
     try {
       await tauri.updateConfig(config);
-      if (config?.language) {
-        i18n.changeLanguage(config.language);
+      // 关键：保存后重新从后端加载，确保同步
+      const savedConfig = await tauri.getConfig();
+      if (savedConfig?.language) {
+        i18n.changeLanguage(savedConfig.language);
       }
-      set({ config, loading: false });
+      set({ config: savedConfig, loading: false });
     } catch (e) {
       set({
         error: e instanceof Error ? e.message : i18n.t('errors:updateConfigFailed'),
