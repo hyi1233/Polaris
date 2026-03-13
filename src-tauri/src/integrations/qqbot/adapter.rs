@@ -17,17 +17,12 @@ use super::super::types::*;
 
 /// QQ Bot Intents
 /// 参考: https://bot.q.qq.com/wiki/develop/api-v2/
+/// 注意: 只请求必要的 intents，避免权限不足导致连接失败
 const INTENTS_DEFAULT: u32 =
-    (1 << 0) |   // GUILDS
-    (1 << 1) |   // GUILD_MEMBERS
-    (1 << 9) |   // GUILD_MESSAGES
-    (1 << 10) |  // GUILD_MESSAGE_REACTIONS
-    (1 << 12) |  // DIRECT_MESSAGE
-    (1 << 25) |  // AT_MESSAGES
-    (1 << 26) |  // INTERACTION
-    (1 << 27) |  // MESSAGE_AUDIT
-    (1 << 29) |  // AUDIO_ACTION
-    (1 << 30);   // PUBLIC_GUILD_MESSAGES
+    (1 << 9) |   // GUILD_MESSAGES - 频道消息
+    (1 << 12) |  // DIRECT_MESSAGE - 私信
+    (1 << 25) |  // AT_MESSAGES - @消息
+    (1 << 30);   // PUBLIC_GUILD_MESSAGES - 公域频道消息
 
 /// QQ Bot 适配器
 pub struct QQBotAdapter {
