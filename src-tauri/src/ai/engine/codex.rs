@@ -325,6 +325,7 @@ impl CodexEngine {
         let event_callback = options.event_callback.clone();
         let on_complete = options.on_complete.clone();
         let on_error = options.on_error.clone();
+        let on_session_id_update = options.on_session_id_update.clone();
         let current_session_id = temp_id.clone();
 
         std::thread::spawn(move || {
@@ -383,6 +384,11 @@ impl CodexEngine {
                                 &sessions, &temp_id, real_id, pid, "codex"
                             );
                             tracing::info!("[CodexEngine] session_id 更新: {} -> {}", temp_id, real_id);
+
+                            // 通知外部 session_id 已更新
+                            if let Some(ref cb) = on_session_id_update {
+                                cb(real_id.clone());
+                            }
                         }
                     }
 
