@@ -78,6 +78,8 @@ export interface UnifiedHistoryItem {
   fileSize?: number
   inputTokens?: number
   outputTokens?: number
+  /** Claude Code 项目目录名（如 D--space-app-Polaris） */
+  projectPath?: string
 }
 
 /**
@@ -399,7 +401,7 @@ interface EventChatState {
   getUnifiedHistory: () => Promise<UnifiedHistoryItem[]>
 
   /** 从历史恢复会话 */
-  restoreFromHistory: (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => Promise<boolean>
+  restoreFromHistory: (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`, projectPath?: string) => Promise<boolean>
 
   /** 删除历史会话 */
   deleteHistorySession: (sessionId: string, source?: 'local' | 'iflow' | 'codex') => void
@@ -1565,6 +1567,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
               engineId: 'claude-code',
               source: 'claude-code-native',
               fileSize: session.fileSize,
+              projectPath: session.projectPath, // 保存 Claude Code 项目目录名
             })
           }
         }
@@ -1630,7 +1633,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
   /**
    * 从历史恢复会话
    */
-  restoreFromHistory: async (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => {
+  restoreFromHistory: async (sessionId: string, engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`, projectPath?: string) => {
     try {
       set({ isLoadingHistory: true })
 
@@ -1656,12 +1659,10 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
       // 2. 尝试从 Claude Code 原生历史恢复
       if (!engineId || engineId === 'claude-code') {
         const claudeCodeService = getClaudeCodeHistoryService()
-        const workspaceStore = useWorkspaceStore.getState()
-        const currentWorkspace = workspaceStore.getCurrentWorkspace()
 
         const messages = await claudeCodeService.getSessionHistory(
           sessionId,
-          currentWorkspace?.path
+          projectPath // 使用传入的 projectPath（Claude Code 项目目录名）
         )
 
         if (messages.length > 0) {

@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useEventChatStore, type UnifiedHistoryItem } from '../../stores/eventChatStore'
+import { useEventChatStore, UnifiedHistoryItem } from '../../stores/eventChatStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Clock, MessageSquare, Trash2, RotateCcw, HardDrive, Zap, Loader2, X, Terminal, ChevronDown } from 'lucide-react'
 
@@ -51,12 +51,16 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   }, [displayCount, allHistory, filter, searchQuery])
 
   // 恢复会话
-  const handleRestore = async (sessionId: string, engineId: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`) => {
-    setRestoring(sessionId)
+  const handleRestore = async (item: UnifiedHistoryItem) => {
+    setRestoring(item.id)
     try {
-      const success = await useEventChatStore.getState().restoreFromHistory(sessionId, engineId)
+      const success = await useEventChatStore.getState().restoreFromHistory(
+        item.id,
+        item.engineId,
+        item.projectPath
+      )
       if (success) {
-        console.log('[SessionHistoryPanel] 会话已恢复:', sessionId)
+        console.log('[SessionHistoryPanel] 会话已恢复:', item.id)
         onClose?.()
       } else {
         console.error('[SessionHistoryPanel] 恢复会话失败')
@@ -321,7 +325,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
                   {/* 操作按钮 */}
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      onClick={() => handleRestore(item.id, item.engineId)}
+                      onClick={() => handleRestore(item)}
                       disabled={isRestoring}
                       className={`p-1.5 rounded-md hover:bg-background-elevated transition-colors ${
                         isRestoring ? 'opacity-50 cursor-not-allowed' : 'text-text-secondary hover:text-text-primary'
