@@ -4,6 +4,9 @@ mod services;
 mod commands;
 mod integrations;
 mod ai;
+mod state;
+
+pub use state::AppState;
 
 use error::Result;
 use models::config::{Config, HealthStatus};
@@ -32,7 +35,6 @@ use commands::context::{
     context_upsert, context_upsert_many, context_query, context_get_all,
     context_remove, context_clear,
     ide_report_current_file, ide_report_file_structure, ide_report_diagnostics,
-    ContextMemoryStore,
 };
 use commands::git::{
     git_is_repository, git_init_repository, git_get_status, git_get_diffs,
@@ -62,29 +64,10 @@ use commands::integration::{
     disconnect_integration_instance, update_integration_instance,
 };
 
-
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
-use tokio_util::sync::CancellationToken;
-use integrations::IntegrationManager;
 use ai::EngineRegistry;
-
-/// 全局配置状态
-pub struct AppState {
-    pub config_store: Mutex<ConfigStore>,
-    /// 保存会话 ID 到进程 PID 的映射（保留向后兼容）
-    /// 使用 PID 而不是 Child，因为 Child 会在读取输出时被消费
-    pub sessions: Arc<Mutex<HashMap<String, u32>>>,
-    /// OpenAIProxy 任务的取消控制
-    pub openai_tasks: Arc<Mutex<HashMap<String, CancellationToken>>>,
-    /// 上下文存储
-    pub context_store: Arc<Mutex<ContextMemoryStore>>,
-    /// 集成管理器 (使用 tokio::sync::Mutex 支持异步操作)
-    pub integration_manager: AsyncMutex<IntegrationManager>,
-    /// AI 引擎注册表（使用 tokio::sync::Mutex 支持异步操作和共享）
-    pub engine_registry: Arc<AsyncMutex<EngineRegistry>>,
-}
+use integrations::IntegrationManager;
 
 // ============================================================================
 // Tauri Commands
@@ -251,14 +234,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .manage(AppState {
-            config_store: Mutex::new(config_store),
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-            openai_tasks: Arc::new(Mutex::new(HashMap::new())),
-            context_store: Arc::new(Mutex::new(ContextMemoryStore::new())),
-            integration_manager: AsyncMutex::new(integration_manager),
-            engine_registry: engine_registry_arc,
-        })
+        .manage(state::create_app_state(
+            config_store,
+            engine_registry_arc,
+            integration_manager,
+        ))
         .on_window_event(|window, event| {
             // 处理窗口关闭事件
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
