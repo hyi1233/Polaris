@@ -1268,6 +1268,8 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
     await router.initialize()
 
     const actualWorkspaceDir = useWorkspaceStore.getState().getCurrentWorkspace()?.path
+    const config = useConfigStore.getState().config
+    const currentEngine = config?.defaultEngine || 'claude-code'
 
     const normalizedPrompt = prompt
       .replace(/\r\n/g, '\\n')
@@ -1277,6 +1279,15 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
 
     set({ isStreaming: true, error: null })
 
+    // Provider 引擎使用前端发送
+    if (currentEngine.startsWith('provider-')) {
+      await get().sendMessageToFrontendEngine(
+        normalizedPrompt,
+        actualWorkspaceDir
+      )
+      return
+    }
+
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('continue_chat', {
@@ -1284,6 +1295,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
         message: normalizedPrompt,
         workDir: actualWorkspaceDir,
         contextId: 'main',
+        engineId: currentEngine,
       })
     } catch (e) {
       const { tokenBuffer } = get()
