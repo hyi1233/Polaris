@@ -198,6 +198,13 @@ export function FloatingWindow() {
     await invoke('show_main_window')
   }, [])
 
+  // 关闭悬浮窗（隐藏）
+  const handleClose = useCallback(async () => {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const window = getCurrentWindow()
+    await window.hide()
+  }, [])
+
   // 键盘事件
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -251,18 +258,30 @@ export function FloatingWindow() {
           <span className="floating-title-icon">◉</span>
           <span>Polaris</span>
         </div>
-        <button
-          className="floating-expand-btn"
-          onClick={handleExpand}
-          title="展开主窗口"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 3 21 3 21 9" />
-            <polyline points="9 21 3 21 3 15" />
-            <line x1="21" y1="3" x2="14" y2="10" />
-            <line x1="3" y1="21" x2="10" y2="14" />
-          </svg>
-        </button>
+        <div className="floating-header-actions">
+          <button
+            className="floating-expand-btn"
+            onClick={handleExpand}
+            title="展开主窗口"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+          <button
+            className="floating-close-btn"
+            onClick={handleClose}
+            title="关闭悬浮窗"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* 消息区域 */}

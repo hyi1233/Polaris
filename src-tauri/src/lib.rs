@@ -259,6 +259,28 @@ pub fn run() {
             integration_manager: AsyncMutex::new(integration_manager),
             engine_registry: engine_registry_arc,
         })
+        .on_window_event(|window, event| {
+            // 处理窗口关闭事件
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let label = window.label();
+                tracing::info!("[Window] 窗口关闭请求: {}", label);
+
+                // 主窗口关闭时，退出整个应用（包括悬浮窗）
+                if label == "main" {
+                    tracing::info!("[Window] 主窗口关闭，退出应用");
+                    // 退出整个应用
+                    std::process::exit(0);
+                }
+                // 悬浮窗关闭时，只隐藏而不是真正关闭
+                if label == "floating" {
+                    // 阻止默认关闭行为
+                    api.prevent_close();
+                    // 隐藏窗口
+                    let _ = window.hide();
+                    tracing::info!("[Window] 悬浮窗已隐藏");
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // 配置相关
             get_config,
