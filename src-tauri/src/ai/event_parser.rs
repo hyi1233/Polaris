@@ -207,12 +207,101 @@ impl EventParser {
     }
 
     /// 解析用户消息事件
-    fn parse_user_event(&self, message: serde_json::Value) -> Vec<AIEvent> {
-        let text = self.extract_text_content(&message);
-        if text.is_empty() {
-            return vec![];
+    ///
+    /// 用户消息可能包含：
+    /// 1. 文本内容
+    /// 2. tool_result 块（工具执行结果）
+    fn parse_user_event(&mut self, message: serde_json::Value) -> Vec<AIEvent> {
+        let mut results = Vec::new();
+
+        // 1. 提取 tool_result 块，生成 ToolCallEnd 事件
+        if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
+            for item in content {
+                if let Some(obj) = item.as_object() {
+                    if obj.get("type").and_then(|t| t.as_str()) == Some("tool_result") {
+                        let tool_use_id = obj.get("tool_use_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        // 提取输出内容
+                        let output = self.extract_tool_result_content(obj);
+                        let success = !output.is_empty();
+
+                        // 更新工具调用状态
+                        if let Some(tc) = self.tool_call_manager.end_tool_call(
+                            &tool_use_id,
+                            Some(serde_json::Value::String(output.clone())),
+                            success
+                        ) {
+                            // 找到了对应的工具调用
+                            let status_emoji = if success { "✅" } else { "❌" };
+                            results.push(AIEvent::Progress(ProgressEvent::new(
+                                format!("{} {}", status_emoji, tc.name)
+                            )));
+                            results.push(AIEvent::ToolCallEnd(
+                                ToolCallEndEvent::new(tc.name, success)
+                                    .with_call_id(tool_use_id)
+                                    .with_result(serde_json::Value::String(output))
+                            ));
+                        } else {
+                            // 找不到对应的工具调用（可能是 assistant 消息中的 tool_use 未被正确记录）
+                            // 仍然发送事件，但工具名称为空
+                            tracing::warn!(
+                                "[EventParser] tool_result 找不到对应的 tool_use: {}",
+                                tool_use_id
+                            );
+                            let status_emoji = if success { "✅" } else { "❌" };
+                            results.push(AIEvent::ToolCallEnd(
+                                ToolCallEndEvent::new("unknown".to_string(), success)
+                                    .with_call_id(tool_use_id)
+                                    .with_result(serde_json::Value::String(output))
+                            ));
+                        }
+                    }
+                }
+            }
         }
-        vec![AIEvent::UserMessage(UserMessageEvent::new(text))]
+
+        // 2. 提取文本内容
+        let text = self.extract_text_content(&message);
+        if !text.is_empty() {
+            results.push(AIEvent::UserMessage(UserMessageEvent::new(text)));
+        }
+
+        results
+    }
+
+    /// 从 tool_result 对象中提取输出内容
+    fn extract_tool_result_content(&self, obj: &serde_json::Map<String, serde_json::Value>) -> String {
+        // 1. 尝试直接从 content 字段提取
+        if let Some(content) = obj.get("content") {
+            if let Some(s) = content.as_str() {
+                return s.to_string();
+            }
+            // content 可能是数组
+            if let Some(arr) = content.as_array() {
+                let texts: Vec<&str> = arr.iter()
+                    .filter_map(|item| {
+                        if item.get("type").and_then(|t| t.as_str()) == Some("text") {
+                            item.get("text").and_then(|t| t.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if !texts.is_empty() {
+                    return texts.join("\n");
+                }
+            }
+        }
+
+        // 2. 尝试从 result 字段提取
+        if let Some(result) = obj.get("result").and_then(|v| v.as_str()) {
+            return result.to_string();
+        }
+
+        String::new()
     }
 
     /// 解析工具开始事件
