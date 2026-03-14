@@ -281,6 +281,7 @@ function handleAIEvent(
       break
 
     case 'error':
+      state.finishMessage()
       storeSet({ error: event.error, isStreaming: false })
       break
 
