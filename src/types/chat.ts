@@ -109,6 +109,14 @@ interface BaseChatMessage {
 export interface UserChatMessage extends BaseChatMessage {
   type: 'user';
   content: string;
+  /** 附件列表（用于显示） */
+  attachments?: Array<{
+    id: string;
+    type: 'image' | 'file';
+    fileName: string;
+    fileSize: number;
+    preview?: string; // 图片预览（base64 data URL）
+  }>;
 }
 
 /** 助手消息 - 使用内容块数组 */

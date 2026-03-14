@@ -38,12 +38,41 @@ pub struct OpenAIConfig {
     pub supports_tools: bool,
 }
 
+/// 消息内容部分（支持多模态）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    /// 纯文本
+    Text(String),
+    /// 多部分内容（文本 + 图片）
+    Parts(Vec<ContentPart>),
+}
+
+/// 内容部分
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentPart {
+    #[serde(rename = "type")]
+    pub part_type: String, // "text" or "image_url"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<ImageUrl>,
+}
+
+/// 图片 URL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageUrl {
+    pub url: String, // data:image/png;base64,xxx or URL
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>, // "auto", "low", "high"
+}
+
 /// 聊天消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub content: Option<MessageContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -562,7 +591,7 @@ impl OpenAIService {
             // 添加助手消息
             current_messages.push(ChatMessage {
                 role: "assistant".to_string(),
-                content: choice.message.content.clone(),
+                content: choice.message.content.clone().map(MessageContent::Text),
                 tool_calls: choice.message.tool_calls.clone(),
                 tool_call_id: None,
             });
@@ -593,7 +622,7 @@ impl OpenAIService {
                     // 添加工具结果消息
                     current_messages.push(ChatMessage {
                         role: "tool".to_string(),
-                        content: Some(result),
+                        content: Some(MessageContent::Text(result)),
                         tool_calls: None,
                         tool_call_id: Some(tool_call.id.clone()),
                     });

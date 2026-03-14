@@ -372,9 +372,9 @@ interface EventChatState {
   initializeEventListeners: () => Promise<() => void>
 
   /** 发送消息 */
-  sendMessage: (content: string, workspaceDir?: string) => Promise<void>
+  sendMessage: (content: string, workspaceDir?: string, attachments?: import('../types/attachment').Attachment[]) => Promise<void>
   /** 使用前端引擎发送消息（OpenAI Provider） */
-  sendMessageToFrontendEngine: (content: string, workspaceDir?: string, systemPrompt?: string) => Promise<void>
+  sendMessageToFrontendEngine: (content: string, workspaceDir?: string, systemPrompt?: string, attachments?: import('../types/attachment').Attachment[]) => Promise<void>
   /** 继续会话 */
   continueChat: (prompt?: string) => Promise<void>
   /** 中断会话 */
@@ -1003,7 +1003,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
     return cleanup
   },
 
-  sendMessage: async (content, workspaceDir) => {
+  sendMessage: async (content, workspaceDir, attachments) => {
     const { conversationId } = get()
 
     const router = getEventRouter()
@@ -1044,11 +1044,20 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
       .replace(/\n/g, '\\n')
       .trim()
 
+    // 构建用户消息，包含附件信息
     const userMessage: UserChatMessage = {
       id: crypto.randomUUID(),
       type: 'user',
       content,
       timestamp: new Date().toISOString(),
+      // 附件信息（用于显示）
+      attachments: attachments?.map(a => ({
+        id: a.id,
+        type: a.type,
+        fileName: a.fileName,
+        fileSize: a.fileSize,
+        preview: a.preview,
+      })),
     }
     get().addMessage(userMessage)
 
@@ -1070,15 +1079,29 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
         await get().sendMessageToFrontendEngine(
           content,
           actualWorkspaceDir,
-          systemPrompt
+          systemPrompt,
+          attachments
         )
       } else {
+        // CLI 引擎：将附件转换为文本描述
+        let messageWithAttachments = normalizedMessage
+        if (attachments && attachments.length > 0) {
+          const attachmentDescriptions = attachments.map(a => {
+            if (a.type === 'image') {
+              return `[图片: ${a.fileName}]`
+            } else {
+              return `[文件: ${a.fileName}]`
+            }
+          }).join('\n')
+          messageWithAttachments = `${attachmentDescriptions}\n\n${normalizedMessage}`
+        }
+
         const { invoke } = await import('@tauri-apps/api/core')
 
         if (conversationId) {
           await invoke('continue_chat', {
             sessionId: conversationId,
-            message: normalizedMessage,
+            message: messageWithAttachments,
             systemPrompt: normalizedSystemPrompt,
             workDir: actualWorkspaceDir,
             contextId: 'main',
@@ -1086,7 +1109,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
           })
         } else {
           const newSessionId = await invoke<string>('start_chat', {
-            message: normalizedMessage,
+            message: messageWithAttachments,
             systemPrompt: normalizedSystemPrompt,
             workDir: actualWorkspaceDir,
             contextId: 'main',
@@ -1121,8 +1144,9 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
    * @param content - 原始消息内容
    * @param workspaceDir - 工作区路径
    * @param systemPrompt - 系统提示词
+   * @param attachments - 附件列表
    */
-  sendMessageToFrontendEngine: async (content: string, workspaceDir?: string, systemPrompt?: string) => {
+  sendMessageToFrontendEngine: async (content: string, workspaceDir?: string, systemPrompt?: string, attachments?: import('../types/attachment').Attachment[]) => {
     const config = useConfigStore.getState().config
 
     // 检查是否有配置的 OpenAI Providers
@@ -1217,11 +1241,20 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
         })
       }
 
-      // 构建任务
+      // 构建任务，包含附件
       const task = {
         id: crypto.randomUUID(),
         kind: 'chat' as const,
-        input: { prompt: content },
+        input: {
+          prompt: content,
+          // 传递附件给 session
+          attachments: attachments?.map(a => ({
+            type: a.type,
+            fileName: a.fileName,
+            mimeType: a.mimeType,
+            content: a.content, // base64 data URL
+          })),
+        },
         engineId: 'deepseek',
       }
 

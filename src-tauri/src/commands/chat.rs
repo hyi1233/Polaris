@@ -407,7 +407,8 @@ pub struct ClaudeSessionMeta {
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeHistoryMessage {
     pub role: String,
-    pub content: String,
+    /// 内容可能是字符串或数组（包含 text、tool_use、tool_result 等）
+    pub content: serde_json::Value,
     pub timestamp: Option<String>,
 }
 
@@ -509,32 +510,26 @@ pub async fn get_claude_code_session_history(
                 if let Some(msg_type) = json.get("type").and_then(|t| t.as_str()) {
                     match msg_type {
                         "user" => {
-                            if let Some(content) = json.get("message").and_then(|m| m.get("content")) {
-                                if let Some(text) = content.as_str() {
+                            // 用户消息：content 可能是字符串或数组
+                            if let Some(message) = json.get("message") {
+                                if let Some(content) = message.get("content") {
                                     messages.push(ClaudeHistoryMessage {
                                         role: "user".to_string(),
-                                        content: text.to_string(),
+                                        content: content.clone(),
                                         timestamp: json.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
                                     });
                                 }
                             }
                         }
                         "assistant" => {
+                            // 助手消息：content 通常是数组（包含 text、tool_use 等）
                             if let Some(message) = json.get("message") {
                                 if let Some(content) = message.get("content") {
-                                    if let Some(arr) = content.as_array() {
-                                        for item in arr {
-                                            if item.get("type").and_then(|t| t.as_str()) == Some("text") {
-                                                if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
-                                                    messages.push(ClaudeHistoryMessage {
-                                                        role: "assistant".to_string(),
-                                                        content: text.to_string(),
-                                                        timestamp: json.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    }
+                                    messages.push(ClaudeHistoryMessage {
+                                        role: "assistant".to_string(),
+                                        content: content.clone(),
+                                        timestamp: json.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                                    });
                                 }
                             }
                         }

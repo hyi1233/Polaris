@@ -39,17 +39,8 @@ fn default_max_tokens() -> u32 {
     4096
 }
 
-/// 聊天消息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub role: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_calls: Option<Vec<ToolCall>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-}
+/// 聊天消息（使用 openai_service 中的多模态支持）
+pub use crate::services::openai_service::{ChatMessage, MessageContent, ContentPart, ImageUrl};
 
 /// 工具调用
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -429,7 +420,7 @@ impl AIEngine for OpenAIEngine {
         // 构建消息
         let messages = vec![ChatMessage {
             role: "user".to_string(),
-            content: Some(message.to_string()),
+            content: Some(MessageContent::Text(message.to_string())),
             tool_calls: None,
             tool_call_id: None,
         }];
@@ -489,7 +480,7 @@ impl AIEngine for OpenAIEngine {
             .iter()
             .map(|h| ChatMessage {
                 role: h.role.clone(),
-                content: Some(h.content.clone()),
+                content: Some(MessageContent::Text(h.content.clone())),
                 tool_calls: None,
                 tool_call_id: None,
             })
@@ -498,7 +489,7 @@ impl AIEngine for OpenAIEngine {
         // 添加新消息
         messages.push(ChatMessage {
             role: "user".to_string(),
-            content: Some(message.to_string()),
+            content: Some(MessageContent::Text(message.to_string())),
             tool_calls: None,
             tool_call_id: None,
         });

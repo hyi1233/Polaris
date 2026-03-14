@@ -34,13 +34,15 @@ export interface CodeBlockMatch {
 export function extractCodeBlocks(html: string): CodeBlockMatch[] {
   const codeBlocks: CodeBlockMatch[] = [];
 
-  // 匹配 <pre><code class="language-xxx">...</code></pre>
-  const regex = /<pre><code\s+class="(?:language-)?([^"]*)"(?:[^>]*)>([\s\S]*?)<\/code><\/pre>/gi;
+  // 匹配两种格式的代码块：
+  // 1. <pre><code class="language-xxx">...</code></pre> - 有语言标识符
+  // 2. <pre><code>...</code></pre> - 没有语言标识符
+  const regex = /<pre><code(?:\s+class="(?:language-)?([^"]*)")?(?:[^>]*)>([\s\S]*?)<\/code><\/pre>/gi;
   let match;
 
   while ((match = regex.exec(html)) !== null) {
     const fullHTML = match[0];
-    const className = match[1];
+    const className = match[1] || ''; // 可能为 undefined（没有 class 属性）
     const code = match[2];
 
     // 解码 HTML 实体
@@ -54,7 +56,7 @@ export function extractCodeBlocks(html: string): CodeBlockMatch[] {
     codeBlocks.push({
       fullHTML,
       code: decodedCode,
-      className: `language-${className}`,
+      className: className ? `language-${className}` : 'language-text',
       startIndex: match.index,
       endIndex: match.index + fullHTML.length,
     });
@@ -110,5 +112,5 @@ export function codeBlockToReact(block: CodeBlockMatch, index: number): React.Re
  * 检查 HTML 是否包含代码块
  */
 export function hasCodeBlocks(html: string): boolean {
-  return /<pre><code\s+class="(?:language-)?[^"]*"/.test(html);
+  return /<pre><code(?:\s+class="(?:language-)?[^"]*")?[^>]*>/.test(html);
 }

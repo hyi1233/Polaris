@@ -42,11 +42,23 @@ export interface OpenAIProviderSessionConfig extends AISessionConfig {
 }
 
 /**
+ * OpenAI 消息内容部分
+ */
+interface OpenAIContentPart {
+  type: 'text' | 'image_url'
+  text?: string
+  image_url?: {
+    url: string // data:image/png;base64,xxx 或 URL
+    detail?: 'auto' | 'low' | 'high'
+  }
+}
+
+/**
  * OpenAI API 消息格式
  */
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content?: string | null
+  content?: string | OpenAIContentPart[] | null
   tool_calls?: Array<{
     id: string
     type: string
@@ -56,6 +68,16 @@ interface OpenAIMessage {
     }
   }>
   tool_call_id?: string
+}
+
+/**
+ * 附件数据格式
+ */
+interface AttachmentInput {
+  type: 'image' | 'file'
+  fileName: string
+  mimeType: string
+  content: string // base64 data URL
 }
 
 /**
@@ -150,8 +172,9 @@ export class OpenAIProviderSession extends BaseSession {
     this.currentTaskId = task.id
     this.abortRequested = false
 
-    // 添加用户消息到历史
-    this.addUserMessage(task.input.prompt)
+    // 添加用户消息到历史，包含附件
+    const attachments = (task.input as any).attachments as AttachmentInput[] | undefined
+    this.addUserMessage(task.input.prompt, attachments)
 
     // 设置事件监听
     await this.setupEventListeners()
@@ -343,10 +366,56 @@ export class OpenAIProviderSession extends BaseSession {
   /**
    * 添加用户消息
    */
-  private addUserMessage(content: string): void {
+  /**
+   * 添加用户消息
+   *
+   * @param content - 文本内容
+   * @param attachments - 附件列表（可选）
+   */
+  private addUserMessage(content: string, attachments?: AttachmentInput[]): void {
+    // 如果没有附件，直接添加文本消息
+    if (!attachments || attachments.length === 0) {
+      this.messages.push({
+        role: 'user',
+        content,
+      })
+      return
+    }
+
+    // 有附件，构建多部分内容
+    const parts: OpenAIContentPart[] = []
+
+    // 添加文本部分
+    if (content) {
+      parts.push({
+        type: 'text',
+        text: content,
+      })
+    }
+
+    // 添加附件部分
+    for (const att of attachments) {
+      if (att.type === 'image') {
+        // 图片使用 image_url 格式
+        parts.push({
+          type: 'image_url',
+          image_url: {
+            url: att.content, // 已经是 data:image/xxx;base64,xxx 格式
+            detail: 'auto',
+          },
+        })
+      } else {
+        // 文件转换为文本描述
+        parts.push({
+          type: 'text',
+          text: `\n[文件: ${att.fileName}]\n类型: ${att.mimeType}\n`,
+        })
+      }
+    }
+
     this.messages.push({
       role: 'user',
-      content,
+      content: parts,
     })
   }
 
