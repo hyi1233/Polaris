@@ -116,14 +116,28 @@ export const useTabStore = create<TabStore>()(
 
       // 打开 Webview Tab
       openWebviewTab: async (url: string, title?: string) => {
-        // 检查是否已存在相同 URL 的 Webview Tab
-        const existingTab = get().tabs.find(
-          (tab) => tab.type === 'webview' && tab.url === url
-        )
+        // 查找现有的 Webview Tab
+        const existingTab = get().tabs.find((tab) => tab.type === 'webview')
 
         if (existingTab) {
-          // 如果已存在,切换到该 Tab
-          set({ activeTabId: existingTab.id })
+          // 如果已存在 Webview Tab，更新其 URL 并导航
+          set((state) => ({
+            tabs: state.tabs.map((tab) =>
+              tab.id === existingTab.id
+                ? { ...tab, url, title: title || extractDomainTitle(url) }
+                : tab
+            ),
+            activeTabId: existingTab.id,
+          }))
+
+          // 导航到新 URL
+          try {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('webview_navigate', { id: existingTab.id, url })
+          } catch (e) {
+            console.error('导航失败:', e)
+          }
+
           return existingTab.id
         }
 

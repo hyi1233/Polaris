@@ -104,6 +104,7 @@ export const FileTreeNode = memo<FileTreeNodeProps>(({
         }
       }
     } else {
+      select_file(file);
       // 直接调用 store 的 openFile
       await openFile(file.path, file.name);
     }

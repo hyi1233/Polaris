@@ -199,19 +199,54 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
     set({ is_refreshing: true, error: null });
     
     try {
-      // 清除所有缓存
-      set({ 
-        folder_cache: new Map(),
-        expanded_folders: new Set() // 清除展开状态，重新加载
-      });
-      
       // 重新加载当前目录
       const files = await tauri.readDirectory(current_path) as FileInfo[];
       
-      set({ 
+      set({
         current_path,
-        file_tree: files,
-        is_refreshing: false 
+        file_tree: files
+      });
+
+      const { expanded_folders } = get();
+      const expandedPaths = Array.from(expanded_folders);
+      const removed = new Set<string>();
+
+      await Promise.allSettled(expandedPaths.map(async (folderPath) => {
+        try {
+          const children = await tauri.readDirectory(folderPath) as FileInfo[];
+
+          set((state) => {
+            const newCache = new Map(state.folder_cache);
+            newCache.set(folderPath, children);
+            const updatedTree = updateFolderChildren(state.file_tree, folderPath, children);
+
+            return {
+              folder_cache: newCache,
+              file_tree: updatedTree
+            };
+          });
+        } catch {
+          removed.add(folderPath);
+        }
+      }));
+
+      if (removed.size > 0) {
+        set((state) => {
+          const nextExpanded = new Set(state.expanded_folders);
+          const nextCache = new Map(state.folder_cache);
+          removed.forEach((path) => {
+            nextExpanded.delete(path);
+            nextCache.delete(path);
+          });
+          return {
+            expanded_folders: nextExpanded,
+            folder_cache: nextCache
+          };
+        });
+      }
+
+      set({
+        is_refreshing: false
       });
     } catch (error) {
       set({ 
