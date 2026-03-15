@@ -6,6 +6,7 @@ use crate::error::Result;
 use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TriggerType, RunTaskResult, PaginatedLogs};
 use crate::state::AppState;
 use crate::utils::{LockStatus, SchedulerLock};
+use crate::services::scheduler::ProtocolTaskService;
 
 /// 获取所有任务
 #[tauri::command]
@@ -237,4 +238,81 @@ pub async fn scheduler_clear_task_logs(
 ) -> Result<usize> {
     let mut store = state.scheduler_log_store.lock().await;
     store.clear_task_logs(&task_id)
+}
+
+// ============================================================================
+// 协议任务文档操作
+// ============================================================================
+
+/// 协议文档类型
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProtocolFileType {
+    /// 协议文档
+    Task,
+    /// 用户补充
+    Supplement,
+    /// 记忆索引
+    MemoryIndex,
+    /// 记忆任务
+    MemoryTasks,
+}
+
+/// 读取协议任务文档
+#[tauri::command]
+pub fn scheduler_read_protocol_file(
+    work_dir: String,
+    task_path: String,
+    file_type: ProtocolFileType,
+) -> Result<String> {
+    let content = match file_type {
+        ProtocolFileType::Task => ProtocolTaskService::read_task_md(&work_dir, &task_path),
+        ProtocolFileType::Supplement => ProtocolTaskService::read_supplement_md(&work_dir, &task_path),
+        ProtocolFileType::MemoryIndex => ProtocolTaskService::read_memory_index(&work_dir, &task_path),
+        ProtocolFileType::MemoryTasks => ProtocolTaskService::read_memory_tasks(&work_dir, &task_path),
+    };
+
+    content.map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 写入协议任务文档
+#[tauri::command]
+pub fn scheduler_write_protocol_file(
+    work_dir: String,
+    task_path: String,
+    file_type: ProtocolFileType,
+    content: String,
+) -> Result<()> {
+    let result = match file_type {
+        ProtocolFileType::Task => ProtocolTaskService::update_task_md(&work_dir, &task_path, &content),
+        ProtocolFileType::Supplement => {
+            // 用户补充直接覆盖文件
+            std::fs::write(
+                std::path::PathBuf::from(&work_dir).join(&task_path).join("user-supplement.md"),
+                &content
+            )
+        }
+        ProtocolFileType::MemoryIndex => ProtocolTaskService::update_memory_index(&work_dir, &task_path, &content),
+        ProtocolFileType::MemoryTasks => ProtocolTaskService::update_memory_tasks(&work_dir, &task_path, &content),
+    };
+
+    result.map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 获取协议任务文档路径
+#[tauri::command]
+pub fn scheduler_get_protocol_file_path(
+    work_dir: String,
+    task_path: String,
+    file_type: ProtocolFileType,
+) -> Result<String> {
+    let file_name = match file_type {
+        ProtocolFileType::Task => "task.md",
+        ProtocolFileType::Supplement => "user-supplement.md",
+        ProtocolFileType::MemoryIndex => "memory/index.md",
+        ProtocolFileType::MemoryTasks => "memory/tasks.md",
+    };
+
+    let full_path = std::path::PathBuf::from(&work_dir).join(&task_path).join(file_name);
+    Ok(full_path.to_string_lossy().to_string())
 }

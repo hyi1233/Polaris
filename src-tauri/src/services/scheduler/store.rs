@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
-use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TaskStore, LogStore, TriggerType, PaginatedLogs};
+use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TaskStore, LogStore, PaginatedLogs, TaskMode};
+use crate::services::scheduler::ProtocolTaskService;
 use std::path::PathBuf;
-use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::Utc;
 
@@ -58,11 +58,39 @@ impl TaskStoreService {
     /// 创建任务
     pub fn create(&mut self, params: CreateTaskParams) -> Result<ScheduledTask> {
         let now = Utc::now().timestamp();
-        let mut task: ScheduledTask = params.into();
+        let id = Uuid::new_v4().to_string();
 
-        task.id = Uuid::new_v4().to_string();
-        task.created_at = now;
-        task.updated_at = now;
+        let mut task = ScheduledTask {
+            id: id.clone(),
+            name: params.name,
+            enabled: params.enabled,
+            trigger_type: params.trigger_type,
+            trigger_value: params.trigger_value,
+            engine_id: params.engine_id,
+            prompt: params.prompt,
+            work_dir: params.work_dir.clone(),
+            mode: params.mode.clone(),
+            task_path: None,
+            last_run_at: None,
+            last_run_status: None,
+            next_run_at: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        // 如果是协议模式，创建任务目录结构
+        if params.mode == TaskMode::Protocol {
+            let work_dir = params.work_dir.clone().unwrap_or_else(|| ".".to_string());
+            let mission = params.mission.clone().unwrap_or_else(|| task.name.clone());
+
+            let task_path = ProtocolTaskService::create_task_structure(
+                &work_dir,
+                &id,
+                &mission,
+            ).map_err(|e| AppError::IoError(e))?;
+
+            task.task_path = Some(task_path);
+        }
 
         // 计算下次执行时间
         task.next_run_at = task.trigger_type.calculate_next_run(&task.trigger_value, now);
@@ -83,6 +111,8 @@ impl TaskStoreService {
             existing.engine_id = task.engine_id;
             existing.prompt = task.prompt;
             existing.work_dir = task.work_dir;
+            existing.mode = task.mode;
+            existing.task_path = task.task_path;
             existing.updated_at = now;
 
             // 重新计算下次执行时间
@@ -95,6 +125,16 @@ impl TaskStoreService {
 
     /// 删除任务
     pub fn delete(&mut self, id: &str) -> Result<()> {
+        // 获取任务信息以删除目录
+        if let Some(task) = self.store.tasks.iter().find(|t| t.id == id) {
+            // 如果是协议模式，删除任务目录
+            if task.mode == TaskMode::Protocol {
+                if let (Some(work_dir), Some(task_path)) = (&task.work_dir, &task.task_path) {
+                    let _ = ProtocolTaskService::delete_task_structure(work_dir, task_path);
+                }
+            }
+        }
+
         self.store.tasks.retain(|t| t.id != id);
         self.save()?;
         Ok(())

@@ -4,9 +4,11 @@
 
 import { useEffect, useState } from 'react';
 import { useSchedulerStore, useToastStore } from '../../stores';
-import type { TaskLog, TriggerType, CreateTaskParams } from '../../types/scheduler';
+import type { TaskLog, TriggerType, CreateTaskParams, TaskMode } from '../../types/scheduler';
 import type { ScheduledTask } from '../../types/scheduler';
-import { TriggerTypeLabels, IntervalUnitLabels, parseIntervalValue } from '../../types/scheduler';
+import { TriggerTypeLabels, IntervalUnitLabels, TaskModeLabels, parseIntervalValue } from '../../types/scheduler';
+import * as tauri from '../../services/tauri';
+import type { ProtocolFileType } from '../../services/tauri';
 
 /** 格式化时间戳 */
 function formatTime(timestamp: number | undefined): string {
@@ -57,12 +59,14 @@ function TaskCard({
   onDelete,
   onToggle,
   onRun,
+  onViewDocs,
 }: {
   task: ScheduledTask;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
   onRun: () => void;
+  onViewDocs?: () => void;
 }) {
   return (
     <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a4a]">
@@ -71,6 +75,14 @@ function TaskCard({
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${task.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
             <h3 className="text-white font-medium">{task.name}</h3>
+            {/* 模式徽章 */}
+            <span className={`px-2 py-0.5 rounded text-xs ${
+              task.mode === 'protocol'
+                ? 'bg-purple-500/20 text-purple-400'
+                : 'bg-gray-500/20 text-gray-400'
+            }`}>
+              {TaskModeLabels[task.mode]}
+            </span>
           </div>
 
           <div className="mt-2 text-sm text-gray-400 space-y-1">
@@ -98,6 +110,16 @@ function TaskCard({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 协议模式显示查看文档按钮 */}
+          {task.mode === 'protocol' && onViewDocs && (
+            <button
+              onClick={onViewDocs}
+              className="px-3 py-1 text-sm bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 rounded transition-colors"
+              title="查看任务文档"
+            >
+              文档
+            </button>
+          )}
           <button
             onClick={onRun}
             className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
@@ -145,11 +167,13 @@ function TaskEditor({
 }) {
   const toast = useToastStore();
   const [name, setName] = useState(task?.name || '');
+  const [mode, setMode] = useState<TaskMode>(task?.mode || 'simple');
   const [triggerType, setTriggerType] = useState<TriggerType>(task?.triggerType || 'interval');
   const [triggerValue, setTriggerValue] = useState(task?.triggerValue || '1h');
   const [engineId, setEngineId] = useState(task?.engineId || 'claude');
   const [prompt, setPrompt] = useState(task?.prompt || '');
   const [workDir, setWorkDir] = useState(task?.workDir || '');
+  const [mission, setMission] = useState('');
 
   // 间隔快速选择
   const [intervalNum, setIntervalNum] = useState(1);
@@ -172,9 +196,27 @@ function TaskEditor({
   };
 
   const handleSave = () => {
-    if (!name.trim() || !prompt.trim()) {
-      toast.warning('请填写任务名称和提示词');
+    if (!name.trim()) {
+      toast.warning('请填写任务名称');
       return;
+    }
+
+    // 简单模式需要提示词
+    if (mode === 'simple' && !prompt.trim()) {
+      toast.warning('请填写提示词');
+      return;
+    }
+
+    // 协议模式需要工作目录和任务目标
+    if (mode === 'protocol') {
+      if (!workDir.trim()) {
+        toast.warning('协议模式需要指定工作目录');
+        return;
+      }
+      if (!mission.trim()) {
+        toast.warning('协议模式需要填写任务目标');
+        return;
+      }
     }
 
     onSave({
@@ -184,6 +226,8 @@ function TaskEditor({
       engineId,
       prompt,
       workDir: workDir || undefined,
+      mode,
+      mission: mode === 'protocol' ? mission : undefined,
       enabled: task?.enabled ?? true,
     });
   };
@@ -212,6 +256,75 @@ function TaskEditor({
               placeholder="例如：每日日报生成"
             />
           </div>
+
+          {/* 任务模式 */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">任务模式</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === 'simple'}
+                  onChange={() => setMode('simple')}
+                  className="w-4 h-4"
+                />
+                <span className="text-white">简单模式</span>
+                <span className="text-xs text-gray-500">直接执行提示词</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === 'protocol'}
+                  onChange={() => setMode('protocol')}
+                  className="w-4 h-4"
+                />
+                <span className="text-white">协议模式</span>
+                <span className="text-xs text-gray-500">自动生成协议文档</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 简单模式：提示词 */}
+          {mode === 'simple' && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">提示词</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={5}
+                className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                placeholder="输入 AI 要执行的提示词..."
+              />
+            </div>
+          )}
+
+          {/* 协议模式：任务目标和工作目录 */}
+          {mode === 'protocol' && (
+            <>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  任务目标 <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={mission}
+                  onChange={(e) => setMission(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+                  placeholder="描述任务目标，例如：帮我持续优化 ERP 查询性能"
+                />
+              </div>
+              <div className="p-3 bg-purple-500/10 rounded border border-purple-500/20">
+                <p className="text-sm text-purple-400">
+                  💡 创建后将自动生成协议文档，包含任务目标、执行规则、记忆系统等。
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  路径: {workDir || '[工作目录]'}/.polaris/tasks/[时间戳]/
+                </p>
+              </div>
+            </>
+          )}
 
           {/* 触发类型 */}
           <div>
@@ -291,25 +404,15 @@ function TaskEditor({
 
           {/* 工作目录 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">工作目录（可选）</label>
+            <label className="block text-sm text-gray-400 mb-1">
+              工作目录 {mode === 'protocol' && <span className="text-red-400">*</span>}
+            </label>
             <input
               type="text"
               value={workDir}
               onChange={(e) => setWorkDir(e.target.value)}
               className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
-              placeholder="留空使用默认目录"
-            />
-          </div>
-
-          {/* 提示词 */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">提示词</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={5}
-              className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none"
-              placeholder="输入 AI 要执行的提示词..."
+              placeholder={mode === 'protocol' ? '协议模式必须指定工作目录' : '留空使用默认目录'}
             />
           </div>
         </div>
@@ -439,6 +542,7 @@ export function SchedulerPanel() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingTask, setEditingTask] = useState<ScheduledTask | undefined>();
   const [activeTab, setActiveTab] = useState<'tasks' | 'logs'>('tasks');
+  const [viewingTask, setViewingTask] = useState<ScheduledTask | undefined>();
 
   useEffect(() => {
     loadTasks();
@@ -560,6 +664,7 @@ export function SchedulerPanel() {
                   onDelete={() => handleDelete(task.id)}
                   onToggle={() => toggleTask(task.id, !task.enabled)}
                   onRun={() => handleRunTask(task)}
+                  onViewDocs={() => setViewingTask(task)}
                 />
               ))}
             </div>
@@ -580,6 +685,159 @@ export function SchedulerPanel() {
           }}
         />
       )}
+
+      {/* 协议文档查看器 */}
+      {viewingTask && (
+        <ProtocolDocViewer
+          task={viewingTask}
+          onClose={() => setViewingTask(undefined)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 协议文档查看器 */
+function ProtocolDocViewer({
+  task,
+  onClose,
+}: {
+  task: ScheduledTask;
+  onClose: () => void;
+}) {
+  const toast = useToastStore();
+  const [activeDoc, setActiveDoc] = useState<'task' | 'supplement' | 'memory'>('task');
+  const [content, setContent] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // 读取文档内容
+  useEffect(() => {
+    if (!task.workDir || !task.taskPath) return;
+
+    setLoading(true);
+    const fileType: ProtocolFileType = activeDoc === 'memory' ? 'memory_index' : activeDoc;
+
+    tauri.schedulerReadProtocolFile(task.workDir, task.taskPath, fileType)
+      .then((data) => {
+        setContent(data);
+        setEditedContent(data);
+      })
+      .catch((e) => {
+        toast.error('读取文档失败', e instanceof Error ? e.message : '未知错误');
+      })
+      .finally(() => setLoading(false));
+  }, [task, activeDoc, toast]);
+
+  const handleSave = async () => {
+    if (!task.workDir || !task.taskPath) return;
+
+    const fileType: ProtocolFileType = activeDoc === 'memory' ? 'memory_index' : activeDoc;
+
+    try {
+      await tauri.schedulerWriteProtocolFile(task.workDir, task.taskPath, fileType, editedContent);
+      setContent(editedContent);
+      setIsEditing(false);
+      toast.success('保存成功');
+    } catch (e) {
+      toast.error('保存失败', e instanceof Error ? e.message : '未知错误');
+    }
+  };
+
+  const docTabs = [
+    { id: 'task' as const, label: '协议文档' },
+    { id: 'supplement' as const, label: '用户补充' },
+    { id: 'memory' as const, label: '记忆索引' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-[#16162a] rounded-lg w-[800px] h-[80vh] flex flex-col border border-[#2a2a4a]">
+        {/* 头部 */}
+        <div className="p-4 border-b border-[#2a2a4a] flex items-center justify-between">
+          <h2 className="text-lg font-medium text-white">
+            📄 {task.name} - 文档管理
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        {/* 文档标签页 */}
+        <div className="border-b border-[#2a2a4a]">
+          <div className="flex">
+            {docTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveDoc(tab.id);
+                  setIsEditing(false);
+                }}
+                className={`px-4 py-2 text-sm transition-colors ${
+                  activeDoc === tab.id
+                    ? 'text-purple-400 border-b-2 border-purple-400'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-hidden p-4">
+          {loading ? (
+            <div className="text-center text-gray-500 py-8">加载中...</div>
+          ) : isEditing ? (
+            <textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="w-full h-full p-3 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-purple-500 resize-none font-mono text-sm"
+            />
+          ) : (
+            <pre className="w-full h-full p-3 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-gray-300 overflow-auto text-sm whitespace-pre-wrap">
+              {content || '(空文档)'}
+            </pre>
+          )}
+        </div>
+
+        {/* 底部操作栏 */}
+        <div className="p-4 border-t border-[#2a2a4a] flex justify-between items-center">
+          <div className="text-xs text-gray-500">
+            路径: {task.taskPath}/{activeDoc === 'memory' ? 'memory/index.md' : `${activeDoc}.md`}
+          </div>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 bg-gray-600/20 text-gray-300 hover:bg-gray-600/30 rounded transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                >
+                  保存
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setEditedContent(content);
+                  setIsEditing(true);
+                }}
+                className="px-4 py-2 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 rounded transition-colors"
+              >
+                编辑
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

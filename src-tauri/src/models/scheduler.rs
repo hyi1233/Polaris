@@ -20,10 +20,26 @@ pub struct CreateTaskParams {
     pub prompt: String,
     /// 工作目录（可选）
     pub work_dir: Option<String>,
+    /// 任务模式
+    #[serde(default)]
+    pub mode: TaskMode,
+    /// 任务目标（protocol 模式使用）
+    pub mission: Option<String>,
 }
 
 fn default_enabled() -> bool {
     true
+}
+
+/// 任务模式
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskMode {
+    /// 简单模式：直接使用 prompt
+    #[default]
+    Simple,
+    /// 协议模式：读取 task.md + memory + supplement
+    Protocol,
 }
 
 /// 定时任务
@@ -45,10 +61,15 @@ pub struct ScheduledTask {
     pub trigger_value: String,
     /// 使用的引擎 ID
     pub engine_id: String,
-    /// 提示词
+    /// 提示词 (simple 模式使用)
     pub prompt: String,
     /// 工作目录（可选）
     pub work_dir: Option<String>,
+    /// 任务模式
+    #[serde(default)]
+    pub mode: TaskMode,
+    /// 任务路径 (protocol 模式使用，相对于 workDir)
+    pub task_path: Option<String>,
     /// 上次执行时间
     pub last_run_at: Option<i64>,
     /// 上次执行状态
@@ -72,6 +93,8 @@ impl From<CreateTaskParams> for ScheduledTask {
             engine_id: params.engine_id,
             prompt: params.prompt,
             work_dir: params.work_dir,
+            mode: params.mode,
+            task_path: None, // 将在创建任务目录后设置
             last_run_at: None,
             last_run_status: None,
             next_run_at: None,

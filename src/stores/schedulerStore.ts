@@ -75,6 +75,8 @@ export const useSchedulerStore = create<SchedulerState>((set) => ({
         engineId: params.engineId,
         prompt: params.prompt,
         workDir: params.workDir,
+        mode: params.mode,
+        mission: params.mission,
       });
 
       // 刷新列表

@@ -8,6 +8,9 @@ export type TriggerType = 'once' | 'cron' | 'interval';
 /** 任务状态 */
 export type TaskStatus = 'running' | 'success' | 'failed';
 
+/** 任务模式 */
+export type TaskMode = 'simple' | 'protocol';
+
 /** 定时任务 */
 export interface ScheduledTask {
   /** 任务 ID */
@@ -22,10 +25,14 @@ export interface ScheduledTask {
   triggerValue: string;
   /** 使用的引擎 ID */
   engineId: string;
-  /** 提示词 */
+  /** 提示词 (simple 模式使用) */
   prompt: string;
   /** 工作目录 */
   workDir?: string;
+  /** 任务模式 */
+  mode: TaskMode;
+  /** 任务路径 (protocol 模式使用，相对于 workDir) */
+  taskPath?: string;
   /** 上次执行时间 */
   lastRunAt?: number;
   /** 上次执行状态 */
@@ -81,7 +88,33 @@ export interface CreateTaskParams {
   engineId: string;
   prompt: string;
   workDir?: string;
+  /** 任务模式 */
+  mode?: TaskMode;
+  /** 任务目标 (protocol 模式使用，用于生成协议文档) */
+  mission?: string;
 }
+
+/** 协议任务目录结构 */
+export interface ProtocolTaskFiles {
+  /** 任务 ID */
+  taskId: string;
+  /** 任务路径 */
+  taskPath: string;
+  /** 协议文档内容 */
+  taskContent: string;
+  /** 用户补充文档内容 */
+  supplementContent: string;
+  /** 记忆索引内容 */
+  memoryIndexContent: string;
+  /** 记忆任务内容 */
+  memoryTasksContent: string;
+}
+
+/** 任务模式显示名称 */
+export const TaskModeLabels: Record<TaskMode, string> = {
+  simple: '简单模式',
+  protocol: '协议模式',
+};
 
 /** 触发类型显示名称 */
 export const TriggerTypeLabels: Record<TriggerType, string> = {

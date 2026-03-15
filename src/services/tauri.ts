@@ -781,3 +781,34 @@ export async function schedulerDeleteLogs(logIds: string[]): Promise<number> {
 export async function schedulerClearTaskLogs(taskId: string): Promise<number> {
   return invoke<number>('scheduler_clear_task_logs', { taskId });
 }
+
+/** 协议文档类型 */
+export type ProtocolFileType = 'task' | 'supplement' | 'memory_index' | 'memory_tasks';
+
+/** 读取协议任务文档 */
+export async function schedulerReadProtocolFile(
+  workDir: string,
+  taskPath: string,
+  fileType: ProtocolFileType
+): Promise<string> {
+  return invoke<string>('scheduler_read_protocol_file', { workDir, taskPath, fileType });
+}
+
+/** 写入协议任务文档 */
+export async function schedulerWriteProtocolFile(
+  workDir: string,
+  taskPath: string,
+  fileType: ProtocolFileType,
+  content: string
+): Promise<void> {
+  return invoke('scheduler_write_protocol_file', { workDir, taskPath, fileType, content });
+}
+
+/** 获取协议任务文档路径 */
+export async function schedulerGetProtocolFilePath(
+  workDir: string,
+  taskPath: string,
+  fileType: ProtocolFileType
+): Promise<string> {
+  return invoke<string>('scheduler_get_protocol_file_path', { workDir, taskPath, fileType });
+}

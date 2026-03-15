@@ -73,6 +73,8 @@ use commands::scheduler::{
     scheduler_get_lock_status, scheduler_start, scheduler_stop,
     scheduler_get_logs_paginated, scheduler_delete_log, scheduler_delete_logs,
     scheduler_clear_task_logs,
+    scheduler_read_protocol_file, scheduler_write_protocol_file,
+    scheduler_get_protocol_file_path,
 };
 
 use std::sync::Arc;
@@ -458,6 +460,10 @@ pub fn run() {
             scheduler_delete_log,
             scheduler_delete_logs,
             scheduler_clear_task_logs,
+            // 协议任务文档
+            scheduler_read_protocol_file,
+            scheduler_write_protocol_file,
+            scheduler_get_protocol_file_path,
 
         ])
         .run(tauri::generate_context!())
