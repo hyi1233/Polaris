@@ -53,6 +53,44 @@ function StatusBadge({ status }: { status?: 'running' | 'success' | 'failed' }) 
   );
 }
 
+/** 可折叠的内容块 */
+function CollapsibleContent({
+  label,
+  content,
+  maxHeight = 100,
+  className = 'text-text-secondary',
+}: {
+  label: string;
+  content: string;
+  maxHeight?: number;
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const needsExpand = content.length > 200 || content.split('\n').length > 5;
+
+  return (
+    <div className="mt-3">
+      <div
+        className="flex items-center justify-between text-sm text-text-muted mb-1 cursor-pointer hover:text-text-secondary"
+        onClick={() => needsExpand && setExpanded(!expanded)}
+      >
+        <span>{label}:</span>
+        {needsExpand && (
+          <span className="text-xs text-primary">
+            {expanded ? '收起' : '展开全部'}
+          </span>
+        )}
+      </div>
+      <pre
+        className={`text-xs ${className} bg-background p-2 rounded overflow-x-auto whitespace-pre-wrap transition-all`}
+        style={!expanded && needsExpand ? { maxHeight: `${maxHeight}px`, overflow: 'hidden' } : {}}
+      >
+        {content}
+      </pre>
+    </div>
+  );
+}
+
 /** 主组件 */
 export function SchedulerTab() {
   const { tasks, logs, loading, loadTasks, loadLogs, createTask, updateTask, deleteTask, toggleTask, runTask } =
@@ -192,7 +230,7 @@ export function SchedulerTab() {
             onClick={() => setShowTemplateManager(true)}
             className="px-4 py-2 bg-surface text-text-secondary hover:text-text-primary border border-border-subtle rounded transition-colors"
           >
-            📝 模板管理
+            模板管理
           </button>
           <button
             onClick={() => {
@@ -336,6 +374,15 @@ export function SchedulerTab() {
                         {task.enabled && task.nextRunAt && (
                           <span>下次: {formatRelativeTime(task.nextRunAt)}</span>
                         )}
+                        {/* 执行轮次显示 */}
+                        {task.maxRuns != null && task.maxRuns > 0 && (
+                          <span>
+                            轮次:
+                            <span className={task.currentRuns >= task.maxRuns ? 'text-yellow-400 ml-1' : 'text-text-secondary ml-1'}>
+                              {task.currentRuns}/{task.maxRuns}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -399,25 +446,49 @@ export function SchedulerTab() {
                 </div>
                 {expandedLogId === log.id && (
                   <div className="mt-3 pt-3 border-t border-border-subtle">
-                    <div className="text-sm text-text-muted mb-2">提示词:</div>
-                    <pre className="text-xs text-text-secondary bg-background p-2 rounded overflow-x-auto whitespace-pre-wrap">
-                      {log.prompt}
-                    </pre>
+                    {/* 显示增强字段：Session ID、工具调用次数 */}
+                    <div className="flex flex-wrap gap-4 text-xs text-text-muted mb-3">
+                      {log.sessionId && (
+                        <span>
+                          Session: <code className="text-primary bg-background px-1 rounded">{log.sessionId.slice(0, 8)}...</code>
+                        </span>
+                      )}
+                      {log.toolCallCount != null && log.toolCallCount > 0 && (
+                        <span className="text-yellow-400">
+                          工具调用: {log.toolCallCount} 次
+                        </span>
+                      )}
+                    </div>
+                    {/* 提示词 - 默认折叠 */}
+                    <CollapsibleContent
+                      label="提示词"
+                      content={log.prompt}
+                      maxHeight={60}
+                      className="text-text-secondary"
+                    />
+                    {log.thinkingSummary && (
+                      <CollapsibleContent
+                        label="思考过程"
+                        content={log.thinkingSummary}
+                        maxHeight={80}
+                        className="text-purple-400"
+                      />
+                    )}
                     {log.output && (
-                      <>
-                        <div className="text-sm text-text-muted mt-3 mb-2">输出:</div>
-                        <pre className="text-xs text-green-400 bg-background p-2 rounded overflow-x-auto whitespace-pre-wrap max-h-60">
-                          {log.output}
-                        </pre>
-                      </>
+                      <CollapsibleContent
+                        label="输出"
+                        content={log.output}
+                        maxHeight={120}
+                        className="text-green-400"
+                      />
                     )}
                     {log.error && (
-                      <>
-                        <div className="text-sm text-text-muted mt-3 mb-2">错误:</div>
-                        <pre className="text-xs text-red-400 bg-background p-2 rounded overflow-x-auto whitespace-pre-wrap">
-                          {log.error}
-                        </pre>
-                      </>
+                      <CollapsibleContent
+                        label="错误"
+                        content={log.error}
+                        maxHeight={80}
+                        className="text-red-400"
+                      />
                     )}
                   </div>
                 )}

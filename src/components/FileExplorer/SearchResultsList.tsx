@@ -178,7 +178,7 @@ export const SearchResultsList = memo<SearchResultsListProps>(({ results }) => {
       {
         id: 'open',
         label: file.is_dir ? '打开文件夹' : '打开文件',
-        icon: file.is_dir ? '📂' : '📄',
+        icon: '',
         action: async () => {
           if (!file.is_dir) {
             await openFile(file.path, file.name);
@@ -192,7 +192,7 @@ export const SearchResultsList = memo<SearchResultsListProps>(({ results }) => {
       items.push({
         id: 'open-in-browser',
         label: '在浏览器中打开',
-        icon: '🌐',
+        icon: '',
         action: async () => {
           await openInDefaultApp(file.path);
         },
@@ -205,7 +205,9 @@ export const SearchResultsList = memo<SearchResultsListProps>(({ results }) => {
   if (results.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
-        <div className="text-4xl mb-2">🔍</div>
+        <svg className="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
         <div className="text-sm">没有找到匹配的文件</div>
       </div>
     );

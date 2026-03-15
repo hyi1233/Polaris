@@ -145,8 +145,8 @@ function handleAIEvent(
   storeGet: () => EventChatState,
   workspacePath?: string
 ): void {
-  // 🔍 强制诊断日志
-  console.log('🔍 [handleAIEvent] 收到事件:', event.type, {
+  // 强制诊断日志
+  console.log('[handleAIEvent] 收到事件:', event.type, {
     hasToken: event.type === 'token',
     tokenLength: event.type === 'token' ? event.value?.length : 0,
     timestamp: new Date().toISOString()

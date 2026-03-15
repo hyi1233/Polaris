@@ -347,13 +347,13 @@ export class UnifiedHistoryService {
   getProviderIcon(provider: ProviderType): string {
     switch (provider) {
       case 'claude-code':
-        return '🤖'
+        return 'Claude'
       case 'iflow':
-        return '🧠'
+        return 'IFlow'
       case 'codex':
-        return '💻'
+        return 'Codex'
       default:
-        return '📝'
+        return 'AI'
     }
   }
 }

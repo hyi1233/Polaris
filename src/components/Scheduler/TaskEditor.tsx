@@ -11,6 +11,7 @@ import type { ScheduledTask, TriggerType, CreateTaskParams, TaskMode } from '../
 import { TriggerTypeLabels, IntervalUnitLabels, TaskModeLabels, parseIntervalValue } from '../../types/scheduler';
 import { ProtocolTemplateCategoryLabels, renderProtocolTemplate } from '../../types/protocolTemplate';
 import type { ProtocolTemplate } from '../../types/protocolTemplate';
+import * as tauri from '../../services/tauri';
 
 /** 格式化当前时间用于 datetime-local 输入 */
 function formatDateTimeLocal(date: Date): string {
@@ -83,7 +84,7 @@ function ProtocolTemplateSelector({
         onClick={() => setShowTemplates(!showTemplates)}
         className="w-full px-3 py-2 flex items-center justify-between text-sm text-gray-300 hover:text-white transition-colors"
       >
-        <span>📝 选择模板快速创建</span>
+        <span>选择模板快速创建</span>
         <span className={`transform transition-transform ${showTemplates ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
@@ -193,11 +194,22 @@ export function TaskEditor({
     }
   }, [triggerType, triggerValue]);
 
-  // 初始化协议模式数据
+  // 初始化协议模式数据 - 从协议文档中读取任务目标
   useEffect(() => {
     if (task?.mode === 'protocol' && task.taskPath && task.workDir) {
-      // 读取任务目标（从 task.md 中解析或从 store 中获取）
-      // 这里简化处理，编辑时不改变 mission
+      // 读取任务目标（从 task.md 中解析）
+      tauri.schedulerReadProtocolFile(task.workDir, task.taskPath, 'task')
+        .then((content) => {
+          // 解析任务目标部分
+          const missionMatch = content.match(/## 任务目标\s*\n([\s\S]*?)(?=\n##|$)/);
+          if (missionMatch && missionMatch[1]) {
+            const extractedMission = missionMatch[1].trim();
+            setMission(extractedMission);
+          }
+        })
+        .catch((e) => {
+          console.error('读取协议文档失败:', e);
+        });
     }
   }, [task]);
 
@@ -401,7 +413,7 @@ export function TaskEditor({
               </div>
               <div className="p-3 bg-purple-500/10 rounded border border-purple-500/20">
                 <p className="text-sm text-purple-400">
-                  💡 创建后将自动生成协议文档，包含任务目标、执行规则、记忆系统等。
+                  创建后将自动生成协议文档，包含任务目标、执行规则、记忆系统等。
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   支持占位符：{'{dateTime}'} - 当前日期时间

@@ -46,7 +46,9 @@ export function WorkspaceSelector() {
         <div className="p-3 border-b border-border">
           <div className="text-center py-4">
             <div className="w-12 h-12 rounded-lg bg-background-surface border border-border flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl">📁</span>
+              <svg className="w-6 h-6 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
             </div>
             <p className="text-sm text-text-secondary mb-3">
               还没有工作区
@@ -126,7 +128,7 @@ export function WorkspaceSelector() {
                       ? 'text-white/70'
                       : 'text-text-tertiary'
                   }`}>
-                    📁 {workspace.path}
+                    {workspace.path}
                   </div>
                   {workspace.id === currentWorkspaceId && (
                     <div className="mt-1 space-y-1">
@@ -135,7 +137,7 @@ export function WorkspaceSelector() {
                         <span className="text-xs">当前工作区</span>
                       </div>
                       <div className="text-xs text-white/80 bg-white/10 rounded px-1.5 py-0.5">
-                        📁 {workspace.path}
+                        {workspace.path}
                       </div>
                     </div>
                   )}

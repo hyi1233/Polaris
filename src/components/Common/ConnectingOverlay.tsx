@@ -62,14 +62,14 @@ export function ConnectingOverlay() {
           </p>
         ) : isFailed ? (
           <div className="text-xs text-text-tertiary space-y-3 max-w-md">
-            <p className="text-danger font-medium">❌ {error || 'Claude CLI 未找到'}</p>
+            <p className="text-danger font-medium">{error || 'Claude CLI 未找到'}</p>
             {config?.claudeCode?.cliPath && (
               <p>当前路径: <code className="bg-background-surface px-1 py-0.5 rounded">{config.claudeCode.cliPath}</code></p>
             )}
 
             {/* 详细诊断信息 */}
             <div className="bg-background-surface p-3 rounded-lg space-y-2">
-              <p className="font-medium text-text-secondary">🔍 问题诊断:</p>
+              <p className="font-medium text-text-secondary">问题诊断:</p>
               <ul className="space-y-1 list-disc list-inside">
                 <li>Claude CLI 可能未正确安装</li>
                 <li>命令路径配置错误或文件不存在</li>
@@ -80,7 +80,7 @@ export function ConnectingOverlay() {
 
             {/* 引导式帮助 */}
             <div className="bg-background-surface p-3 rounded-lg space-y-2">
-              <p className="font-medium text-text-secondary">💡 解决方案:</p>
+              <p className="font-medium text-text-secondary">解决方案:</p>
               <ol className="space-y-1 list-decimal list-inside">
                 <li>确认已安装 Claude CLI: <code className="px-1 py-0.5 rounded">claude --version</code></li>
                 <li>Windows 用户查找路径: <code className="px-1 py-0.5 rounded">where claude</code></li>

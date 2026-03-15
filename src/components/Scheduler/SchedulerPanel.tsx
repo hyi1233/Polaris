@@ -165,6 +165,47 @@ function TaskCard({
   );
 }
 
+/** 可折叠的内容块 */
+function CollapsibleContent({
+  label,
+  content,
+  maxHeight = 100,
+  className = 'text-gray-300',
+}: {
+  label: string;
+  content: string;
+  maxHeight?: number;
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const needsExpand = content.length > 200 || content.split('\n').length > 5;
+
+  return (
+    <div>
+      <div
+        className="flex items-center justify-between text-sm text-gray-400 mb-1 cursor-pointer hover:text-gray-300"
+        onClick={() => needsExpand && setExpanded(!expanded)}
+      >
+        <span>{label}</span>
+        {needsExpand && (
+          <span className="text-xs text-blue-400">
+            {expanded ? '收起' : '展开全部'}
+          </span>
+        )}
+      </div>
+      <pre
+        className={`text-xs ${className} bg-[#12122a] p-2 rounded overflow-x-auto whitespace-pre-wrap transition-all ${!expanded && needsExpand ? `max-h-[${maxHeight}px] overflow-hidden relative` : ''}`}
+        style={!expanded && needsExpand ? { maxHeight: `${maxHeight}px`, overflow: 'hidden' } : {}}
+      >
+        {content}
+        {!expanded && needsExpand && (
+          <span className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#12122a] to-transparent pointer-events-none" />
+        )}
+      </pre>
+    </div>
+  );
+}
+
 /** 日志列表 */
 function LogList({ logs }: { logs: TaskLog[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -215,44 +256,45 @@ function LogList({ logs }: { logs: TaskLog[] }) {
                 )}
                 {log.toolCallCount != null && log.toolCallCount > 0 && (
                   <span className="text-yellow-400">
-                    🔧 工具调用: {log.toolCallCount} 次
+                    工具调用: {log.toolCallCount} 次
                   </span>
                 )}
               </div>
 
-              <div>
-                <div className="text-sm text-gray-400 mb-2">提示词:</div>
-                <pre className="text-xs text-gray-300 bg-[#12122a] p-2 rounded overflow-x-auto">
-                  {log.prompt}
-                </pre>
-              </div>
+              {/* 提示词 - 默认折叠 */}
+              <CollapsibleContent
+                label="提示词"
+                content={log.prompt}
+                maxHeight={60}
+                className="text-gray-300"
+              />
 
               {/* 显示思考过程摘要 */}
               {log.thinkingSummary && (
-                <div>
-                  <div className="text-sm text-gray-400 mb-2">💭 思考过程:</div>
-                  <pre className="text-xs text-purple-400 bg-[#12122a] p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap">
-                    {log.thinkingSummary}
-                  </pre>
-                </div>
+                <CollapsibleContent
+                  label="思考过程"
+                  content={log.thinkingSummary}
+                  maxHeight={80}
+                  className="text-purple-400"
+                />
               )}
 
               {log.output && (
-                <div>
-                  <div className="text-sm text-gray-400 mb-2">输出:</div>
-                  <pre className="text-xs text-green-400 bg-[#12122a] p-2 rounded overflow-x-auto max-h-60 whitespace-pre-wrap">
-                    {log.output}
-                  </pre>
-                </div>
+                <CollapsibleContent
+                  label="输出"
+                  content={log.output}
+                  maxHeight={120}
+                  className="text-green-400"
+                />
               )}
 
               {log.error && (
-                <div>
-                  <div className="text-sm text-gray-400 mb-2">❌ 错误:</div>
-                  <pre className="text-xs text-red-400 bg-[#12122a] p-2 rounded overflow-x-auto">
-                    {log.error}
-                  </pre>
-                </div>
+                <CollapsibleContent
+                  label="错误"
+                  content={log.error}
+                  maxHeight={80}
+                  className="text-red-400"
+                />
               )}
             </div>
           )}
@@ -332,7 +374,7 @@ export function SchedulerPanel() {
       {/* 头部 */}
       <div className="p-4 border-b border-[#2a2a4a] flex items-center justify-between">
         <h1 className="text-xl font-medium text-white flex items-center gap-2">
-          <span>⏰</span> 定时任务
+          定时任务
         </h1>
         <button
           onClick={() => {
@@ -486,7 +528,7 @@ function ProtocolDocViewer({
         {/* 头部 */}
         <div className="p-4 border-b border-[#2a2a4a] flex items-center justify-between">
           <h2 className="text-lg font-medium text-white">
-            📄 {task.name} - 文档管理
+            {task.name} - 文档管理
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             ✕

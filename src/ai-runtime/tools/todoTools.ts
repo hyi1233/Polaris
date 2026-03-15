@@ -580,7 +580,7 @@ export const startTodoTool: AITool = {
         data: {
           id: todoId,
           status: 'in_progress',
-          message: '待办已开始 🔄',
+          message: '待办已开始',
         },
       }
     } catch (error) {
