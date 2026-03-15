@@ -203,16 +203,52 @@ impl IFlowEngine {
             .count()
     }
 
+    /// 检查进程是否还在运行
+    #[cfg(windows)]
+    fn is_process_running(pid: u32) -> bool {
+        use std::process::Command;
+
+        // 使用 tasklist 命令检查进程是否存在
+        let output = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+
+        match output {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // 如果找到了进程，输出会包含进程 ID
+                stdout.contains(&pid.to_string())
+            }
+            Err(e) => {
+                tracing::warn!("[IFlowEngine] 检查进程状态失败: {}", e);
+                false
+            }
+        }
+    }
+
+    /// 检查进程是否还在运行 (非 Windows)
+    #[cfg(not(windows))]
+    fn is_process_running(pid: u32) -> bool {
+        // Unix: 检查 /proc/{pid} 目录是否存在
+        let path = format!("/proc/{}", pid);
+        std::path::Path::new(&path).exists()
+    }
+
     /// 监控 JSONL 文件
     fn monitor_jsonl_file(
         path: PathBuf,
         session_id: String,
         start_line: usize,
+        cli_pid: u32,
         event_callback: Arc<dyn Fn(AIEvent) + Send + Sync>,
         on_complete: Option<Arc<dyn Fn(i32) + Send + Sync>>,
     ) {
         std::thread::spawn(move || {
-            tracing::info!("[IFlowEngine] 开始监控文件: {:?}, 从第 {} 行开始", path, start_line);
+            tracing::info!(
+                "[IFlowEngine] 开始监控文件: {:?}, session_id: {}, CLI PID: {}, 从第 {} 行开始",
+                path, session_id, cli_pid, start_line
+            );
 
             // 创建事件解析器
             let mut parser = EventParser::new(&session_id);
@@ -220,25 +256,52 @@ impl IFlowEngine {
             // 等待文件创建
             let mut wait_count = 0;
             while !path.exists() && wait_count < 50 {
+                tracing::debug!(
+                    "[IFlowEngine] 等待文件创建... ({}/50), 路径: {:?}",
+                    wait_count + 1, path
+                );
                 std::thread::sleep(Duration::from_millis(100));
                 wait_count += 1;
             }
 
             if !path.exists() {
-                tracing::error!("[IFlowEngine] 文件未创建: {:?}", path);
+                tracing::error!(
+                    "[IFlowEngine] 文件未创建: {:?}, 等待了 {} 次检查 ({}ms)",
+                    path, wait_count, wait_count * 100
+                );
                 event_callback(AIEvent::error("会话文件未创建"));
                 return;
+            }
+
+            tracing::info!("[IFlowEngine] 文件已存在: {:?}", path);
+
+            // 读取文件当前内容，帮助调试
+            if let Ok(file) = File::open(&path) {
+                let reader = BufReader::new(file);
+                let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).take(5).collect();
+                tracing::info!(
+                    "[IFlowEngine] 文件当前有 {} 行（显示前5行）: {:?}",
+                    lines.len(),
+                    lines.iter().map(|l| if l.len() > 100 { &l[..100] } else { l.as_str() }).collect::<Vec<_>>()
+                );
             }
 
             // 持续监控文件
             let mut line_count = start_line;
             let mut sleep_count = 0;
+            let mut total_checks = 0usize;
+            let mut last_process_check = 0usize;
             const MAX_SLEEPS: usize = 600;
 
             loop {
+                total_checks += 1;
                 let file = match File::open(&path) {
                     Ok(f) => f,
-                    Err(_) => {
+                    Err(e) => {
+                        tracing::warn!(
+                            "[IFlowEngine] 打开文件失败: {:?}, 错误: {}, 重试中...",
+                            path, e
+                        );
                         std::thread::sleep(Duration::from_millis(100));
                         continue;
                     }
@@ -247,11 +310,15 @@ impl IFlowEngine {
                 let reader = BufReader::new(file);
                 let mut current_file_lines = 0;
                 let mut has_new_content = false;
+                let mut new_events_count = 0usize;
 
                 for line in reader.lines() {
                     let line = match line {
                         Ok(l) => l,
-                        Err(_) => break,
+                        Err(e) => {
+                            tracing::warn!("[IFlowEngine] 读取行失败: {}", e);
+                            break;
+                        }
                     };
 
                     let trimmed = line.trim();
@@ -272,6 +339,12 @@ impl IFlowEngine {
 
                     // 解析事件
                     if let Some(iflow_event) = IFlowJsonlEvent::parse_line(trimmed) {
+                        new_events_count += 1;
+                        tracing::debug!(
+                            "[IFlowEngine] 解析到事件类型: {:?}, 行号: {}",
+                            iflow_event.event_type, current_file_lines
+                        );
+
                         let stream_events = iflow_event.to_stream_events();
                         for stream_event in stream_events {
                             let is_session_end = matches!(stream_event, StreamEvent::SessionEnd);
@@ -282,25 +355,96 @@ impl IFlowEngine {
                             }
 
                             if is_session_end {
-                                tracing::info!("[IFlowEngine] 检测到会话结束");
+                                tracing::info!(
+                                    "[IFlowEngine] 检测到会话结束, 总检查次数: {}, 总行数: {}",
+                                    total_checks, line_count
+                                );
                                 if let Some(cb) = on_complete {
                                     cb(0);
                                 }
                                 return;
                             }
                         }
+                    } else {
+                        tracing::warn!(
+                            "[IFlowEngine] 无法解析行 {} 内容: {}",
+                            current_file_lines,
+                            if trimmed.len() > 100 { &trimmed[..100] } else { trimmed }
+                        );
                     }
                 }
 
-                if !has_new_content {
+                if has_new_content {
+                    tracing::debug!(
+                        "[IFlowEngine] 本轮读取完成: 新行数={}, 新事件数={}, 当前行数={}",
+                        line_count - start_line, new_events_count, line_count
+                    );
+                } else {
                     sleep_count += 1;
+
+                    // 每 50 次检查 (5秒) 检查一次进程状态
+                    if sleep_count >= last_process_check + 50 {
+                        last_process_check = sleep_count;
+                        let process_running = Self::is_process_running(cli_pid);
+                        tracing::info!(
+                            "[IFlowEngine] 进程状态检查: PID={}, 运行中={}, sleep_count={}/{}, 当前行数={}",
+                            cli_pid, process_running, sleep_count, MAX_SLEEPS, line_count
+                        );
+
+                        // 如果进程已退出但没有 SessionEnd 事件，也应该结束监控
+                        if !process_running {
+                            tracing::warn!(
+                                "[IFlowEngine] IFlow CLI 进程 (PID: {}) 已退出，但未收到 SessionEnd 事件，结束监控",
+                                cli_pid
+                            );
+                            // 等待一下看是否还有最后的输出
+                            std::thread::sleep(Duration::from_millis(500));
+                            break;
+                        }
+                    }
+
+                    if sleep_count % 100 == 0 {
+                        // 每 10 秒打印一次状态 (100 * 100ms = 10s)
+                        tracing::info!(
+                            "[IFlowEngine] 等待新内容中... sleep_count={}/{}, 当前行数={}, 总检查次数={}",
+                            sleep_count, MAX_SLEEPS, line_count, total_checks
+                        );
+                    }
+
                     if sleep_count >= MAX_SLEEPS {
-                        tracing::warn!("[IFlowEngine] 等待超时");
+                        let process_running = Self::is_process_running(cli_pid);
+                        tracing::error!(
+                            "[IFlowEngine] ====== 等待超时! ======\n\
+                             - sleep_count: {}\n\
+                             - MAX_SLEEPS: {}\n\
+                             - 当前行数: {}\n\
+                             - 总检查次数: {}\n\
+                             - 路径: {:?}\n\
+                             - CLI PID: {}\n\
+                             - CLI 进程运行中: {}",
+                            sleep_count, MAX_SLEEPS, line_count, total_checks, path, cli_pid, process_running
+                        );
+
+                        if !process_running {
+                            tracing::error!(
+                                "[IFlowEngine] IFlow CLI 进程已退出但未发送 SessionEnd 事件，可能是异常终止"
+                            );
+                        } else {
+                            tracing::error!(
+                                "[IFlowEngine] IFlow CLI 进程仍在运行但无输出，可能是卡住了"
+                            );
+                        }
+
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(100));
                 }
             }
+
+            tracing::info!(
+                "[IFlowEngine] 监控结束: session_id={}, 最终行数={}, 总检查次数={}",
+                session_id, line_count, total_checks
+            );
 
             if let Some(cb) = on_complete {
                 cb(0);
@@ -336,10 +480,15 @@ impl IFlowEngine {
 
     /// 从 stderr 行中提取 session_id
     fn extract_session_id_from_line(line: &str) -> Option<String> {
-        // IFlow stderr 格式: "Session ID: xxx" 或 JSON 格式
-        if line.contains("session_id") {
-            // 尝试 JSON 解析
+        // IFlow stderr 格式: JSON 中的 "session-id": "session-xxx"
+        // 尝试 JSON 解析
+        if line.contains("session-id") || line.contains("session_id") {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                // 优先检查 session-id（IFlow 格式）
+                if let Some(id) = json.get("session-id").and_then(|v| v.as_str()) {
+                    return Some(id.to_string());
+                }
+                // 兼容 session_id 格式
                 if let Some(id) = json.get("session_id").and_then(|v| v.as_str()) {
                     return Some(id.to_string());
                 }
@@ -390,7 +539,7 @@ impl AIEngine for IFlowEngine {
         self.configure_command(&mut cmd, Some(&work_dir));
 
         // 启动进程
-        let child = cmd.spawn()
+        let mut child = cmd.spawn()
             .map_err(|e| AppError::ProcessError(format!("启动 IFlow 进程失败: {}", e)))?;
 
         let pid = child.id();
@@ -398,20 +547,89 @@ impl AIEngine for IFlowEngine {
 
         tracing::info!("[IFlowEngine] 进程启动，PID: {}, 临时 ID: {}", pid, temp_id);
 
+        // 获取会话管理器的共享引用和回调（用于 stderr 线程）
+        let sessions_shared = self.sessions.shared();
+        let on_session_id_update = options.on_session_id_update.clone();
+
+        // 读取 stderr 以防止缓冲区满，并捕获错误信息
+        // 同时解析真实的 session-id
+        let stderr = child.stderr.take();
+        let temp_id_for_stderr = temp_id.clone();
+        let sessions_for_stderr = sessions_shared.clone();
+        let on_session_id_update_for_stderr = on_session_id_update.clone();
+        let pid_for_stderr = pid;
+        if let Some(stderr) = stderr {
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().flatten() {
+                    tracing::info!("[IFlowEngine] CLI stderr: {}", line);
+
+                    // 尝试从 stderr 解析 session-id
+                    if let Some(real_id) = Self::extract_session_id_from_line(&line) {
+                        tracing::info!(
+                            "[IFlowEngine] 从 stderr 解析到真实 session_id: {} -> {}",
+                            temp_id_for_stderr, real_id
+                        );
+
+                        // 更新 session_id 映射
+                        SessionManager::update_session_id_shared(
+                            &sessions_for_stderr,
+                            &temp_id_for_stderr,
+                            &real_id,
+                            pid_for_stderr,
+                            "iflow"
+                        );
+
+                        // 通知外部 session_id 已更新
+                        if let Some(ref cb) = on_session_id_update_for_stderr {
+                            cb(real_id);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 读取 stdout 以防止缓冲区满
+        let stdout = child.stdout.take();
+        if let Some(stdout) = stdout {
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().flatten() {
+                    tracing::debug!("[IFlowEngine] CLI stdout: {}", line);
+                }
+            });
+        }
+
         // 注册会话
         self.sessions.register(temp_id.clone(), pid, "iflow".to_string())?;
 
         // 后台线程监控
         let event_callback = options.event_callback.clone();
         let on_complete = options.on_complete.clone();
+        let on_session_id_update_for_monitor = options.on_session_id_update.clone();
+        let sessions_for_monitor = self.sessions.shared();
         let work_dir_owned = work_dir;
         let temp_id_for_monitor = temp_id.clone();
+        let cli_pid = pid;
 
         std::thread::spawn(move || {
+            tracing::info!(
+                "[IFlowEngine] 后台监控线程启动, work_dir: {}, temp_id: {}",
+                work_dir_owned, temp_id_for_monitor
+            );
+
+            // 记录进程启动时间，用于判断文件是否是新创建的
+            let start_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            tracing::info!("[IFlowEngine] 会话启动时间戳: {}", start_time);
+
             // 等待会话文件创建
             std::thread::sleep(Duration::from_millis(500));
+            tracing::debug!("[IFlowEngine] 初始等待 500ms 完成");
 
-            // 尝试找到最新的会话文件
+            // 尝试找到新的会话文件
             let home = std::env::var("USERPROFILE")
                 .or_else(|_| std::env::var("HOME"))
                 .unwrap_or_default();
@@ -420,49 +638,132 @@ impl AIEngine for IFlowEngine {
             let encoded_path = Self::encode_project_path(&work_dir_owned);
             let session_dir = config_dir.join("projects").join(&encoded_path);
 
-            // 等待文件出现
+            tracing::info!(
+                "[IFlowEngine] 查找会话目录: {:?}, 编码路径: {}",
+                session_dir, encoded_path
+            );
+
+            // 等待新文件出现（修改时间 >= 启动时间）
             let mut wait_count = 0;
             let jsonl_path = loop {
                 if let Ok(entries) = std::fs::read_dir(&session_dir) {
-                    let mut latest: Option<PathBuf> = None;
-                    let mut latest_time: u64 = 0;
+                    let mut newest: Option<PathBuf> = None;
+                    let mut newest_time: u64 = 0;
+                    let mut new_file: Option<PathBuf> = None;
+                    let mut jsonl_count = 0;
 
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                            jsonl_count += 1;
                             if let Ok(meta) = std::fs::metadata(&path) {
                                 if let Ok(modified) = meta.modified() {
                                     let secs = modified
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap_or_default()
                                         .as_secs();
-                                    if secs > latest_time {
-                                        latest_time = secs;
-                                        latest = Some(path);
+                                    tracing::debug!(
+                                        "[IFlowEngine] 发现 jsonl 文件: {:?}, 修改时间戳: {}",
+                                        path, secs
+                                    );
+                                    if secs > newest_time {
+                                        newest_time = secs;
+                                        newest = Some(path.clone());
+                                    }
+                                    // 检查是否是新创建的文件（修改时间 >= 启动时间）
+                                    if secs >= start_time {
+                                        tracing::info!(
+                                            "[IFlowEngine] 发现新创建的会话文件: {:?}, 时间戳: {}",
+                                            path, secs
+                                        );
+                                        new_file = Some(path);
                                     }
                                 }
                             }
                         }
                     }
 
-                    if let Some(p) = latest {
+                    tracing::info!(
+                        "[IFlowEngine] 目录中有 {} 个 jsonl 文件，最新时间戳: {}, 启动时间戳: {}",
+                        jsonl_count, newest_time, start_time
+                    );
+
+                    // 优先使用新创建的文件
+                    if let Some(p) = new_file {
+                        tracing::info!("[IFlowEngine] 使用新创建的会话文件: {:?}", p);
                         break p;
                     }
+
+                    // 如果没有新文件，使用最新的文件（可能是恢复会话的情况）
+                    if let Some(p) = newest {
+                        tracing::info!("[IFlowEngine] 使用最新的会话文件: {:?}", p);
+                        break p;
+                    }
+                } else {
+                    tracing::warn!(
+                        "[IFlowEngine] 无法读取目录: {:?}, 等待中...",
+                        session_dir
+                    );
                 }
 
                 wait_count += 1;
                 if wait_count > 50 {
+                    tracing::error!(
+                        "[IFlowEngine] 超时未找到会话文件! 目录: {:?}, 等待了 {} 次",
+                        session_dir, wait_count
+                    );
                     event_callback(AIEvent::error("未找到会话文件"));
                     return;
+                }
+                if wait_count % 10 == 0 {
+                    tracing::info!(
+                        "[IFlowEngine] 等待会话文件... ({}/50), 目录: {:?}",
+                        wait_count, session_dir
+                    );
                 }
                 std::thread::sleep(Duration::from_millis(100));
             };
 
-            // 监控文件
+            // ===== 关键修复：从文件名提取真实 session_id =====
+            // IFlow 文件名格式: session-{uuid}.jsonl
+            let real_session_id = jsonl_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| temp_id_for_monitor.clone());
+
+            tracing::info!(
+                "[IFlowEngine] 从文件名提取 session_id: {} -> {}",
+                temp_id_for_monitor, real_session_id
+            );
+
+            // 如果成功提取到真实 session_id，更新映射并通知前端
+            if real_session_id != temp_id_for_monitor {
+                // 更新 SessionManager 映射
+                SessionManager::update_session_id_shared(
+                    &sessions_for_monitor,
+                    &temp_id_for_monitor,
+                    &real_session_id,
+                    cli_pid,
+                    "iflow"
+                );
+
+                // 通知前端 session_id 已更新
+                if let Some(ref cb) = on_session_id_update_for_monitor {
+                    tracing::info!(
+                        "[IFlowEngine] 通知前端 session_id 更新: {}",
+                        real_session_id
+                    );
+                    cb(real_session_id.clone());
+                }
+            }
+
+            // 监控文件（使用真实 session_id）
             Self::monitor_jsonl_file(
                 jsonl_path,
-                temp_id_for_monitor,
+                real_session_id,
                 0,
+                cli_pid,
                 event_callback,
                 on_complete,
             );
@@ -487,33 +788,98 @@ impl AIEngine for IFlowEngine {
             .or_else(|| self.config.work_dir.as_ref().map(|p| p.to_string_lossy().to_string()))
             .unwrap_or_else(|| ".".to_string());
 
-        // 终止旧进程
-        let _ = self.sessions.kill_process(session_id);
+        // 获取会话信息，找到真实的 session_id
+        let real_session_id = if let Some(info) = self.sessions.get(session_id) {
+            tracing::info!("[IFlowEngine] 找到会话，真实 ID: {}, PID: {}", info.id, info.pid);
+            // 终止旧进程
+            tracing::info!("[IFlowEngine] 终止旧进程 PID: {}", info.pid);
+            let _ = self.sessions.kill_process(session_id);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            info.id.clone() // 使用真实 ID
+        } else {
+            tracing::warn!("[IFlowEngine] 未找到会话信息，使用传入的 session_id");
+            session_id.to_string()
+        };
 
-        // 构建命令
-        let mut cmd = self.build_command(message, Some(session_id))?;
+        tracing::info!("[IFlowEngine] 使用 --resume 参数，session_id: {}", real_session_id);
+
+        // 构建命令（带 --resume，使用真实 session_id）
+        let mut cmd = self.build_command(message, Some(&real_session_id))?;
         self.configure_command(&mut cmd, Some(&work_dir));
 
         // 启动进程
-        let child = cmd.spawn()
+        let mut child = cmd.spawn()
             .map_err(|e| AppError::ProcessError(format!("继续 IFlow 会话失败: {}", e)))?;
 
         let pid = child.id();
 
         tracing::info!("[IFlowEngine] 进程启动，PID: {}", pid);
 
-        // 更新会话 PID
-        self.sessions.register(session_id.to_string(), pid, "iflow".to_string())?;
+        // 读取 stderr 以防止缓冲区满，并捕获错误信息
+        // 同时解析可能的 session-id（IFlow 可能创建新会话）
+        let stderr = child.stderr.take();
+        let temp_id_for_stderr = real_session_id.clone();
+        let sessions_for_stderr = self.sessions.shared();
+        let on_session_id_update_for_stderr = options.on_session_id_update.clone();
+        let pid_for_stderr = pid;
+        if let Some(stderr) = stderr {
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().flatten() {
+                    tracing::info!("[IFlowEngine] CLI stderr ({}): {}", temp_id_for_stderr, line);
+
+                    // 尝试从 stderr 解析 session-id
+                    if let Some(new_real_id) = Self::extract_session_id_from_line(&line) {
+                        if new_real_id != temp_id_for_stderr {
+                            tracing::info!(
+                                "[IFlowEngine] 从 stderr 解析到新的 session_id: {} -> {}",
+                                temp_id_for_stderr, new_real_id
+                            );
+
+                            // 更新 session_id 映射
+                            SessionManager::update_session_id_shared(
+                                &sessions_for_stderr,
+                                &temp_id_for_stderr,
+                                &new_real_id,
+                                pid_for_stderr,
+                                "iflow"
+                            );
+
+                            // 通知外部 session_id 已更新
+                            if let Some(ref cb) = on_session_id_update_for_stderr {
+                                cb(new_real_id);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 读取 stdout 以防止缓冲区满
+        let stdout = child.stdout.take();
+        if let Some(stdout) = stdout {
+            let sid = real_session_id.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().flatten() {
+                    tracing::debug!("[IFlowEngine] CLI stdout ({}): {}", sid, line);
+                }
+            });
+        }
+
+        // 更新会话 PID（使用真实 session_id）
+        self.sessions.register(real_session_id.clone(), pid, "iflow".to_string())?;
 
         // 查找会话文件
-        let jsonl_path = self.find_session_jsonl(&work_dir, session_id)?;
+        let jsonl_path = self.find_session_jsonl(&work_dir, &real_session_id)?;
         let start_line = Self::get_jsonl_line_count(&jsonl_path);
 
         // 启动监控
         Self::monitor_jsonl_file(
             jsonl_path,
-            session_id.to_string(),
+            real_session_id.clone(),
             start_line,
+            pid,
             options.event_callback.clone(),
             options.on_complete.clone(),
         );
