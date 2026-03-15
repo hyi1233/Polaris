@@ -9,19 +9,9 @@ import { useToastStore } from '../../stores';
 import { useProtocolTemplateStore } from '../../stores/protocolTemplateStore';
 import type { ScheduledTask, TriggerType, CreateTaskParams, TaskMode } from '../../types/scheduler';
 import { TriggerTypeLabels, IntervalUnitLabels, TaskModeLabels, parseIntervalValue } from '../../types/scheduler';
-import { ProtocolTemplateCategoryLabels, renderProtocolTemplate } from '../../types/protocolTemplate';
+import { ProtocolTemplateCategoryLabels } from '../../types/protocolTemplate';
 import type { ProtocolTemplate } from '../../types/protocolTemplate';
 import * as tauri from '../../services/tauri';
-
-/** 格式化当前时间用于 datetime-local 输入 */
-function formatDateTimeLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
 
 /** 预设时间选项 */
 interface TimePreset {
@@ -169,10 +159,10 @@ export function TaskEditor({
 
   // 执行轮次
   const [maxRuns, setMaxRuns] = useState<number | undefined>(task?.maxRuns);
-  const [currentRuns, setCurrentRuns] = useState<number>(task?.currentRuns || 0);
+  const [currentRuns] = useState<number>(task?.currentRuns || 0);
 
   // 在终端中执行
-  const [runInTerminal, setRunInTerminal] = useState<boolean>(task?.runInTerminal || false);
+  const [runInTerminal] = useState<boolean>(task?.runInTerminal || false);
 
   // 间隔时间选择
   const [intervalNum, setIntervalNum] = useState(1);
@@ -180,8 +170,8 @@ export function TaskEditor({
 
   // 高级时间设置
   const [showAdvancedTime, setShowAdvancedTime] = useState(false);
-  const [dailyHours, setDailyHours] = useState<number[]>([]);
-  const [hourlyMinute, setHourlyMinute] = useState<number>(0);
+  const [, setDailyHours] = useState<number[]>([]);
+  const [, setHourlyMinute] = useState<number>(0);
 
   // 初始化间隔值
   useEffect(() => {
