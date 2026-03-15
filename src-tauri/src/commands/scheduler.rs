@@ -3,7 +3,7 @@
  */
 
 use crate::error::Result;
-use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TriggerType};
+use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TriggerType, RunTaskResult};
 use crate::state::AppState;
 use crate::utils::{LockStatus, SchedulerLock};
 
@@ -72,7 +72,7 @@ pub async fn scheduler_toggle_task(
 pub async fn scheduler_run_task(
     id: String,
     state: tauri::State<'_, AppState>,
-) -> Result<()> {
+) -> Result<RunTaskResult> {
     let disp = state.scheduler_dispatcher.lock().await;
     disp.run_now(&id).await
 }

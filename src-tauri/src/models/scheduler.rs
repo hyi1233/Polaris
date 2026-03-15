@@ -112,10 +112,16 @@ pub struct TaskLog {
     pub task_id: String,
     /// 任务名称
     pub task_name: String,
+    /// 使用的引擎 ID
+    pub engine_id: String,
+    /// AI 会话 ID（可用于跳转查看详情）
+    pub session_id: Option<String>,
     /// 开始时间
     pub started_at: i64,
     /// 结束时间
     pub finished_at: Option<i64>,
+    /// 执行耗时（毫秒）
+    pub duration_ms: Option<i64>,
     /// 状态
     pub status: TaskStatus,
     /// 执行时的提示词
@@ -124,6 +130,22 @@ pub struct TaskLog {
     pub output: Option<String>,
     /// 错误信息
     pub error: Option<String>,
+    /// 思考过程摘要
+    pub thinking_summary: Option<String>,
+    /// 工具调用次数
+    pub tool_call_count: u32,
+    /// Token 消耗
+    pub token_count: Option<u32>,
+}
+
+/// 执行任务结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunTaskResult {
+    /// 日志 ID
+    pub log_id: String,
+    /// 提示信息
+    pub message: String,
 }
 
 /// 任务存储

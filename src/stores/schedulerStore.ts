@@ -3,7 +3,7 @@
  */
 
 import { create } from 'zustand';
-import type { ScheduledTask, TaskLog, TriggerType, CreateTaskParams } from '../types/scheduler';
+import type { ScheduledTask, TaskLog, TriggerType, CreateTaskParams, RunTaskResult } from '../types/scheduler';
 import * as tauri from '../services/tauri';
 
 interface SchedulerState {
@@ -29,7 +29,7 @@ interface SchedulerState {
   /** 切换任务启用状态 */
   toggleTask: (id: string, enabled: boolean) => Promise<void>;
   /** 立即执行任务 */
-  runTask: (id: string) => Promise<void>;
+  runTask: (id: string) => Promise<RunTaskResult>;
   /** 验证触发表达式 */
   validateTrigger: (type: TriggerType, value: string) => Promise<number | null>;
   /** 清理过期日志 */
@@ -136,11 +136,13 @@ export const useSchedulerStore = create<SchedulerState>((set) => ({
 
   runTask: async (id) => {
     try {
-      await tauri.schedulerRunTask(id);
+      const result = await tauri.schedulerRunTask(id);
 
       // 刷新任务列表获取最新状态
       const tasks = await tauri.schedulerGetTasks();
       set({ tasks });
+
+      return result;
     } catch (e) {
       console.error('执行任务失败:', e);
       throw e;

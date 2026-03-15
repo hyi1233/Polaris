@@ -46,10 +46,16 @@ export interface TaskLog {
   taskId: string;
   /** 任务名称 */
   taskName: string;
+  /** 使用的引擎 ID */
+  engineId: string;
+  /** AI 会话 ID（可用于跳转查看详情） */
+  sessionId?: string;
   /** 开始时间 */
   startedAt: number;
   /** 结束时间 */
   finishedAt?: number;
+  /** 执行耗时（毫秒） */
+  durationMs?: number;
   /** 状态 */
   status: TaskStatus;
   /** 执行时的提示词 */
@@ -58,6 +64,12 @@ export interface TaskLog {
   output?: string;
   /** 错误信息 */
   error?: string;
+  /** 思考过程摘要 */
+  thinkingSummary?: string;
+  /** 工具调用次数 */
+  toolCallCount: number;
+  /** Token 消耗 */
+  tokenCount?: number;
 }
 
 /** 创建任务参数 */
@@ -112,4 +124,12 @@ export interface LockStatus {
   isLockedByOther: boolean;
   /** 当前进程 PID */
   pid: number;
+}
+
+/** 执行任务结果 */
+export interface RunTaskResult {
+  /** 日志 ID */
+  logId: string;
+  /** 提示信息 */
+  message: string;
 }

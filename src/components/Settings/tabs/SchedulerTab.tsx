@@ -331,6 +331,18 @@ export function SchedulerTab() {
     }
   };
 
+  const handleRunTask = async (taskId: string, taskName: string) => {
+    toast.info(`正在执行任务: ${taskName}`);
+    try {
+      await runTask(taskId);
+      toast.success(`任务「${taskName}」已启动`);
+      // 刷新日志列表
+      loadLogs(50);
+    } catch (e) {
+      toast.error('执行失败', e instanceof Error ? e.message : undefined);
+    }
+  };
+
   const handleDelete = (id: string) => {
     setConfirmDialog({
       show: true,
@@ -503,7 +515,7 @@ export function SchedulerTab() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => runTask(task.id)}
+                      onClick={() => handleRunTask(task.id, task.name)}
                       className="px-3 py-1 text-sm bg-primary/20 text-primary hover:bg-primary/30 rounded transition-colors"
                     >
                       执行

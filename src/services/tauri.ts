@@ -678,7 +678,7 @@ export async function updateIntegrationInstance(
 // 定时任务相关命令
 // ============================================================================
 
-import type { ScheduledTask, TaskLog, TriggerType, CreateTaskParams, LockStatus } from '../types/scheduler';
+import type { ScheduledTask, TaskLog, TriggerType, CreateTaskParams, LockStatus, RunTaskResult } from '../types/scheduler';
 
 /** 获取所有任务 */
 export async function schedulerGetTasks(): Promise<ScheduledTask[]> {
@@ -711,8 +711,8 @@ export async function schedulerToggleTask(id: string, enabled: boolean): Promise
 }
 
 /** 立即执行任务 */
-export async function schedulerRunTask(id: string): Promise<void> {
-  return invoke('scheduler_run_task', { id });
+export async function schedulerRunTask(id: string): Promise<RunTaskResult> {
+  return invoke<RunTaskResult>('scheduler_run_task', { id });
 }
 
 /** 获取任务日志 */

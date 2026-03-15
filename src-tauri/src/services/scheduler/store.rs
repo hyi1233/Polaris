@@ -194,17 +194,23 @@ impl LogStoreService {
     }
 
     /// 创建日志记录
-    pub fn create(&mut self, task_id: &str, task_name: &str, prompt: &str) -> Result<TaskLog> {
+    pub fn create(&mut self, task_id: &str, task_name: &str, prompt: &str, engine_id: &str) -> Result<TaskLog> {
         let log = TaskLog {
             id: Uuid::new_v4().to_string(),
             task_id: task_id.to_string(),
             task_name: task_name.to_string(),
+            engine_id: engine_id.to_string(),
+            session_id: None,
             started_at: Utc::now().timestamp(),
             finished_at: None,
+            duration_ms: None,
             status: crate::models::scheduler::TaskStatus::Running,
             prompt: prompt.to_string(),
             output: None,
             error: None,
+            thinking_summary: None,
+            tool_call_count: 0,
+            token_count: None,
         };
 
         // 添加到任务日志列表
@@ -223,8 +229,17 @@ impl LogStoreService {
         Ok(log)
     }
 
-    /// 更新日志
-    pub fn update(&mut self, log_id: &str, output: Option<String>, error: Option<String>) -> Result<()> {
+    /// 更新日志（完成时调用）
+    pub fn update_complete(
+        &mut self,
+        log_id: &str,
+        session_id: Option<String>,
+        output: Option<String>,
+        error: Option<String>,
+        thinking_summary: Option<String>,
+        tool_call_count: u32,
+        token_count: Option<u32>,
+    ) -> Result<()> {
         let status = if error.is_some() {
             crate::models::scheduler::TaskStatus::Failed
         } else {
@@ -232,6 +247,11 @@ impl LogStoreService {
         };
 
         let finished_at = Utc::now().timestamp();
+        let started_at = self.store.all_logs.iter()
+            .find(|l| l.id == log_id)
+            .map(|l| l.started_at)
+            .unwrap_or(finished_at);
+        let duration_ms = (finished_at - started_at) * 1000;
 
         // 截取输出
         let truncated_output = output.map(|o| {
@@ -243,19 +263,56 @@ impl LogStoreService {
             }
         });
 
+        // 截取思考摘要
+        let truncated_thinking = thinking_summary.map(|t| {
+            if t.len() > 500 {
+                format!("{}...", &t[..500])
+            } else {
+                t
+            }
+        });
+
         // 更新所有日志中的记录
         for log in &mut self.store.all_logs {
             if log.id == log_id {
+                log.session_id = session_id.clone();
                 log.finished_at = Some(finished_at);
+                log.duration_ms = Some(duration_ms);
                 log.status = status.clone();
                 log.output = truncated_output.clone();
                 log.error = error.clone();
+                log.thinking_summary = truncated_thinking.clone();
+                log.tool_call_count = tool_call_count;
+                log.token_count = token_count;
                 break;
+            }
+        }
+
+        // 同步更新任务日志列表
+        for logs in self.store.logs.values_mut() {
+            for log in logs.iter_mut() {
+                if log.id == log_id {
+                    log.session_id = session_id.clone();
+                    log.finished_at = Some(finished_at);
+                    log.duration_ms = Some(duration_ms);
+                    log.status = status.clone();
+                    log.output = truncated_output.clone();
+                    log.error = error.clone();
+                    log.thinking_summary = truncated_thinking.clone();
+                    log.tool_call_count = tool_call_count;
+                    log.token_count = token_count;
+                    break;
+                }
             }
         }
 
         self.save()?;
         Ok(())
+    }
+
+    /// 更新日志（兼容旧接口）
+    pub fn update(&mut self, log_id: &str, output: Option<String>, error: Option<String>) -> Result<()> {
+        self.update_complete(log_id, None, output, error, None, 0, None)
     }
 
     /// 获取任务日志

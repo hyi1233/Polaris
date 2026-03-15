@@ -5,7 +5,7 @@
  */
 
 use crate::error::Result;
-use crate::models::scheduler::{ScheduledTask, TaskStatus};
+use crate::models::scheduler::{ScheduledTask, TaskStatus, RunTaskResult};
 use crate::ai::{EngineRegistry, EngineId, SessionOptions};
 use crate::models::AIEvent;
 use super::store::{TaskStoreService, LogStoreService};
@@ -151,7 +151,7 @@ impl SchedulerDispatcher {
             // 创建日志记录
             let log_id = {
                 let mut store = log_store.lock().await;
-                match store.create(&task_id, &task_name, &prompt) {
+                match store.create(&task_id, &task_name, &prompt, &engine_id) {
                     Ok(log) => log.id,
                     Err(e) => {
                         tracing::error!("[Scheduler] 创建日志失败: {:?}", e);
@@ -164,20 +164,51 @@ impl SchedulerDispatcher {
             let engine_id_parsed = EngineId::from_str(&engine_id)
                 .unwrap_or(EngineId::ClaudeCode);
 
-            // 收集输出
+            // 收集输出、思考过程、工具调用、session_id
             let output = Arc::new(AsyncMutex::new(String::new()));
+            let thinking = Arc::new(AsyncMutex::new(String::new()));
+            let session_id = Arc::new(AsyncMutex::new(None::<String>));
+            let session_id_for_update = session_id.clone();
+            let tool_call_count = Arc::new(AsyncMutex::new(0u32));
+
             let output_clone = output.clone();
+            let thinking_clone = thinking.clone();
+            let session_id_clone = session_id.clone();
+            let tool_call_count_clone = tool_call_count.clone();
 
             // 创建会话选项
             let options = SessionOptions::new(move |event: AIEvent| {
-                // 收集输出
-                if let AIEvent::AssistantMessage(msg) = &event {
-                    if let Ok(mut o) = output_clone.try_lock() {
-                        o.push_str(&msg.content);
+                match &event {
+                    AIEvent::AssistantMessage(msg) => {
+                        if let Ok(mut o) = output_clone.try_lock() {
+                            o.push_str(&msg.content);
+                        }
                     }
+                    AIEvent::Thinking(t) => {
+                        if let Ok(mut th) = thinking_clone.try_lock() {
+                            th.push_str(&t.content);
+                            th.push('\n');
+                        }
+                    }
+                    AIEvent::ToolCallStart(_) => {
+                        if let Ok(mut count) = tool_call_count_clone.try_lock() {
+                            *count += 1;
+                        }
+                    }
+                    AIEvent::SessionStart(s) => {
+                        if let Ok(mut sid) = session_id_clone.try_lock() {
+                            *sid = Some(s.session_id.clone());
+                        }
+                    }
+                    _ => {}
                 }
             })
-            .with_work_dir(work_dir.unwrap_or_else(|| ".".to_string()));
+            .with_work_dir(work_dir.unwrap_or_else(|| ".".to_string()))
+            .with_on_session_id_update(move |sid: String| {
+                if let Ok(mut s) = session_id_for_update.try_lock() {
+                    *s = Some(sid);
+                }
+            });
 
             // 执行
             let result = {
@@ -188,10 +219,22 @@ impl SchedulerDispatcher {
             // 更新结果
             {
                 let mut log_store = log_store.lock().await;
+                let final_output = output.lock().await.clone();
+                let final_thinking = thinking.lock().await.clone();
+                let final_session_id = session_id.lock().await.clone();
+                let final_tool_count = *tool_call_count.lock().await;
+
                 match result {
                     Ok(_) => {
-                        let final_output = output.lock().await.clone();
-                        if let Err(e) = log_store.update(&log_id, Some(final_output), None) {
+                        if let Err(e) = log_store.update_complete(
+                            &log_id,
+                            final_session_id,
+                            Some(final_output),
+                            None,
+                            if final_thinking.is_empty() { None } else { Some(final_thinking) },
+                            final_tool_count,
+                            None,
+                        ) {
                             tracing::error!("[Scheduler] 更新日志失败: {:?}", e);
                         }
 
@@ -205,7 +248,15 @@ impl SchedulerDispatcher {
                     }
                     Err(e) => {
                         let error_msg = e.to_string();
-                        if let Err(e) = log_store.update(&log_id, None, Some(error_msg.clone())) {
+                        if let Err(e) = log_store.update_complete(
+                            &log_id,
+                            final_session_id,
+                            Some(final_output),
+                            Some(error_msg.clone()),
+                            if final_thinking.is_empty() { None } else { Some(final_thinking) },
+                            final_tool_count,
+                            None,
+                        ) {
                             tracing::error!("[Scheduler] 更新日志失败: {:?}", e);
                         }
 
@@ -234,8 +285,8 @@ impl SchedulerDispatcher {
         }
     }
 
-    /// 手动执行任务
-    pub async fn run_now(&self, task_id: &str) -> Result<()> {
+    /// 手动执行任务（返回日志 ID）
+    pub async fn run_now(&self, task_id: &str) -> Result<RunTaskResult> {
         let task = {
             let store = self.task_store.lock().await;
             store.get(task_id)
@@ -243,7 +294,18 @@ impl SchedulerDispatcher {
                 .ok_or_else(|| crate::error::AppError::ValidationError(format!("任务不存在: {}", task_id)))?
         };
 
+        // 创建日志记录获取 log_id
+        let log_id = {
+            let mut store = self.log_store.lock().await;
+            let log = store.create(&task.id, &task.name, &task.prompt, &task.engine_id)?;
+            log.id
+        };
+
         self.execute_task(task).await;
-        Ok(())
+
+        Ok(RunTaskResult {
+            log_id,
+            message: "任务已启动".to_string(),
+        })
     }
 }
