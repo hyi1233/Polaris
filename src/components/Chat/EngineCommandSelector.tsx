@@ -12,7 +12,7 @@ import type {
   CommandOptionValue,
 } from '../../types/engineCommand'
 import { getEngineCommands, getAllOptions } from '../../config/engineCommands'
-import { IconSettings, IconChevronDown, IconX, IconAlertTriangle } from '../Common/Icons'
+import { IconSettings, IconX, IconAlertTriangle } from '../Common/Icons'
 
 interface EngineCommandSelectorProps {
   /** 当前引擎 ID */
@@ -46,13 +46,13 @@ function OptionInput({
       return (
         <button
           onClick={() => onChange(!value)}
-          className={`relative w-10 h-5 rounded-full transition-colors ${
+          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
             value ? 'bg-primary' : 'bg-background-surface border border-border'
           }`}
         >
           <span
             className={`absolute top-0.5 w-4 h-4 rounded-full transition-transform ${
-              value ? 'translate-x-5 bg-white' : 'translate-x-0.5 bg-text-tertiary'
+              value ? 'translate-x-4 bg-white' : 'translate-x-0.5 bg-text-tertiary'
             }`}
           />
         </button>
@@ -63,7 +63,7 @@ function OptionInput({
         <select
           value={value as string || ''}
           onChange={(e) => onChange(e.target.value)}
-          className="px-2 py-1 bg-background-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="px-2 py-1 bg-background-surface border border-border rounded text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[80px]"
         >
           <option value="">{t('commandSelector.selectPlaceholder', '选择...')}</option>
           {option.options?.map((opt) => (
@@ -77,7 +77,7 @@ function OptionInput({
     case 'multiselect':
       const selectedValues = Array.isArray(value) ? value : []
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 max-w-[200px]">
           {option.options?.map((opt) => {
             const isSelected = selectedValues.includes(opt.value)
             return (
@@ -90,10 +90,10 @@ function OptionInput({
                     onChange([...selectedValues, opt.value])
                   }
                 }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
                   isSelected
                     ? 'bg-primary text-white'
-                    : 'bg-background-surface border border-border text-text-primary hover:border-primary'
+                    : 'bg-background-surface border border-border text-text-secondary hover:border-primary'
                 }`}
               >
                 {opt.label}
@@ -110,7 +110,7 @@ function OptionInput({
           value={value as number || ''}
           onChange={(e) => onChange(Number(e.target.value))}
           placeholder={option.placeholder}
-          className="px-2 py-1 w-24 bg-background-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="px-2 py-1 w-20 bg-background-surface border border-border rounded text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       )
 
@@ -122,14 +122,14 @@ function OptionInput({
           value={value as string || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={option.placeholder}
-          className="px-2 py-1 w-full bg-background-surface border border-border rounded text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="px-2 py-1 flex-1 min-w-[100px] bg-background-surface border border-border rounded text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       )
   }
 }
 
 /**
- * 命令选项行
+ * 命令选项行 - 紧凑布局
  */
 function OptionRow({
   option,
@@ -153,29 +153,28 @@ function OptionRow({
   }
 
   return (
-    <div className="flex items-center gap-3 py-2 px-3 hover:bg-background-hover rounded-lg transition-colors group">
+    <div className="flex items-start gap-2 py-1.5 px-2 hover:bg-background-hover/50 rounded-md transition-colors group">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text-primary">{option.name}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-text-primary truncate">{option.name}</span>
           {option.dangerous && (
-            <span className="text-warning" title={option.dangerWarning}>
-              <IconAlertTriangle size={14} />
+            <span className="text-warning shrink-0" title={option.dangerWarning}>
+              <IconAlertTriangle size={12} />
             </span>
           )}
-          <code className="text-xs px-1.5 py-0.5 bg-background-surface rounded text-text-tertiary">
+          <code className="text-[10px] px-1 py-0.5 bg-background-surface rounded text-text-tertiary shrink-0">
             {option.cliFlag}
           </code>
         </div>
-        <p className="text-xs text-text-tertiary mt-0.5">{option.description}</p>
 
         {/* 危险操作确认 */}
         {showDangerConfirm && option.dangerWarning && (
-          <div className="mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-xs text-warning">
+          <div className="mt-1.5 p-1.5 bg-warning/10 border border-warning/30 rounded text-[10px] text-warning">
             <p className="font-medium">⚠️ {option.dangerWarning}</p>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-1.5 mt-1">
               <button
                 onClick={() => setShowDangerConfirm(false)}
-                className="px-2 py-1 bg-background-surface border border-border rounded hover:border-warning"
+                className="px-1.5 py-0.5 bg-background-surface border border-border rounded hover:border-warning"
               >
                 取消
               </button>
@@ -184,32 +183,32 @@ function OptionRow({
                   setShowDangerConfirm(false)
                   onChange(value === undefined ? true : value)
                 }}
-                className="px-2 py-1 bg-warning text-white rounded hover:bg-warning/90"
+                className="px-1.5 py-0.5 bg-warning text-white rounded hover:bg-warning/90"
               >
-                确认启用
+                确认
               </button>
             </div>
           </div>
         )}
       </div>
 
-      <div className="shrink-0">
+      <div className="shrink-0 pt-0.5">
         <OptionInput option={option} value={value} onChange={handleChange} />
       </div>
 
       <button
         onClick={onRemove}
-        className="shrink-0 p-1 text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-danger transition-all"
+        className="shrink-0 p-0.5 text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-danger transition-all"
         title="移除选项"
       >
-        <IconX size={14} />
+        <IconX size={12} />
       </button>
     </div>
   )
 }
 
 /**
- * 分类面板
+ * 分类面板 - 紧凑布局
  */
 function CategoryPanel({
   category,
@@ -223,42 +222,39 @@ function CategoryPanel({
   const selectedOptionIds = selectedOptions.map((o) => o.optionId)
 
   return (
-    <div className="border-b border-border last:border-b-0">
-      <div className="px-3 py-2 bg-background-surface/50">
-        <h3 className="text-sm font-medium text-text-primary">{category.name}</h3>
-        {category.description && (
-          <p className="text-xs text-text-tertiary mt-0.5">{category.description}</p>
-        )}
+    <div className="border-b border-border/50 last:border-b-0">
+      <div className="px-2 py-1.5 bg-background-surface/30">
+        <h3 className="text-xs font-medium text-text-secondary">{category.name}</h3>
       </div>
-      <div className="py-1">
+      <div className="py-0.5">
         {category.options.map((option) => {
           const isSelected = selectedOptionIds.includes(option.id)
           return (
             <button
               key={option.id}
               onClick={() => onToggleOption(option)}
-              className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-background-hover transition-colors ${
+              className={`w-full px-2 py-1.5 text-left flex items-center justify-between hover:bg-background-hover/50 transition-colors ${
                 isSelected ? 'bg-primary/5' : ''
               }`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-text-primary">{option.name}</span>
+              <div className="flex-1 min-w-0 pr-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-text-primary truncate">{option.name}</span>
                   {option.dangerous && (
-                    <IconAlertTriangle size={12} className="text-warning" />
+                    <IconAlertTriangle size={10} className="text-warning shrink-0" />
                   )}
                 </div>
-                <p className="text-xs text-text-tertiary truncate">{option.description}</p>
+                <p className="text-[10px] text-text-tertiary truncate">{option.description}</p>
               </div>
               <div
-                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
                   isSelected
                     ? 'bg-primary border-primary text-white'
-                    : 'border-border bg-background-surface'
+                    : 'border-border/50 bg-background-surface'
                 }`}
               >
                 {isSelected && (
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -379,7 +375,7 @@ export function EngineCommandSelector({
 
   if (!config) {
     return (
-      <div className="p-4 text-center text-text-tertiary">
+      <div className="p-3 text-center text-text-tertiary text-xs">
         {t('commandSelector.noConfig', '未找到引擎配置')}
       </div>
     )
@@ -393,27 +389,27 @@ export function EngineCommandSelector({
     <div
       ref={panelRef}
       style={panelStyle}
-      className="w-80 max-h-[400px] bg-background-elevated border border-border rounded-xl shadow-lg overflow-hidden flex flex-col"
+      className="w-72 max-h-[360px] bg-background-elevated border border-border rounded-lg shadow-xl overflow-hidden flex flex-col z-50"
     >
       {/* 头部 */}
-      <div className="px-4 py-3 border-b border-border bg-background-surface/50">
+      <div className="px-3 py-2 border-b border-border/50 bg-background-surface/30">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-primary">
+          <h2 className="text-xs font-semibold text-text-primary">
             {config.engineName} {t('commandSelector.title', '命令选项')}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+            className="p-0.5 text-text-tertiary hover:text-text-primary transition-colors"
           >
-            <IconX size={16} />
+            <IconX size={14} />
           </button>
         </div>
 
         {/* Tab 切换 */}
-        <div className="flex gap-1 mt-2">
+        <div className="flex gap-1 mt-1.5">
           <button
             onClick={() => setActiveTab('selected')}
-            className={`px-3 py-1 text-xs rounded-full transition-colors ${
+            className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
               activeTab === 'selected'
                 ? 'bg-primary text-white'
                 : 'bg-background-surface text-text-tertiary hover:text-text-primary'
@@ -423,7 +419,7 @@ export function EngineCommandSelector({
           </button>
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-3 py-1 text-xs rounded-full transition-colors ${
+            className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
               activeTab === 'all'
                 ? 'bg-primary text-white'
                 : 'bg-background-surface text-text-tertiary hover:text-text-primary'
@@ -435,19 +431,19 @@ export function EngineCommandSelector({
       </div>
 
       {/* 内容区 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {activeTab === 'selected' ? (
           selectedOptions.length === 0 ? (
-            <div className="p-6 text-center text-text-tertiary">
-              <p className="text-sm">
+            <div className="p-4 text-center text-text-tertiary">
+              <p className="text-xs">
                 {t('commandSelector.emptyHint', '暂无已选选项')}
               </p>
-              <p className="text-xs mt-1">
+              <p className="text-[10px] mt-1">
                 {t('commandSelector.emptyHintSub', '点击"全部"标签添加选项')}
               </p>
             </div>
           ) : (
-            <div className="py-1">
+            <div className="py-0.5">
               {selectedOptions.map((opt) => {
                 const option = allOptions.find((o) => o.id === opt.optionId)
                 if (!option) return null
@@ -479,9 +475,9 @@ export function EngineCommandSelector({
 
       {/* CLI 预览 */}
       {selectedOptions.length > 0 && (
-        <div className="px-3 py-2 border-t border-border bg-background-surface/50">
-          <div className="text-xs text-text-tertiary mb-1">CLI 参数预览:</div>
-          <code className="text-xs text-primary break-all">{cliPreview || '(无)'}</code>
+        <div className="px-2 py-1.5 border-t border-border/50 bg-background-surface/30">
+          <div className="text-[10px] text-text-tertiary mb-0.5">CLI 参数预览:</div>
+          <code className="text-[10px] text-primary break-all line-clamp-2">{cliPreview || '(无)'}</code>
         </div>
       )}
     </div>
@@ -509,7 +505,7 @@ export function EngineCommandTrigger({
     if (selectedOptions.length === 0) return null
 
     const parts: string[] = []
-    for (const opt of selectedOptions.slice(0, 3)) {
+    for (const opt of selectedOptions.slice(0, 2)) {
       const option = allOptions.find((o) => o.id === opt.optionId)
       if (option) {
         if (option.type === 'boolean' && opt.value) {
@@ -517,36 +513,44 @@ export function EngineCommandTrigger({
         } else if (opt.value !== '' && opt.value !== undefined) {
           const displayValue =
             option.type === 'select'
-              ? option.options?.find((o) => o.value === opt.value)?.label || opt.value
-              : opt.value
-          parts.push(`${option.name}: ${displayValue}`)
+              ? option.options?.find((o) => o.value === opt.value)?.label || String(opt.value)
+              : String(opt.value)
+          parts.push(`${option.name}: ${displayValue.length > 8 ? displayValue.slice(0, 8) + '...' : displayValue}`)
         }
       }
     }
 
-    if (selectedOptions.length > 3) {
-      parts.push(`+${selectedOptions.length - 3}`)
+    if (selectedOptions.length > 2) {
+      parts.push(`+${selectedOptions.length - 2}`)
     }
 
     return parts.join(', ')
   }, [selectedOptions, allOptions])
 
+  // 无选项时显示简洁的图标按钮
+  if (selectedOptions.length === 0) {
+    return (
+      <button
+        onClick={onClick}
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-text-tertiary hover:text-text-secondary hover:bg-background-hover/50 transition-colors"
+        title="引擎命令选项"
+      >
+        <IconSettings size={12} />
+        <span className="text-[10px]">选项</span>
+      </button>
+    )
+  }
+
+  // 有选项时显示高亮状态
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
-        selectedOptions.length > 0
-          ? 'bg-primary/10 text-primary hover:bg-primary/20'
-          : 'bg-background-surface text-text-tertiary hover:text-text-primary hover:bg-background-hover'
-      }`}
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors max-w-[160px]"
+      title={`${selectedOptions.length} 个命令选项已配置`}
     >
-      <IconSettings size={14} />
-      {selectedOptions.length > 0 ? (
-        <span className="truncate max-w-[120px]">{summary}</span>
-      ) : (
-        <span>选项</span>
-      )}
-      <IconChevronDown size={12} />
+      <IconSettings size={12} />
+      <span className="text-[10px] truncate">{summary}</span>
+      <span className="text-[10px] opacity-70">({selectedOptions.length})</span>
     </button>
   )
 }

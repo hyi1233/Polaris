@@ -646,13 +646,6 @@ export function ChatInput({
             <IconPaperclip size={18} />
           </button>
 
-          {/* 引擎命令选项按钮 */}
-          <EngineCommandTrigger
-            engineId={config?.defaultEngine || 'claude-code'}
-            selectedOptions={engineOptions}
-            onClick={openCommandSelector}
-          />
-
           {/* 文本输入 */}
           <AutoResizingTextarea
             ref={textareaRef}
@@ -705,41 +698,41 @@ export function ChatInput({
         </div>
 
         {/* 状态栏 */}
-        {(isStreaming || suggestionMode || value.length > 0 || attachments.length > 0 || engineOptions.length > 0) && (
-          <div className="flex items-center justify-between mt-1.5 px-1">
-            <div className="text-xs text-text-tertiary">
-              {isStreaming ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-1 h-1 bg-warning rounded-full animate-pulse" />
-                  {t('status.generating')}
-                </span>
-              ) : suggestionMode === 'workspace' ? (
-                <span>{t('input.selectWorkspace')}</span>
-              ) : suggestionMode === 'file' ? (
-                <span>{t('input.selectFile')}</span>
-              ) : suggestionMode === 'git' ? (
-                <span>{t('input.gitContext')}</span>
-              ) : engineOptions.length > 0 ? (
-                <span className="flex items-center gap-1 text-primary">
-                  {engineOptions.length} 个命令选项已配置
-                </span>
-              ) : attachments.length > 0 ? (
-                <span className="flex items-center gap-1">
-                  <IconPaperclip size={10} />
-                  {attachments.length} 个附件
-                  {hasReadyAttachments && ' · 可直接发送'}
-                </span>
-              ) : (
-                <span>{t('input.hint')}</span>
-              )}
-            </div>
-            {value.length > 0 && (
-              <div className="text-xs text-text-tertiary">
-                {value.length}
-              </div>
-            )}
+        <div className="flex items-center justify-between mt-1.5 px-1">
+          <div className="flex items-center gap-2 text-xs text-text-tertiary">
+            {/* 引擎命令选项 - 移到状态栏 */}
+            <EngineCommandTrigger
+              engineId={config?.defaultEngine || 'claude-code'}
+              selectedOptions={engineOptions}
+              onClick={openCommandSelector}
+            />
+            {isStreaming ? (
+              <span className="flex items-center gap-2">
+                <span className="w-1 h-1 bg-warning rounded-full animate-pulse" />
+                {t('status.generating')}
+              </span>
+            ) : suggestionMode === 'workspace' ? (
+              <span>{t('input.selectWorkspace')}</span>
+            ) : suggestionMode === 'file' ? (
+              <span>{t('input.selectFile')}</span>
+            ) : suggestionMode === 'git' ? (
+              <span>{t('input.gitContext')}</span>
+            ) : attachments.length > 0 ? (
+              <span className="flex items-center gap-1">
+                <IconPaperclip size={10} />
+                {attachments.length} 个附件
+                {hasReadyAttachments && ' · 可直接发送'}
+              </span>
+            ) : value.length === 0 && engineOptions.length === 0 ? (
+              <span>{t('input.hint')}</span>
+            ) : null}
           </div>
-        )}
+          {value.length > 0 && (
+            <div className="text-xs text-text-tertiary">
+              {value.length}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 工作区建议 */}
