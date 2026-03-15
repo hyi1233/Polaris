@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSchedulerStore, useToastStore } from '../../stores';
-import type { TaskLog, TriggerType, CreateTaskParams, RunTaskResult } from '../../types/scheduler';
+import type { TaskLog, TriggerType, CreateTaskParams } from '../../types/scheduler';
 import type { ScheduledTask } from '../../types/scheduler';
 import { TriggerTypeLabels, IntervalUnitLabels, parseIntervalValue } from '../../types/scheduler';
 
@@ -359,37 +359,68 @@ function LogList({ logs }: { logs: TaskLog[] }) {
             </div>
             <div className="text-sm text-gray-400">
               {formatTime(log.startedAt)}
-              {log.finishedAt && (
+              {/* 使用 durationMs 显示耗时 */}
+              {log.durationMs != null && log.durationMs > 0 ? (
+                <span className="ml-2">
+                  耗时 {log.durationMs < 1000 ? `${log.durationMs}ms` : `${(log.durationMs / 1000).toFixed(1)}s`}
+                </span>
+              ) : log.finishedAt && log.startedAt ? (
                 <span className="ml-2">
                   耗时 {log.finishedAt - log.startedAt}s
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 
           {expandedId === log.id && (
-            <div className="mt-3 pt-3 border-t border-[#2a2a4a]">
-              <div className="text-sm text-gray-400 mb-2">提示词:</div>
-              <pre className="text-xs text-gray-300 bg-[#12122a] p-2 rounded overflow-x-auto">
-                {log.prompt}
-              </pre>
+            <div className="mt-3 pt-3 border-t border-[#2a2a4a] space-y-3">
+              {/* 显示增强字段：Session ID、工具调用次数 */}
+              <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                {log.sessionId && (
+                  <span>
+                    Session: <code className="text-blue-400 bg-[#12122a] px-1 rounded">{log.sessionId.slice(0, 8)}...</code>
+                  </span>
+                )}
+                {log.toolCallCount != null && log.toolCallCount > 0 && (
+                  <span className="text-yellow-400">
+                    🔧 工具调用: {log.toolCallCount} 次
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm text-gray-400 mb-2">提示词:</div>
+                <pre className="text-xs text-gray-300 bg-[#12122a] p-2 rounded overflow-x-auto">
+                  {log.prompt}
+                </pre>
+              </div>
+
+              {/* 显示思考过程摘要 */}
+              {log.thinkingSummary && (
+                <div>
+                  <div className="text-sm text-gray-400 mb-2">💭 思考过程:</div>
+                  <pre className="text-xs text-purple-400 bg-[#12122a] p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap">
+                    {log.thinkingSummary}
+                  </pre>
+                </div>
+              )}
 
               {log.output && (
-                <>
-                  <div className="text-sm text-gray-400 mt-3 mb-2">输出:</div>
-                  <pre className="text-xs text-green-400 bg-[#12122a] p-2 rounded overflow-x-auto max-h-60">
+                <div>
+                  <div className="text-sm text-gray-400 mb-2">输出:</div>
+                  <pre className="text-xs text-green-400 bg-[#12122a] p-2 rounded overflow-x-auto max-h-60 whitespace-pre-wrap">
                     {log.output}
                   </pre>
-                </>
+                </div>
               )}
 
               {log.error && (
-                <>
-                  <div className="text-sm text-gray-400 mt-3 mb-2">错误:</div>
+                <div>
+                  <div className="text-sm text-gray-400 mb-2">❌ 错误:</div>
                   <pre className="text-xs text-red-400 bg-[#12122a] p-2 rounded overflow-x-auto">
                     {log.error}
                   </pre>
-                </>
+                </div>
               )}
             </div>
           )}
@@ -417,13 +448,14 @@ export function SchedulerPanel() {
   /** 处理立即执行任务 */
   const handleRunTask = async (task: ScheduledTask) => {
     try {
-      toast.info('开始执行', `正在执行任务: ${task.name}`);
-      const result: RunTaskResult = await runTask(task.id);
-      toast.success('执行成功', `任务 ${task.name} 已完成，日志ID: ${result.logId.slice(0, 8)}`);
-      // 刷新日志
+      await runTask(task.id);
+      // 任务在后台执行，这里只是提交成功
+      toast.info('任务已提交', `任务 ${task.name} 已在后台开始执行`);
+      // 刷新任务列表和日志
+      loadTasks();
       loadLogs(50);
     } catch (e) {
-      toast.error('执行失败', e instanceof Error ? e.message : '未知错误');
+      toast.error('提交失败', e instanceof Error ? e.message : '未知错误');
     }
   };
 
