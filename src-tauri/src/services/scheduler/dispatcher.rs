@@ -770,9 +770,15 @@ impl SchedulerDispatcher {
 
     /// 根据任务模式构建提示词
     async fn build_prompt(&self, task: &ScheduledTask) -> Result<String> {
+        tracing::info!(
+            "[Scheduler] 构建提示词: 模式={:?}, work_dir={:?}, task_path={:?}",
+            task.mode, task.work_dir, task.task_path
+        );
+
         match task.mode {
             TaskMode::Simple => {
                 // 简单模式：直接使用 prompt
+                tracing::info!("[Scheduler] 简单模式提示词长度: {}", task.prompt.len());
                 Ok(task.prompt.clone())
             }
             TaskMode::Protocol => {
