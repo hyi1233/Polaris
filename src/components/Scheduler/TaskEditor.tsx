@@ -549,7 +549,23 @@ export function TaskEditor({
                 <div className="space-y-3 p-3 bg-[#1a1a2e] rounded-lg border border-[#2a2a4a]">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-400">模板参数</span>
-                    <span className="text-xs text-gray-500">{selectedTemplate.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">{selectedTemplate.name}</span>
+                      {!task?.taskPath && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTemplate(null);
+                            setTemplateParamValues({});
+                            setMission('');
+                          }}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          title="清除模板，返回手动输入模式"
+                        >
+                          ✕ 清除
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {selectedTemplate.templateParams.map((param) => (
                     <TemplateParamInput
