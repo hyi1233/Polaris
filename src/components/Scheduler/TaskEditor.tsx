@@ -5,13 +5,21 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useToastStore, useWorkspaceStore } from '../../stores';
+import { useToastStore, useWorkspaceStore, useConfigStore } from '../../stores';
 import { useProtocolTemplateStore } from '../../stores/protocolTemplateStore';
 import type { ScheduledTask, TriggerType, CreateTaskParams, TaskMode } from '../../types/scheduler';
 import { TriggerTypeLabels, IntervalUnitLabels, TaskModeLabels, parseIntervalValue } from '../../types/scheduler';
 import { ProtocolTemplateCategoryLabels, renderFullTemplate } from '../../types/protocolTemplate';
 import type { ProtocolTemplate, TemplateParam } from '../../types/protocolTemplate';
 import * as tauri from '../../services/tauri';
+
+/** 解析引擎ID，返回基础引擎和可能的 provider ID */
+function parseEngineId(engineId: string): { baseEngine: string; providerId?: string } {
+  if (engineId.startsWith('provider-')) {
+    return { baseEngine: 'openai', providerId: engineId.replace('provider-', '') };
+  }
+  return { baseEngine: engineId };
+}
 
 /** 预设时间选项 */
 interface TimePreset {
@@ -220,6 +228,10 @@ export function TaskEditor({
 }: TaskEditorProps) {
   const toast = useToastStore();
   const { getCurrentWorkspace, workspaces } = useWorkspaceStore();
+  const { config } = useConfigStore();
+  
+  // 获取 OpenAI Providers 列表
+  const openaiProviders = config?.openaiProviders || [];
 
   // 获取当前工作区路径作为默认工作目录
   const currentWorkspace = getCurrentWorkspace();
@@ -768,16 +780,77 @@ export function TaskEditor({
           {/* AI 引擎 */}
           <div>
             <label className="block text-sm text-gray-400 mb-1">AI 引擎</label>
-            <select
-              value={engineId}
-              onChange={(e) => setEngineId(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="claude">Claude Code</option>
-              <option value="iflow">IFlow</option>
-              <option value="codex">Codex</option>
-              <option value="openai">OpenAI</option>
-            </select>
+            <div className="space-y-2">
+              <select
+                value={parseEngineId(engineId).baseEngine}
+                onChange={(e) => {
+                  const baseEngine = e.target.value;
+                  if (baseEngine === 'openai') {
+                    // 选择 OpenAI 时，默认选择第一个启用的 provider
+                    const enabledProviders = openaiProviders.filter(p => p.enabled);
+                    if (enabledProviders.length > 0) {
+                      setEngineId(`provider-${enabledProviders[0].id}`);
+                    } else {
+                      setEngineId('openai'); // 没有配置 provider 时保持原值
+                    }
+                  } else {
+                    setEngineId(baseEngine);
+                  }
+                }}
+                className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="claude">Claude Code</option>
+                <option value="iflow">IFlow</option>
+                <option value="codex">Codex</option>
+                <option value="openai">OpenAI Provider</option>
+              </select>
+              
+              {/* OpenAI Provider 二级选择 */}
+              {parseEngineId(engineId).baseEngine === 'openai' && (
+                <div className="pl-2 border-l-2 border-[#2a2a4a]">
+                  <label className="block text-xs text-gray-500 mb-1">选择 Provider</label>
+                  {openaiProviders.filter(p => p.enabled).length > 0 ? (
+                    <>
+                      <select
+                        value={parseEngineId(engineId).providerId || ''}
+                        onChange={(e) => setEngineId(`provider-${e.target.value}`)}
+                        className="w-full px-3 py-2 bg-[#12122a] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 text-sm"
+                      >
+                        {openaiProviders.filter(p => p.enabled).map((provider) => (
+                          <option key={provider.id} value={provider.id}>
+                            {provider.name} ({provider.model})
+                          </option>
+                        ))}
+                      </select>
+                      {/* 显示选中 Provider 的详情 */}
+                      {(() => {
+                        const selectedProvider = openaiProviders.find(
+                          p => p.id === parseEngineId(engineId).providerId
+                        );
+                        if (selectedProvider) {
+                          return (
+                            <div className="mt-2 p-2 bg-[#0a0a1a] rounded text-xs text-gray-400 space-y-1">
+                              <div>模型: <span className="text-blue-400">{selectedProvider.model}</span></div>
+                              <div>API: <span className="text-gray-500 truncate">{selectedProvider.apiBase}</span></div>
+                              {selectedProvider.supportsTools && (
+                                <span className="inline-block px-1 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">
+                                  支持工具调用
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </>
+                  ) : (
+                    <p className="text-xs text-yellow-500">
+                      未配置 OpenAI Provider，请在设置中添加
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 工作目录 */}
