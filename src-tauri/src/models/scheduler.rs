@@ -45,6 +45,8 @@ pub struct CreateTaskParams {
     pub notify_on_complete: bool,
     /// 执行超时时间（分钟，None 或 0 表示不限）
     pub timeout_minutes: Option<u32>,
+    /// 用户补充内容（一次性提示词，每次执行时可以修改）
+    pub user_supplement: Option<String>,
 }
 
 fn default_notify_on_complete() -> bool {
@@ -140,6 +142,9 @@ pub struct ScheduledTask {
     /// 执行超时时间（分钟，None 或 0 表示不限）
     #[serde(default)]
     pub timeout_minutes: Option<u32>,
+    /// 用户补充内容（一次性提示词，每次执行时可以修改）
+    #[serde(default)]
+    pub user_supplement: Option<String>,
 }
 
 impl From<CreateTaskParams> for ScheduledTask {
@@ -172,6 +177,7 @@ impl From<CreateTaskParams> for ScheduledTask {
             retry_interval: params.retry_interval,
             notify_on_complete: params.notify_on_complete,
             timeout_minutes: params.timeout_minutes,
+            user_supplement: params.user_supplement,
         }
     }
 }

@@ -139,6 +139,9 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         templateParamValues: params.templateParamValues,
         maxRetries: params.maxRetries,
         retryInterval: params.retryInterval,
+        notifyOnComplete: params.notifyOnComplete,
+        timeoutMinutes: params.timeoutMinutes,
+        userSupplement: params.userSupplement,
       });
 
       // 刷新列表

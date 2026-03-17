@@ -67,6 +67,8 @@ export interface ScheduledTask {
   notifyOnComplete?: boolean;
   /** 执行超时时间（分钟，undefined 或 0 表示不限） */
   timeoutMinutes?: number;
+  /** 用户补充内容（一次性提示词，每次执行时可以修改） */
+  userSupplement?: string;
 }
 
 /** 执行日志 */
@@ -134,6 +136,8 @@ export interface CreateTaskParams {
   notifyOnComplete?: boolean;
   /** 执行超时时间（分钟，undefined 或 0 表示不限） */
   timeoutMinutes?: number;
+  /** 用户补充内容（一次性提示词，每次执行时可以修改） */
+  userSupplement?: string;
 }
 
 /** 协议任务目录结构 */

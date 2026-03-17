@@ -279,6 +279,9 @@ export function TaskEditor({
   // 任务完成通知
   const [notifyOnComplete, setNotifyOnComplete] = useState<boolean>(task?.notifyOnComplete ?? true);
 
+  // 用户补充内容（一次性提示词）
+  const [userSupplement, setUserSupplement] = useState<string>(task?.userSupplement || '');
+
   // 执行超时配置
   const [timeoutMinutes, setTimeoutMinutes] = useState<number | undefined>(task?.timeoutMinutes);
   const [showTimeoutConfig, setShowTimeoutConfig] = useState(!!task?.timeoutMinutes);
@@ -453,6 +456,8 @@ export function TaskEditor({
       notifyOnComplete,
       // 超时配置
       timeoutMinutes: timeoutMinutes && timeoutMinutes > 0 ? timeoutMinutes : undefined,
+      // 用户补充内容（一次性提示词）
+      userSupplement: userSupplement.trim() || undefined,
     });
   };
 
@@ -547,6 +552,25 @@ export function TaskEditor({
                 className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none"
                 placeholder="输入 AI 要执行的提示词..."
               />
+            </div>
+          )}
+
+          {/* 用户补充内容（简单模式和协议模式都可填写） */}
+          {(mode === 'simple' || mode === 'protocol') && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                用户补充 <span className="text-gray-600">(可选，一次性提示词)</span>
+              </label>
+              <textarea
+                value={userSupplement}
+                onChange={(e) => setUserSupplement(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none text-sm"
+                placeholder="可选：补充说明、特殊要求或临时调整..."
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                在任务执行时会将此内容追加到提示词中，适合添加临时指令或补充说明
+              </p>
             </div>
           )}
 
