@@ -15,6 +15,13 @@ use crate::models::AIEvent;
 use tauri::{Emitter, State, Window};
 use tauri_plugin_notification::NotificationExt;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Windows 进程创建标志：不创建新窗口
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 // ============================================================================
 // 附件相关结构体
 // ============================================================================
@@ -862,7 +869,22 @@ pub fn validate_codex_path(path: String) -> CodexPathValidationResult {
         };
     }
 
-    let version = Command::new(&path)
+    #[cfg(windows)]
+    let version = std::process::Command::new(&path)
+        .arg("--version")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+
+    #[cfg(not(windows))]
+    let version = std::process::Command::new(&path)
         .arg("--version")
         .output()
         .ok()
