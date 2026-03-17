@@ -211,19 +211,24 @@ export function TabContent({ className = '' }: TabContentProps) {
 interface CenterStageProps {
   children?: ReactNode
   className?: string
+  /** 是否填充剩余空间（当右侧没有其他面板时） */
+  fillRemaining?: boolean
 }
 
 /**
  * CenterStage 主组件
+ * 当 fillRemaining 为 true 时，自动扩展填充剩余空间
  */
-export function CenterStage({ children, className = '' }: CenterStageProps) {
+export function CenterStage({ children, className = '', fillRemaining = false }: CenterStageProps) {
   const tabs = useTabStore((state) => state.tabs)
 
-  // 如果没有 Tab,不渲染 CenterStage,给右侧面板更多空间
+  // 如果没有 Tab,不渲染 CenterStage,让右侧面板填充空间
   if (tabs.length === 0) {
     return null
   }
 
+  // CenterStage 本身就有 flex-1，fillRemaining 主要用于语义标记
+  // 未来可以根据需要添加不同的样式
   return (
     <main className={`flex flex-col flex-1 overflow-hidden bg-background-base ${className}`}>
       <TabBar />

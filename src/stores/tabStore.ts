@@ -200,10 +200,8 @@ export const useTabStore = create<TabStore>()(
     }),
     {
       name: 'tab-store',
-      // 只持久化 Tab 列表,不持久化激活状态(每次打开可能不同)
-      partialize: (state) => ({
-        tabs: state.tabs,
-      }),
+      // 不持久化 tabs，每次启动都是空状态
+      // 这样可以确保 hasOpenTabs 正确反映当前状态
     }
   )
 )

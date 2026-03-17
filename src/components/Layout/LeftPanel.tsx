@@ -12,12 +12,15 @@ import { ResizeHandle } from '../Common'
 interface LeftPanelProps {
   children?: ReactNode
   className?: string
+  /** 是否填充剩余空间（当右侧没有其他面板时） */
+  fillRemaining?: boolean
 }
 
 /**
  * 左侧面板组件
+ * 当 fillRemaining 为 true 时，自动扩展填充剩余空间
  */
-export function LeftPanel({ children, className = '' }: LeftPanelProps) {
+export function LeftPanel({ children, className = '', fillRemaining = false }: LeftPanelProps) {
   const width = useViewStore((state) => state.leftPanelWidth)
   const setWidth = useViewStore((state) => state.setLeftPanelWidth)
 
@@ -25,6 +28,16 @@ export function LeftPanel({ children, className = '' }: LeftPanelProps) {
   const handleResize = (delta: number) => {
     const newWidth = Math.max(200, Math.min(600, width + delta))
     setWidth(newWidth)
+  }
+
+  // 填充模式：使用 flex-1 自动扩展，不显示拖拽手柄
+  if (fillRemaining) {
+    return (
+      <aside className={`flex flex-col bg-background-elevated border-r border-border min-w-[200px] flex-1 ${className}`}>
+        {/* 面板内容 */}
+        <div className="flex-1 overflow-hidden">{children}</div>
+      </aside>
+    )
   }
 
   return (
@@ -36,15 +49,6 @@ export function LeftPanel({ children, className = '' }: LeftPanelProps) {
       >
         {/* 面板内容 */}
         <div className="flex-1 overflow-hidden">{children}</div>
-
-        {/* 关闭按钮 - 左上角 */}
-        {/*<button*/}
-        {/*  onClick={closeLeftPanel}*/}
-        {/*  className="absolute top-2 left-2 p-1 rounded hover:bg-background-hover text-text-secondary hover:text-text-primary transition-all z-10"*/}
-        {/*  title="隐藏面板"*/}
-        {/*>*/}
-        {/*  <X size={14} />*/}
-        {/*</button>*/}
       </aside>
 
       {/* 拖拽手柄 */}

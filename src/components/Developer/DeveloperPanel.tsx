@@ -43,9 +43,11 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 export interface DeveloperPanelProps {
   className?: string
   width?: number
+  /** 是否填充剩余空间（当右侧没有其他面板时） */
+  fillRemaining?: boolean
 }
 
-export function DeveloperPanel({ className = '', width }: DeveloperPanelProps) {
+export function DeveloperPanel({ className = '', width, fillRemaining = false }: DeveloperPanelProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [events, setEvents] = useState<EventRecord[]>([])
   const [filterType, setFilterType] = useState<FilterType>('all')
@@ -148,6 +150,173 @@ export function DeveloperPanel({ className = '', width }: DeveloperPanelProps) {
       <pre className="text-xs text-text-tertiary font-mono whitespace-pre-wrap break-all">
         {JSON.stringify(detail, null, 2)}
       </pre>
+    )
+  }
+
+  // 填充模式：使用 flex-1 自动扩展
+  if (fillRemaining) {
+    return (
+      <aside
+        ref={containerRef}
+        className={clsx(
+          'flex flex-col border-l border-border bg-background-elevated min-w-[200px] flex-1',
+          className
+        )}
+      >
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <span className="text-sm font-medium text-text-primary">Developer</span>
+            <span className="text-xs text-text-tertiary bg-background-surface px-2 py-0.5 rounded-md">
+              {filteredEvents.length}
+            </span>
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* 过滤器栏 */}
+          <div className="flex flex-col gap-2 px-4 py-3 border-b border-border-subtle bg-background-surface">
+            {/* 第一行：过滤类型 */}
+            <div className="flex items-center gap-2">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as FilterType)}
+                className="flex-1 px-2 py-1.5 text-xs bg-background border border-border rounded-md text-text-primary focus:outline-none focus:border-primary"
+              >
+                <option value="all">全部事件</option>
+                <option value="taskId">按 Task ID</option>
+                <option value="sessionId">按 Session ID</option>
+              </select>
+
+              {(filterType === 'taskId' || filterType === 'sessionId') && (
+                <input
+                  type="text"
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  placeholder={filterType === 'taskId' ? 'Task ID...' : 'Session ID...'}
+                  className="flex-1 px-2 py-1.5 text-xs bg-background border border-border rounded-md text-text-primary focus:outline-none focus:border-primary"
+                />
+              )}
+            </div>
+
+            {/* 第二行：事件类型过滤 + 操作按钮 */}
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedEventType || ''}
+                onChange={(e) => setSelectedEventType(e.target.value || null)}
+                className="flex-1 px-2 py-1.5 text-xs bg-background border border-border rounded-md text-text-primary focus:outline-none focus:border-primary"
+              >
+                <option value="">全部类型</option>
+                {eventTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setAutoScroll(!autoScroll)}
+                className={clsx(
+                  'px-2 py-1.5 text-xs rounded-md border transition-colors',
+                  autoScroll
+                    ? 'bg-primary/10 border-primary text-primary'
+                    : 'bg-background border-border text-text-tertiary hover:text-text-primary'
+                )}
+                title={autoScroll ? '自动滚动: 开' : '自动滚动: 关'}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </button>
+
+              <button
+                onClick={clearEvents}
+                className="px-2 py-1.5 text-xs bg-background border border-border text-text-tertiary rounded-md hover:text-text-primary hover:bg-background-hover transition-colors"
+                title="清空事件"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 第三行：最大事件数设置 */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-tertiary">最大事件数:</span>
+              <input
+                type="number"
+                min={100}
+                max={10000}
+                step={100}
+                value={maxEvents}
+                onChange={(e) => setMaxEvents(Number(e.target.value))}
+                className="w-20 px-2 py-1 text-xs bg-background border border-border rounded-md text-text-primary focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+
+          {/* 事件列表 */}
+          <div className="flex-1 overflow-y-auto px-2 py-2">
+            {filteredEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
+                <svg className="w-12 h-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-sm">暂无事件</span>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {filteredEvents.map((record) => {
+                  const eventType = record.event.type
+                  const colorClass = EVENT_TYPE_COLORS[eventType] || 'text-text-secondary'
+
+                  return (
+                    <div
+                      key={record.id}
+                      className={clsx(
+                        'p-2 rounded-md bg-background-surface border border-border-subtle hover:border-border transition-colors cursor-default'
+                      )}
+                    >
+                      {/* 事件头部 */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className={clsx('text-xs font-mono font-medium', colorClass)}>
+                            {eventType}
+                          </span>
+                          <span className="text-xs text-text-tertiary font-mono">
+                            {formatTime(record.timestamp)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => copyEvent(record.event)}
+                          className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                          title="复制 JSON"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* 事件详情 */}
+                      {renderEventDetail(record.event)}
+                    </div>
+                  )
+                })}
+                <div ref={eventsEndRef} />
+              </div>
+            )}
+          </div>
+
+          {/* 底部状态栏 */}
+          <div className="px-4 py-2 border-t border-border-subtle text-xs text-text-tertiary bg-background-surface flex items-center justify-between">
+            <span>总计: {events.length}</span>
+            <span>已过滤: {filteredEvents.length}</span>
+          </div>
+        </div>
+      </aside>
     )
   }
 

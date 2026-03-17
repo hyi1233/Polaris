@@ -10,13 +10,60 @@ import { ToolDetail } from './ToolDetail';
 interface ToolPanelProps {
   className?: string;
   width?: number; // 可选的自定义宽度（像素）
+  /** 是否填充剩余空间（当右侧没有其他面板时） */
+  fillRemaining?: boolean;
 }
 
-export function ToolPanel({ className = '', width }: ToolPanelProps) {
+export function ToolPanel({ className = '', width, fillRemaining = false }: ToolPanelProps) {
   const { isOpen, selectedToolId, selectTool, tools } = useToolPanelStore();
 
   if (tools.length === 0 && !selectedToolId) {
     return null;
+  }
+
+  // 填充模式：使用 flex-1 自动扩展
+  if (fillRemaining) {
+    return (
+      <aside
+        className={clsx(
+          'flex flex-col border-l border-border bg-background-elevated min-w-[200px] flex-1',
+          className
+        )}
+      >
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary shadow-glow" />
+            <span className="text-sm font-medium text-text-primary">工具调用</span>
+            <span className="text-xs text-text-tertiary bg-background-surface px-2 py-0.5 rounded-md">
+              {tools.length}
+            </span>
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <div className="flex-1 overflow-hidden">
+          {selectedToolId ? (
+            <ToolDetail
+              toolId={selectedToolId}
+              onBack={() => selectTool(null)}
+            />
+          ) : (
+            <ToolList />
+          )}
+        </div>
+
+        {/* 底部状态栏 */}
+        {!selectedToolId && (
+          <div className="px-4 py-3 border-t border-border-subtle text-xs text-text-tertiary bg-background-surface">
+            <div className="flex items-center justify-between">
+              <span>运行中: {tools.filter(t => t.status === 'running').length}</span>
+              <span>完成: {tools.filter(t => t.status === 'completed').length}</span>
+            </div>
+          </div>
+        )}
+      </aside>
+    );
   }
 
   // 计算宽度：打开时使用自定义宽度或默认280px，关闭时固定40px
