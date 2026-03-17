@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useSchedulerStore, useToastStore } from '../../stores';
 import type { TaskLog, CreateTaskParams } from '../../types/scheduler';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
 import type { ScheduledTask } from '../../types/scheduler';
 import { TriggerTypeLabels, TaskModeLabels } from '../../types/scheduler';
 import * as tauri from '../../services/tauri';
@@ -871,6 +872,14 @@ export function SchedulerPanel() {
     autoCleanupIntervalHours: 24,
   });
   const [cleaning, setCleaning] = useState(false);
+  // 确认对话框状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    title?: string;
+    message: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   // 从任务列表提取引擎和分组选项
   const engineOptions = [...new Set(tasks.map((t) => t.engineId))].sort();
@@ -959,20 +968,26 @@ export function SchedulerPanel() {
 
   /** 处理手动清理 */
   const handleCleanup = async () => {
-    if (!confirm('确定要清理过期日志吗？此操作不可撤销。')) {
-      return;
-    }
-    setCleaning(true);
-    try {
-      const count = await tauri.schedulerCleanupLogs();
-      toast.success('清理完成', `已清理 ${count} 条过期日志`);
-      // 刷新统计
-      loadLogSettings();
-    } catch (e) {
-      toast.error('清理失败', e instanceof Error ? e.message : '未知错误');
-    } finally {
-      setCleaning(false);
-    }
+    setConfirmDialog({
+      show: true,
+      title: '确认清理',
+      message: '确定要清理过期日志吗？此操作不可撤销。',
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setCleaning(true);
+        try {
+          const count = await tauri.schedulerCleanupLogs();
+          toast.success('清理完成', `已清理 ${count} 条过期日志`);
+          // 刷新统计
+          loadLogSettings();
+        } catch (e) {
+          toast.error('清理失败', e instanceof Error ? e.message : '未知错误');
+        } finally {
+          setCleaning(false);
+        }
+      }
+    });
   };
 
   // 前端筛选日志（搜索和状态）
@@ -1131,17 +1146,25 @@ export function SchedulerPanel() {
       toast.warning('提示', '请先选择要删除的任务');
       return;
     }
-    if (!confirm(`确定要删除选中的 ${selectedTasks.length} 个任务吗？此操作不可恢复。`)) return;
-    try {
-      for (const task of selectedTasks) {
-        await deleteTask(task.id);
+    setConfirmDialog({
+      show: true,
+      title: '确认批量删除',
+      message: `确定要删除选中的 ${selectedTasks.length} 个任务吗？此操作不可恢复。`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          for (const task of selectedTasks) {
+            await deleteTask(task.id);
+          }
+          toast.success('批量删除成功', `已删除 ${selectedTasks.length} 个任务`);
+          setSelectedTaskIds(new Set());
+          loadTasks();
+        } catch (e) {
+          toast.error('批量删除失败', e instanceof Error ? e.message : '未知错误');
+        }
       }
-      toast.success('批量删除成功', `已删除 ${selectedTasks.length} 个任务`);
-      setSelectedTaskIds(new Set());
-      loadTasks();
-    } catch (e) {
-      toast.error('批量删除失败', e instanceof Error ? e.message : '未知错误');
-    }
+    });
   };
 
   const handleCreate = async (params: CreateTaskParams) => {
@@ -1201,13 +1224,21 @@ export function SchedulerPanel() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个任务吗？')) return;
-    try {
-      await deleteTask(id);
-      toast.success('删除成功');
-    } catch (e) {
-      toast.error('删除失败', e instanceof Error ? e.message : '未知错误');
-    }
+    setConfirmDialog({
+      show: true,
+      title: '确认删除',
+      message: '确定要删除这个任务吗？此操作不可恢复。',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await deleteTask(id);
+          toast.success('删除成功');
+        } catch (e) {
+          toast.error('删除失败', e instanceof Error ? e.message : '未知错误');
+        }
+      }
+    });
   };
 
   /** 将任务转换为导出格式 */
@@ -1631,6 +1662,17 @@ export function SchedulerPanel() {
         <ProtocolDocViewer
           task={viewingTask}
           onClose={() => setViewingTask(undefined)}
+        />
+      )}
+
+      {/* 确认对话框 */}
+      {confirmDialog?.show && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </div>
