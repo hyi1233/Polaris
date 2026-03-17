@@ -490,7 +490,7 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
 
   clearMessages: () => {
     // 清理 Provider Session
-    const { providerSessionCache } = get()
+    const { providerSessionCache, _eventListenersCleanup } = get()
     if (providerSessionCache?.session) {
       try {
         providerSessionCache.session.dispose()
@@ -498,6 +498,18 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
         console.warn('[EventChatStore] 清理 Session 失败:', e)
       }
     }
+
+    // 清理事件监听器（如果存在）
+    if (_eventListenersCleanup) {
+      try {
+        _eventListenersCleanup()
+      } catch (e) {
+        console.warn('[EventChatStore] 清理事件监听器失败:', e)
+      }
+    }
+
+    // 清理文件读取缓存
+    fileReadPromises.clear()
 
     set({
       messages: [],
@@ -509,6 +521,8 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
       currentMessage: null,
       toolBlockMap: new Map(),
       providerSessionCache: null,
+      _eventListenersInitialized: false,
+      _eventListenersCleanup: null,
     })
     useToolPanelStore.getState().clearTools()
   },
