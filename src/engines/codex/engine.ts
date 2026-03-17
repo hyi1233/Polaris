@@ -4,32 +4,35 @@
  * OpenAI Codex CLI 的 AIEngine 实现。
  */
 
-import type { AIEngine, AISession, AISessionConfig, EngineCapabilities } from '../../ai-runtime'
+import type { AISessionConfig, EngineCapabilities } from '../../ai-runtime'
 import { createCapabilities } from '../../ai-runtime'
-import { CodexSession } from './session'
+import { BaseCLIEngine, BaseCLISession, type CLIEngineConfig, type CLISessionConfig } from '../../ai-runtime/base'
 
 /**
- * Codex Engine 配置
+ * Codex Session
+ *
+ * 继承 BaseCLISession，实现 Codex 特定的 Session 逻辑。
  */
-export interface CodexEngineConfig {
-  /** Codex CLI 可执行文件路径 */
-  executablePath?: string
-  /** 默认模型 */
-  defaultModel?: string
-  /** API 密钥 */
-  apiKey?: string
-  /** 额外命令行参数 */
-  extraArgs?: string[]
+class CodexSession extends BaseCLISession {
+  readonly engineId = 'codex'
+
+  protected getDefaultExecutable(): string {
+    return 'codex'
+  }
 }
 
 /**
  * Codex Engine
  *
- * 实现 AIEngine 接口，将 Codex CLI 集成到系统中。
+ * 继承 BaseCLIEngine，只需提供差异化配置。
  */
-export class CodexEngine implements AIEngine {
-  readonly id = 'codex'
-  readonly name = 'Codex'
+export class CodexEngine extends BaseCLIEngine {
+  protected readonly descriptor = {
+    id: 'codex',
+    name: 'Codex',
+    description: 'OpenAI Codex CLI - OpenAI 的代码生成助手',
+    defaultExecutable: 'codex',
+  }
 
   readonly capabilities: EngineCapabilities = createCapabilities({
     supportedTaskKinds: ['chat', 'refactor', 'explain', 'generate', 'fix-bug'],
@@ -41,96 +44,17 @@ export class CodexEngine implements AIEngine {
     version: '1.0.0',
   })
 
-  private config: CodexEngineConfig
-  private isInitialized: boolean = false
-
-  constructor(config?: CodexEngineConfig) {
-    this.config = config || {}
-  }
-
-  /**
-   * 创建新的会话
-   */
-  createSession(sessionConfig?: AISessionConfig): AISession {
-    return new CodexSession(sessionConfig, {
-      executablePath: this.config.executablePath,
-      model: this.config.defaultModel,
-      apiKey: this.config.apiKey,
-      extraArgs: this.config.extraArgs,
-    })
-  }
-
-  /**
-   * 检查 Engine 是否可用
-   */
-  async isAvailable(): Promise<boolean> {
-    try {
-      return await this.checkCodexInstalled()
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * 初始化 Engine
-   */
-  async initialize(): Promise<boolean> {
-    if (this.isInitialized) {
-      return true
-    }
-
-    try {
-      const available = await this.isAvailable()
-      if (!available) {
-        console.warn('[CodexEngine] Codex CLI 不可用，请先安装')
-        return false
-      }
-
-      this.isInitialized = true
-      return true
-    } catch (error) {
-      console.error('[CodexEngine] 初始化失败:', error)
-      return false
-    }
-  }
-
-  /**
-   * 清理 Engine 资源
-   */
-  async cleanup(): Promise<void> {
-    this.isInitialized = false
-  }
-
-  /**
-   * 更新引擎配置
-   */
-  updateConfig(config: Partial<CodexEngineConfig>): void {
-    this.config = { ...this.config, ...config }
-  }
-
-  /**
-   * 获取当前配置
-   */
-  getConfig(): CodexEngineConfig {
-    return { ...this.config }
-  }
-
-  /**
-   * 检查 Codex CLI 是否已安装
-   */
-  private async checkCodexInstalled(): Promise<boolean> {
-    // TODO: 调用 Tauri 后端检查 codex 是否安装
-    return true
-  }
-
-  /**
-   * 获取 Codex CLI 版本
-   */
-  async getVersion(): Promise<string | null> {
-    // TODO: 调用 `codex --version` 获取版本
-    return null
+  protected createCLISession(
+    sessionConfig?: AISessionConfig,
+    cliConfig?: CLISessionConfig
+  ): BaseCLISession {
+    return new CodexSession(sessionConfig, cliConfig)
   }
 }
+
+// 类型别名，保持向后兼容
+export type CodexEngineConfig = CLIEngineConfig
+export type CodexConfig = CLISessionConfig
 
 /**
  * 创建 Codex Engine

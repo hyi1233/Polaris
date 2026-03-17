@@ -88,7 +88,7 @@ export async function bootstrapAgents(config?: AgentConfig): Promise<void> {
     },
     () => createIFlowEngine({
       executablePath: defaultConfig.iflowExecutablePath,
-      defaultModel: defaultConfig.iflowDefaultModel,
+      model: defaultConfig.iflowDefaultModel,
       apiKey: defaultConfig.iflowApiKey,
       apiBase: defaultConfig.iflowApiBase,
     })

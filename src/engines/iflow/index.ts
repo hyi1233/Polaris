@@ -6,7 +6,7 @@
  */
 
 export { IFlowEngine, createIFlowEngine, defaultIFlowEngine } from './engine'
-export type { IFlowEngineConfig } from './engine'
+export type { IFlowEngineConfig, IFlowConfig } from './engine'
 
-export { IFlowSession, createIFlowSession } from './session'
-export type { IFlowConfig } from './session'
+// 从基类重新导出 Session 类型（向后兼容）
+export { BaseCLISession as IFlowSession } from '../../ai-runtime/base'
