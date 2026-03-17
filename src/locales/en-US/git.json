@@ -13,6 +13,7 @@
   "discard": "Discard Changes",
   "stageSelected": "Stage selected files",
   "moreActions": "More actions",
+  "confirmDiscardTitle": "Confirm Discard Changes",
   "confirmDiscard": "Are you sure you want to discard changes in {{count}} files?\n\nThis action cannot be undone!",
   "refreshStatus": "Refresh status",
   "aheadRemote": "Ahead of remote",

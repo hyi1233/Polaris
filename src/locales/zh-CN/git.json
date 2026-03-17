@@ -13,6 +13,7 @@
   "discard": "丢弃更改",
   "stageSelected": "暂存选中文件",
   "moreActions": "更多操作",
+  "confirmDiscardTitle": "确认丢弃更改",
   "confirmDiscard": "确定要丢弃 {{count}} 个文件的修改吗？\n\n此操作无法撤销！",
   "refreshStatus": "刷新状态",
   "aheadRemote": "领先远程",

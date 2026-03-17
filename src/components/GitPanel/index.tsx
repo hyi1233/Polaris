@@ -22,6 +22,7 @@ import { GitignoreTab } from './GitignoreTab'
 import { DiffViewer } from '@/components/Diff/DiffViewer'
 import { Button } from '@/components/Common/Button'
 import { DropdownMenu } from '@/components/Common/DropdownMenu'
+import { ConfirmDialog } from '@/components/Common/ConfirmDialog'
 import { logger } from '@/utils/logger'
 import type { GitFileChange, GitDiffEntry } from '@/types'
 
@@ -55,6 +56,14 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
   const [isInitializing, setIsInitializing] = useState(false)
   const [showInitPrompt, setShowInitPrompt] = useState(false)
   const [initBranchName, setInitBranchName] = useState('main')
+  // 确认对话框状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    title?: string;
+    message: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null)
 
   const handleFileClick = async (file: GitFileChange, type: 'staged' | 'unstaged') => {
     if (!currentWorkspace) return
@@ -208,38 +217,44 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
     }
   }, [currentWorkspace, selectedFiles, status, unstageFile, refreshStatus, toast])
 
-  const handleBatchDiscard = useCallback(async () => {
+  const handleBatchDiscard = useCallback(() => {
     if (!currentWorkspace || selectedFiles.size === 0) return
 
-    const confirmed = window.confirm(t('confirmDiscard', { count: selectedFiles.size }))
-    if (!confirmed) return
+    setConfirmDialog({
+      show: true,
+      title: t('confirmDiscardTitle'),
+      message: t('confirmDiscard', { count: selectedFiles.size }),
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        setIsBatchOperating(true)
+        try {
+          const discardablePaths = Array.from(selectedFiles).filter(path => {
+            return status?.unstaged.some(f => f.path === path)
+          })
 
-    setIsBatchOperating(true)
-    try {
-      const discardablePaths = Array.from(selectedFiles).filter(path => {
-        return status?.unstaged.some(f => f.path === path)
-      })
+          setBatchProgress({ current: 0, total: discardablePaths.length })
 
-      setBatchProgress({ current: 0, total: discardablePaths.length })
+          for (let i = 0; i < discardablePaths.length; i++) {
+            const path = discardablePaths[i]
+            await discardChanges(currentWorkspace.path, path)
+            setBatchProgress({ current: i + 1, total: discardablePaths.length })
+          }
 
-      for (let i = 0; i < discardablePaths.length; i++) {
-        const path = discardablePaths[i]
-        await discardChanges(currentWorkspace.path, path)
-        setBatchProgress({ current: i + 1, total: discardablePaths.length })
+          await refreshStatus(currentWorkspace.path)
+          setSelectedFiles(new Set())
+          toast.success(t('batchDiscardSuccess'))
+        } catch (err) {
+          toast.error(t('errors.batchDiscardFailed'), err instanceof Error ? err.message : String(err))
+          // 操作失败后刷新状态
+          await refreshStatus(currentWorkspace.path)
+        } finally {
+          setIsBatchOperating(false)
+          setBatchProgress(null)
+        }
       }
-
-      await refreshStatus(currentWorkspace.path)
-      setSelectedFiles(new Set())
-      toast.success(t('batchDiscardSuccess'))
-    } catch (err) {
-      toast.error(t('errors.batchDiscardFailed'), err instanceof Error ? err.message : String(err))
-      // 操作失败后刷新状态
-      await refreshStatus(currentWorkspace.path)
-    } finally {
-      setIsBatchOperating(false)
-      setBatchProgress(null)
-    }
-  }, [currentWorkspace, selectedFiles, status, discardChanges, refreshStatus, toast])
+    })
+  }, [currentWorkspace, selectedFiles, status, discardChanges, refreshStatus, toast, t])
 
   const handleInitRepository = useCallback(async () => {
     if (!currentWorkspace) return
@@ -562,6 +577,17 @@ export function GitPanel({ width, className = '', onOpenDiffInTab }: GitPanelPro
             setTargetCommitSha(commitSha)
             setActiveTab('history')
           }}
+        />
+      )}
+
+      {/* 确认对话框 */}
+      {confirmDialog?.show && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </aside>
