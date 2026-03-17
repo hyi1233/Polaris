@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-03-15T16:54:45.028Z",
+  "updatedAt": "2026-03-17T17:21:20.951Z",
   "todos": [
     {
       "id": "d64fe89c-dfae-43b7-b816-0e3543b32176",
@@ -52,11 +52,12 @@
     {
       "id": "0b8db2b3-f562-4d7c-b453-1157ee97e594",
       "content": "ai对话面板支持全关闭显示，支持任意宽度",
-      "status": "pending",
+      "status": "completed",
       "priority": "normal",
       "subtasks": [],
       "createdAt": "2026-03-14T19:27:45.928Z",
-      "updatedAt": "2026-03-14T19:27:45.928Z"
+      "updatedAt": "2026-03-17T17:21:20.951Z",
+      "completedAt": "2026-03-17T17:21:20.951Z"
     },
     {
       "id": "704d56d6-3e42-4354-92cc-e0dc787b823d",
