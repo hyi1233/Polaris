@@ -68,6 +68,9 @@ function TaskCard({
   isSubscribing,
   isSubscribed,
   showGroupTag,
+  selectionMode,
+  isSelected,
+  onSelect,
 }: {
   task: ScheduledTask;
   onEdit: () => void;
@@ -84,10 +87,27 @@ function TaskCard({
   isSubscribed?: boolean;
   /** 是否显示分组标签（当任务列表有多个分组时显示） */
   showGroupTag?: boolean;
+  /** 是否处于选择模式 */
+  selectionMode?: boolean;
+  /** 是否被选中 */
+  isSelected?: boolean;
+  /** 选择回调 */
+  onSelect?: () => void;
 }) {
   return (
-    <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a4a]">
+    <div className={`bg-[#1a1a2e] rounded-lg p-4 border ${isSelected ? 'border-blue-500' : 'border-[#2a2a4a]'}`}>
       <div className="flex items-start justify-between">
+        {/* 选择模式下显示复选框 */}
+        {selectionMode && (
+          <div className="flex items-center mr-3 mt-1">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onSelect}
+              className="w-5 h-5 rounded border-gray-500 bg-[#12122a] text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+            />
+          </div>
+        )}
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${task.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
@@ -600,6 +620,9 @@ export function SchedulerPanel() {
   const [filter, setFilter] = useState<TaskFilter>(defaultFilter);
   const [logFilter, setLogFilter] = useState<LogFilterState>(defaultLogFilter);
   const [logPage, setLogPage] = useState(1);
+  // 批量选择状态
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
   // 从任务列表提取引擎和分组选项
   const engineOptions = [...new Set(tasks.map((t) => t.engineId))].sort();
@@ -729,6 +752,92 @@ export function SchedulerPanel() {
       loadTasks();
     } catch (e) {
       toast.error('取消订阅失败', e instanceof Error ? e.message : '未知错误');
+    }
+  };
+
+  /** 切换任务选择状态 */
+  const handleToggleSelect = (taskId: string) => {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  /** 全选/取消全选筛选后的任务 */
+  const handleSelectAll = () => {
+    if (selectedTaskIds.size === filteredTasks.length) {
+      // 已全选，取消全选
+      setSelectedTaskIds(new Set());
+    } else {
+      // 全选
+      setSelectedTaskIds(new Set(filteredTasks.map((t) => t.id)));
+    }
+  };
+
+  /** 退出选择模式 */
+  const handleExitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedTaskIds(new Set());
+  };
+
+  /** 批量启用任务 */
+  const handleBatchEnable = async () => {
+    const selectedTasks = tasks.filter((t) => selectedTaskIds.has(t.id) && !t.enabled);
+    if (selectedTasks.length === 0) {
+      toast.warning('提示', '没有可启用的任务');
+      return;
+    }
+    try {
+      for (const task of selectedTasks) {
+        await toggleTask(task.id, true);
+      }
+      toast.success('批量启用成功', `已启用 ${selectedTasks.length} 个任务`);
+      loadTasks();
+    } catch (e) {
+      toast.error('批量启用失败', e instanceof Error ? e.message : '未知错误');
+    }
+  };
+
+  /** 批量禁用任务 */
+  const handleBatchDisable = async () => {
+    const selectedTasks = tasks.filter((t) => selectedTaskIds.has(t.id) && t.enabled);
+    if (selectedTasks.length === 0) {
+      toast.warning('提示', '没有可禁用的任务');
+      return;
+    }
+    try {
+      for (const task of selectedTasks) {
+        await toggleTask(task.id, false);
+      }
+      toast.success('批量禁用成功', `已禁用 ${selectedTasks.length} 个任务`);
+      loadTasks();
+    } catch (e) {
+      toast.error('批量禁用失败', e instanceof Error ? e.message : '未知错误');
+    }
+  };
+
+  /** 批量删除任务 */
+  const handleBatchDelete = async () => {
+    const selectedTasks = tasks.filter((t) => selectedTaskIds.has(t.id));
+    if (selectedTasks.length === 0) {
+      toast.warning('提示', '请先选择要删除的任务');
+      return;
+    }
+    if (!confirm(`确定要删除选中的 ${selectedTasks.length} 个任务吗？此操作不可恢复。`)) return;
+    try {
+      for (const task of selectedTasks) {
+        await deleteTask(task.id);
+      }
+      toast.success('批量删除成功', `已删除 ${selectedTasks.length} 个任务`);
+      setSelectedTaskIds(new Set());
+      loadTasks();
+    } catch (e) {
+      toast.error('批量删除失败', e instanceof Error ? e.message : '未知错误');
     }
   };
 
@@ -932,6 +1041,23 @@ export function SchedulerPanel() {
                 显示 {filteredTasks.length}/{tasks.length} 条
               </span>
             )}
+            {/* 选择模式切换按钮 */}
+            <button
+              onClick={() => {
+                if (selectionMode) {
+                  handleExitSelectionMode();
+                } else {
+                  setSelectionMode(true);
+                }
+              }}
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                selectionMode
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
+              }`}
+            >
+              {selectionMode ? '退出选择' : '批量选择'}
+            </button>
           </div>
         </div>
       )}
@@ -974,6 +1100,9 @@ export function SchedulerPanel() {
                       onViewDocs={() => setViewingTask(task)}
                       isSubscribing={subscribingTaskId === task.id}
                       isSubscribed={!!task.subscribedContextId}
+                      selectionMode={selectionMode}
+                      isSelected={selectedTaskIds.has(task.id)}
+                      onSelect={() => handleToggleSelect(task.id)}
                     />
                   )}
                 </TaskGroup>
@@ -994,6 +1123,46 @@ export function SchedulerPanel() {
           />
         )}
       </div>
+
+      {/* 批量操作工具栏 */}
+      {selectionMode && activeTab === 'tasks' && (
+        <div className="p-3 border-t border-[#2a2a4a] bg-[#1a1a2e] flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-400">
+              已选择 {selectedTaskIds.size}/{filteredTasks.length} 个任务
+            </span>
+            <button
+              onClick={handleSelectAll}
+              className="px-3 py-1 text-sm bg-gray-600/20 text-gray-300 hover:bg-gray-600/30 rounded transition-colors"
+            >
+              {selectedTaskIds.size === filteredTasks.length ? '取消全选' : '全选'}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBatchEnable}
+              disabled={selectedTaskIds.size === 0}
+              className="px-3 py-1 text-sm bg-green-600/20 text-green-400 hover:bg-green-600/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              批量启用
+            </button>
+            <button
+              onClick={handleBatchDisable}
+              disabled={selectedTaskIds.size === 0}
+              className="px-3 py-1 text-sm bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              批量禁用
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              disabled={selectedTaskIds.size === 0}
+              className="px-3 py-1 text-sm bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              批量删除
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 编辑弹窗 */}
       {showEditor && (
