@@ -7,6 +7,43 @@
  * - 生命周期管理
  *
  * 各 CLI 引擎（IFlow、Codex 等）只需继承此类并实现差异化部分。
+ *
+ * ## Engine 架构设计
+ *
+ * 本项目支持三种不同架构的 Engine 类型，它们各有独立的通信模式和生命周期管理：
+ *
+ * ### 1. CLI 进程型 Engine (继承 BaseCLIEngine)
+ * - **代表**: IFlowEngine, CodexEngine
+ * - **通信方式**: 启动 CLI 子进程，解析 stdout/stderr
+ * - **Session 管理**: 不在 Engine 层管理 sessions，由子类实现 createCLISession
+ * - **事件机制**: 进程输出解析 → AIEvent
+ * - **适用场景**: 命令行工具包装（如 claude-cli、codex-cli）
+ *
+ * ### 2. Tauri 命令型 Engine (独立实现)
+ * - **代表**: ClaudeCodeEngine
+ * - **通信方式**: 直接调用 Tauri invoke 命令（start_chat, continue_chat, interrupt_chat）
+ * - **Session 管理**: Engine 层管理 sessions Map
+ * - **事件机制**: Tauri 事件系统（listen<TauriChatEvent>）
+ * - **适用场景**: 与 Tauri 后端深度集成的原生 Engine
+ *
+ * ### 3. HTTP API 型 Engine (独立实现)
+ * - **代表**: OpenAIProviderEngine
+ * - **通信方式**: HTTP REST API (fetch) 调用远程服务
+ * - **Session 管理**: Engine 层管理 sessions Map，监听 session 生命周期
+ * - **事件机制**: Tauri 事件系统（后端代理 → 前端监听）
+ * - **适用场景**: OpenAI 兼容 API（官方、DeepSeek、Ollama、Azure 等）
+ *
+ * ### 设计决策
+ *
+ * 三种架构不适合共享同一个基类，原因：
+ * 1. 通信架构根本不同（进程 vs Tauri 命令 vs HTTP）
+ * 2. Session 生命周期管理方式不同
+ * 3. 事件产生和处理机制不同
+ *
+ * BaseCLIEngine 仅适用于 CLI 进程型 Engine，其他类型应独立实现 AIEngine 接口。
+ *
+ * @see AIEngine - 引擎接口定义
+ * @see BaseSession - Session 基类
  */
 
 import type { AIEngine, EngineCapabilities } from '../engine'
