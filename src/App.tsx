@@ -87,6 +87,21 @@ function App() {
   const { openDiffTab, tabs } = useTabStore();
   const hasOpenTabs = tabs.length > 0;
 
+  // 计算各面板的显示状态
+  const rightPanelCollapsed = useViewStore((state) => state.rightPanelCollapsed);
+  const hasLeftPanel = leftPanelType !== 'none';
+  const hasCenterStage = hasOpenTabs;
+  const hasRightPanel = !rightPanelCollapsed;
+  const hasToolPanel = showToolPanel;
+  const hasDeveloperPanel = showDeveloperPanel;
+
+  // 计算各面板是否需要填充剩余空间（只有最后一个显示的面板需要填充）
+  const leftPanelFillRemaining = hasLeftPanel && !hasCenterStage && !hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
+  const centerStageFillRemaining = hasCenterStage && !hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
+  const rightPanelFillRemaining = hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
+  const toolPanelFillRemaining = hasToolPanel && !hasDeveloperPanel;
+  const developerPanelFillRemaining = hasDeveloperPanel;
+
   const engineOptions = useMemo(() => {
     const options: { id: EngineId; name: string }[] = [
       { id: 'claude-code', name: 'Claude Code' },
@@ -523,7 +538,7 @@ function App() {
 
         {/* 左侧可切换面板 (FileExplorer 或 GitPanel 或 TodoPanel) - 条件显示 */}
         {leftPanelType !== 'none' && (
-          <LeftPanel>
+          <LeftPanel fillRemaining={leftPanelFillRemaining}>
             <LeftPanelContent
               filesContent={<FileExplorer />}
               gitContent={
@@ -543,10 +558,10 @@ function App() {
         )}
 
         {/* 中间编辑区 (Tab 系统) */}
-        <CenterStage />
+        <CenterStage fillRemaining={centerStageFillRemaining} />
 
         {/* 右侧 AI 对话面板 */}
-        <RightPanel fillRemaining={!hasOpenTabs}>
+        <RightPanel fillRemaining={rightPanelFillRemaining}>
           {/* 状态指示器 */}
           <div className="flex items-center justify-between px-4 py-2 bg-background-elevated border-b border-border-subtle">
             <span className="text-sm text-text-primary">{t('labels.aiChat')}</span>
@@ -582,25 +597,29 @@ function App() {
         {/* 保留: ToolPanel (可选显示) */}
         {showToolPanel && (
           <>
-            <ResizeHandle
-              direction="horizontal"
-              position="left"
-              onDrag={handleToolPanelResize}
-            />
-            <ToolPanel width={toolPanelWidth} />
+            {!toolPanelFillRemaining && (
+              <ResizeHandle
+                direction="horizontal"
+                position="left"
+                onDrag={handleToolPanelResize}
+              />
+            )}
+            <ToolPanel width={toolPanelWidth} fillRemaining={toolPanelFillRemaining} />
           </>
         )}
 
         {/* 保留: DeveloperPanel (可选显示) */}
         {showDeveloperPanel && (
           <>
-            <ResizeHandle
-              direction="horizontal"
-              position="left"
-              onDrag={handleDeveloperPanelResize}
-            />
+            {!developerPanelFillRemaining && (
+              <ResizeHandle
+                direction="horizontal"
+                position="left"
+                onDrag={handleDeveloperPanelResize}
+              />
+            )}
             <Suspense fallback={<div className="flex items-center justify-center text-text-muted">{t('status.loading')}</div>}>
-              <DeveloperPanel width={developerPanelWidth} />
+              <DeveloperPanel width={developerPanelWidth} fillRemaining={developerPanelFillRemaining} />
             </Suspense>
           </>
         )}
