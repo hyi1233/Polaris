@@ -171,7 +171,7 @@ export function BranchTab() {
 
     // 验证分支名称（简单验证）
     const branchName = newBranchName.trim()
-    const invalidChars = /[\s~^:?*\[\\]/
+    const invalidChars = /[\s~:?*[\\]/
     if (invalidChars.test(branchName)) {
       toast.error(t('errors.createBranchFailed'), t('branch.invalidName'))
       return
@@ -252,7 +252,7 @@ export function BranchTab() {
 
     // 验证分支名称
     const branchName = renamedBranchName.trim()
-    const invalidChars = /[\s~^:?*\[\\]/
+    const invalidChars = /[\s~^:?*[\\]/
     if (invalidChars.test(branchName)) {
       toast.error(t('errors.renameBranchFailed'), t('branch.invalidName'))
       return

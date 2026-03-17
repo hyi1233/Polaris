@@ -33,7 +33,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     try {
       sessionStorage.setItem('crash_error', error.message);
       sessionStorage.setItem('crash_time', new Date().toISOString());
-    } catch {}
+    } catch {
+      // 忽略 sessionStorage 不可用的情况
+    }
     return { hasError: true, error };
   }
 
@@ -48,7 +50,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         componentStack: errorInfo.componentStack,
         timestamp: new Date().toISOString()
       }));
-    } catch {}
+    } catch {
+      // 忽略 sessionStorage 不可用的情况
+    }
 
     // 3秒后自动尝试恢复
     this.recoveryTimeoutId = window.setTimeout(() => {
@@ -112,7 +116,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       sessionStorage.removeItem('crash_error');
       sessionStorage.removeItem('crash_time');
       sessionStorage.removeItem('crash_details');
-    } catch {}
+    } catch {
+      // 忽略 sessionStorage 不可用的情况
+    }
   }
 
   /** 手动重试 */
@@ -132,7 +138,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     try {
       // 触发一个事件让其他组件保存状态
       window.dispatchEvent(new CustomEvent('app:crash-save'));
-    } catch {}
+    } catch {
+      // 忽略 dispatch 失败的情况
+    }
   }
 
   render() {
@@ -207,9 +215,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
  * 检测是否白屏的 Hook
  */
 export function useWhiteScreenDetection(enabled: boolean = true) {
-  if (!enabled) return;
-
   useEffect(() => {
+    if (!enabled) return;
+
     let checkCount = 0;
     const maxChecks = 3;
 

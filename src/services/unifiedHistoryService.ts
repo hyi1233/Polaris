@@ -201,21 +201,24 @@ export class UnifiedHistoryService {
     }
   ): Promise<Message[]> {
     switch (provider) {
-      case 'claude-code':
+      case 'claude-code': {
         const claudeMessages = await this.claudeService.getSessionHistory(sessionId, options?.projectPath)
         return this.claudeService.convertMessagesToFormat(claudeMessages)
+      }
 
-      case 'iflow':
+      case 'iflow': {
         const iflowMessages = await this.iflowService.getSessionHistory(sessionId)
         return this.iflowService.convertMessagesToFormat(iflowMessages)
+      }
 
-      case 'codex':
+      case 'codex': {
         if (!options?.filePath) {
           console.error('[UnifiedHistoryService] Codex 需要 filePath 参数')
           return []
         }
         const codexMessages = await this.codexService.getSessionHistory(options.filePath)
         return this.codexService.convertMessagesToFormat(codexMessages)
+      }
 
       default:
         return []

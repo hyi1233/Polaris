@@ -9,6 +9,7 @@ import type { ContentBlock, ToolCallBlock } from '../../types'
 import { useToolPanelStore } from '../toolPanelStore'
 import { MESSAGE_ARCHIVE_THRESHOLD, STORAGE_VERSION, STORAGE_KEY } from './types'
 import { generateToolSummary, calculateDuration } from '../../utils/toolSummary'
+import { clearFileReadCache } from './utils'
 
 /**
  * 创建消息状态 Slice
@@ -87,7 +88,6 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
     }
 
     // 清理文件读取缓存
-    const { clearFileReadCache } = require('./utils') as typeof import('./utils')
     clearFileReadCache()
 
     set({

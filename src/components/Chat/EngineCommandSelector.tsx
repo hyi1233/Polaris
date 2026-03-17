@@ -92,7 +92,7 @@ function OptionInput({
         </select>
       )
 
-    case 'multiselect':
+    case 'multiselect': {
       const selectedValues = Array.isArray(value) ? value : []
       return (
         <div className="flex flex-wrap gap-1.5">
@@ -120,6 +120,7 @@ function OptionInput({
           })}
         </div>
       )
+    }
 
     case 'number':
       return (

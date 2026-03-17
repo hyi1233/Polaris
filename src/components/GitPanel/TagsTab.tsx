@@ -77,7 +77,7 @@ export function TagsTab() {
   // 验证标签名
   const validateTagName = (name: string): boolean => {
     if (!name.trim()) return false
-    const invalidChars = /[\s~^:?*\[\\]/
+    const invalidChars = /[\s~^:?*[\\]/
     return !invalidChars.test(name)
   }
 

@@ -104,93 +104,95 @@ async function callAIForCommitMessage(
   userPrompt: string,
   contextId: string
 ): Promise<string> {
-  return new Promise(async (resolve, reject) => {
-    let accumulatedText = ''
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-    let unregister: (() => void) | null = null
+  return new Promise((resolve, reject) => {
+    (async () => {
+      let accumulatedText = ''
+      let timeoutId: ReturnType<typeof setTimeout> | null = null
+      let unregister: (() => void) | null = null
 
-    const cleanup = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-        timeoutId = null
-      }
-      if (unregister) {
-        unregister()
-        unregister = null
-      }
-    }
-
-    const handleTimeout = () => {
-      cleanup()
-      if (accumulatedText) {
-        resolve(extractCommitMessage(accumulatedText))
-      } else {
-        reject(new Error('AI generation timeout'))
-      }
-    }
-
-    timeoutId = setTimeout(handleTimeout, 30000)
-
-    try {
-      const router = getEventRouter()
-      await router.initialize()
-
-      unregister = router.register(contextId, (payload: unknown) => {
-        try {
-          const data = payload as any
-          
-          switch (data.type) {
-            case 'session_start':
-              break
-              
-            case 'assistant':
-              if (data.message?.content) {
-                const textParts = data.message.content.filter((item: any) => item.type === 'text')
-                const text = textParts.map((item: any) => item.text || '').join('')
-                if (text) {
-                  accumulatedText += text
-                }
-              }
-              break
-              
-            case 'text_delta':
-              if (data.text) {
-                accumulatedText += data.text
-              }
-              break
-              
-            case 'session_end':
-            case 'result':
-              cleanup()
-              if (accumulatedText) {
-                resolve(extractCommitMessage(accumulatedText))
-              } else {
-                reject(new Error('No response from AI'))
-              }
-              break
-              
-            case 'error':
-              cleanup()
-              reject(new Error(data.error || 'AI generation failed'))
-              break
-          }
-        } catch (e) {
-          console.error('[callAIForCommitMessage] Failed to process event:', e)
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
         }
-      })
+        if (unregister) {
+          unregister()
+          unregister = null
+        }
+      }
 
-      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
-      
-      await invoke<string>('start_chat', {
-        message: fullPrompt.replace(/\n/g, '\\n'),
-        workDir,
-        engineId: 'claude-code',
-        contextId,
-      })
-    } catch (err) {
-      cleanup()
-      reject(err)
-    }
+      const handleTimeout = () => {
+        cleanup()
+        if (accumulatedText) {
+          resolve(extractCommitMessage(accumulatedText))
+        } else {
+          reject(new Error('AI generation timeout'))
+        }
+      }
+
+      timeoutId = setTimeout(handleTimeout, 30000)
+
+      try {
+        const router = getEventRouter()
+        await router.initialize()
+
+        unregister = router.register(contextId, (payload: unknown) => {
+          try {
+            const data = payload as any
+            
+            switch (data.type) {
+              case 'session_start':
+                break
+                
+              case 'assistant':
+                if (data.message?.content) {
+                  const textParts = data.message.content.filter((item: any) => item.type === 'text')
+                  const text = textParts.map((item: any) => item.text || '').join('')
+                  if (text) {
+                    accumulatedText += text
+                  }
+                }
+                break
+                
+              case 'text_delta':
+                if (data.text) {
+                  accumulatedText += data.text
+                }
+                break
+                
+              case 'session_end':
+              case 'result':
+                cleanup()
+                if (accumulatedText) {
+                  resolve(extractCommitMessage(accumulatedText))
+                } else {
+                  reject(new Error('No response from AI'))
+                }
+                break
+                
+              case 'error':
+                cleanup()
+                reject(new Error(data.error || 'AI generation failed'))
+                break
+            }
+          } catch (e) {
+            console.error('[callAIForCommitMessage] Failed to process event:', e)
+          }
+        })
+
+        const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
+        
+        await invoke<string>('start_chat', {
+          message: fullPrompt.replace(/\n/g, '\\n'),
+          workDir,
+          engineId: 'claude-code',
+          contextId,
+        })
+      } catch (err) {
+        cleanup()
+        reject(err)
+      }
+    })().catch(reject);
   })
 }
 

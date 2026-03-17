@@ -81,7 +81,9 @@ export function LeftPanelContent({
   developerContent?: ReactNode
   currentType?: LeftPanelType
 }) {
-  const type = currentType ?? useViewStore((state) => state.leftPanelType)
+  // Hook 必须在条件之外调用
+  const storePanelType = useViewStore((state) => state.leftPanelType)
+  const type = currentType ?? storePanelType
 
   if (type === 'files') {
     return <>{filesContent}</>

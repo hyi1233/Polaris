@@ -19,7 +19,7 @@ function isValidFileName(name: string): boolean {
 
   const trimmed = name.trim();
 
-  const invalidChars = /[<>:"|?*\\\/]/;
+  const invalidChars = /[<>:"|?*\\]/;
   if (invalidChars.test(trimmed)) {
     return false;
   }
@@ -43,7 +43,7 @@ function isValidFileName(name: string): boolean {
 }
 
 function joinPath(basePath: string, name: string): string {
-  const cleanBase = basePath.replace(/[\/\\]+$/, '');
+  const cleanBase = basePath.replace(/[/\\]+$/, '');
   return `${cleanBase}/${name}`;
 }
 
@@ -228,7 +228,7 @@ export const FileTreeNode = memo<FileTreeNodeProps>(({
           await openPath(file.path);
         } else {
           // 对于文件，打开其所在目录
-          const parentPath = file.path.substring(0, file.path.lastIndexOf(/[\/\\]/.test(file.path) ? (file.path.includes('\\') ? '\\' : '/') : '/'));
+          const parentPath = file.path.substring(0, file.path.lastIndexOf(/[/\\]/.test(file.path) ? (file.path.includes('\\') ? '\\' : '/') : '/'));
           if (parentPath) {
             await openPath(parentPath);
           }

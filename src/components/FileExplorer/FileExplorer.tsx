@@ -114,7 +114,7 @@ export function FileExplorer() {
       return false;
     }
     const trimmed = name.trim();
-    const invalidChars = /[<>:"|?*\\\/]/;
+    const invalidChars = /[<>:"|?*\\]/;
     if (invalidChars.test(trimmed)) {
       return false;
     }

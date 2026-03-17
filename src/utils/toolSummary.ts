@@ -201,6 +201,7 @@ export function calculateDuration(startedAt: string, completedAt?: string): numb
 }
 
 export function stripAnsiCodes(text: string): string {
+  // eslint-disable-next-line no-control-regex
   const ansiRegex = /\x1b\[[0-9;]*m/g;
   return text.replace(ansiRegex, '');
 }
