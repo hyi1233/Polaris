@@ -269,13 +269,8 @@ export const BUILTIN_PROTOCOL_TEMPLATES: ProtocolTemplate[] = [
         required: true,
         placeholder: '描述任务目标...',
       },
-      {
-        key: 'userSupplement',
-        label: '用户补充',
-        type: 'textarea',
-        required: false,
-        placeholder: '可选：补充说明或特殊要求...',
-      },
+      // userSupplement 作为独立字段存在于 ScheduledTask 中，不需要在模板参数中定义
+      // fullTemplate 中的 {userSupplement} 占位符在渲染时从独立字段获取
     ],
     defaultTriggerType: 'interval',
     defaultTriggerValue: '1h',

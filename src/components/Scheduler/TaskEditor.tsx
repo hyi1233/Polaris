@@ -318,26 +318,15 @@ export function TaskEditor({
         const template = getTemplate(task.templateId);
         if (template) {
           setSelectedTemplate(template);
-          // 回显模板参数值
+          // 回显模板参数值（userSupplement 作为独立字段处理，不需要同步）
           if (task.templateParamValues) {
-            // 如果模板参数中有 userSupplement，同步到独立字段
-            const paramValues = { ...task.templateParamValues };
-            if (paramValues.userSupplement !== undefined) {
-              // 从模板参数中恢复 userSupplement
-              setUserSupplement(paramValues.userSupplement);
-            }
-            setTemplateParamValues(paramValues);
+            setTemplateParamValues(task.templateParamValues);
           } else {
             // 没有保存的参数值，使用默认值
             const initialValues: Record<string, string> = {};
             if (template.templateParams) {
               template.templateParams.forEach((param) => {
-                // userSupplement 参数使用独立字段的值（如果有的话）
-                if (param.key === 'userSupplement' && task.userSupplement) {
-                  initialValues[param.key] = task.userSupplement;
-                } else {
-                  initialValues[param.key] = param.default || '';
-                }
+                initialValues[param.key] = param.default || '';
               });
             }
             setTemplateParamValues(initialValues);
@@ -444,18 +433,17 @@ export function TaskEditor({
     // 计算 mission：如果是 fullTemplate 模式，渲染完整模板
     let finalMission = mission;
     if (mode === 'protocol' && selectedTemplate?.fullTemplate) {
-      finalMission = renderFullTemplate(selectedTemplate.fullTemplate, templateParamValues);
+      // 渲染时将 userSupplement 独立字段的值传入，支持 fullTemplate 中的 {userSupplement} 占位符
+      finalMission = renderFullTemplate(selectedTemplate.fullTemplate, {
+        ...templateParamValues,
+        userSupplement: userSupplement.trim() || undefined,
+      });
     }
 
-    // 如果模板有 userSupplement 参数，同步独立字段的值
-    const finalTemplateParamValues = mode === 'protocol' && selectedTemplate
-      ? {
-          ...templateParamValues,
-          // 同步独立的 userSupplement 字段到模板参数
-          ...(selectedTemplate.templateParams?.some(p => p.key === 'userSupplement') && userSupplement.trim()
-            ? { userSupplement: userSupplement.trim() }
-            : {}),
-        }
+    // 模板参数值：直接使用 templateParamValues，不再同步 userSupplement
+    // userSupplement 作为独立字段处理，在 renderFullTemplate 时传入
+    const finalTemplateParamValues = mode === 'protocol' && selectedTemplate && Object.keys(templateParamValues).length > 0
+      ? templateParamValues
       : undefined;
 
     onSave({
