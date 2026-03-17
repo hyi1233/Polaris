@@ -5,6 +5,7 @@
 export { MessageBubble } from './MessageBubble';
 export { ChatInput } from './ChatInput';
 export { SessionHistoryPanel } from './SessionHistoryPanel';
+export { AIPopover } from './AIPopover';
 
 // 分层对话流组件
 export { EnhancedChatMessages } from './EnhancedChatMessages';

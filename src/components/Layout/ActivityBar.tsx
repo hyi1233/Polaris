@@ -5,7 +5,7 @@
  * 参考 VSCode 的 Activity Bar 设计
  */
 
-import { Files, GitPullRequest, CheckSquare, Settings, Languages, Clock, Terminal, MessageSquare } from 'lucide-react'
+import { Files, GitPullRequest, CheckSquare, Settings, Languages, Clock, Terminal, Wrench, Code2, MessageSquare } from 'lucide-react'
 import { useViewStore } from '@/stores/viewStore'
 import { ActivityBarIcon } from './ActivityBarIcon'
 import { useTranslation } from 'react-i18next'
@@ -14,14 +14,14 @@ interface ActivityBarProps {
   className?: string
   /** 可选: 打开设置的回调 */
   onOpenSettings?: () => void
+  /** 可选: 打开 AI 对话弹出的回调 */
+  onOpenAIPopover?: () => void
 }
 
-export function ActivityBar({ className, onOpenSettings }: ActivityBarProps) {
+export function ActivityBar({ className, onOpenSettings, onOpenAIPopover }: ActivityBarProps) {
   const { t } = useTranslation('common')
   const leftPanelType = useViewStore((state) => state.leftPanelType)
   const toggleLeftPanel = useViewStore((state) => state.toggleLeftPanel)
-  const rightPanelCollapsed = useViewStore((state) => state.rightPanelCollapsed)
-  const toggleRightPanel = useViewStore((state) => state.toggleRightPanel)
 
   const panelButtons = [
     {
@@ -54,6 +54,16 @@ export function ActivityBar({ className, onOpenSettings }: ActivityBarProps) {
       icon: Terminal,
       label: t('labels.terminalPanel'),
     },
+    {
+      id: 'tools' as const,
+      icon: Wrench,
+      label: t('labels.toolPanel'),
+    },
+    {
+      id: 'developer' as const,
+      icon: Code2,
+      label: t('labels.developerPanel'),
+    },
   ]
 
   return (
@@ -72,12 +82,12 @@ export function ActivityBar({ className, onOpenSettings }: ActivityBarProps) {
 
       <div className="flex-1" />
 
-      {/* AI 对话面板切换按钮 */}
+      {/* AI 对话弹出按钮 */}
       <ActivityBarIcon
         icon={MessageSquare}
         label={t('labels.aiChat')}
-        active={!rightPanelCollapsed}
-        onClick={toggleRightPanel}
+        active={false}
+        onClick={onOpenAIPopover || (() => {})}
       />
 
       <ActivityBarIcon

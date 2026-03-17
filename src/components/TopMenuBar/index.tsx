@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Minus, Square, X, Clock, Download, Copy } from 'lucide-react';
+import { Minus, Square, X, Clock, Download, Copy, MessageSquare } from 'lucide-react';
 import { useWorkspaceStore, useViewStore, useEventChatStore, useConfigStore } from '../../stores';
 import { useFloatingWindowStore } from '../../stores/floatingWindowStore';
 import * as tauri from '../../services/tauri';
@@ -14,16 +14,16 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 interface TopMenuBarProps {
   onNewConversation: () => void;
   onCreateWorkspace: () => void;
+  onOpenAIPopover?: () => void;
 }
 
-export function TopMenuBar({ onNewConversation, onCreateWorkspace }: TopMenuBarProps) {
+export function TopMenuBar({ onNewConversation, onCreateWorkspace, onOpenAIPopover }: TopMenuBarProps) {
   const { t } = useTranslation('common');
   const { config } = useConfigStore();
   const { getCurrentWorkspace } = useWorkspaceStore();
   const { showFloatingWindow } = useFloatingWindowStore();
   const { toggleSessionHistory } = useViewStore();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
-  const [showViewMenu, setShowViewMenu] = useState(false);
   const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -145,30 +145,15 @@ export function TopMenuBar({ onNewConversation, onCreateWorkspace }: TopMenuBarP
         {/* 分隔线 */}
         <div data-tauri-drag-region className="w-px h-4 bg-border-subtle mx-1" />
 
-        {/* View 菜单 */}
-        <div className="relative">
-          <button
-            onClick={() => setShowViewMenu(!showViewMenu)}
-            className="px-2.5 py-1 rounded-md text-xs text-text-secondary
-                     hover:text-text-primary hover:bg-background-hover transition-colors"
-            data-tauri-drag-region={false}
-          >
-            {t('menu.view')}
-          </button>
-
-          {/* View 下拉菜单 */}
-          {showViewMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowViewMenu(false)}
-              />
-              <div className="absolute right-0 top-full mt-1 w-40 bg-background-surface border border-border rounded-lg shadow-xl z-20 overflow-hidden">
-                <ViewMenuContent onClose={() => setShowViewMenu(false)} />
-              </div>
-            </>
-          )}
-        </div>
+        {/* AI 对话弹出按钮 */}
+        <button
+          onClick={onOpenAIPopover}
+          className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors"
+          title={t('labels.aiChat')}
+          data-tauri-drag-region={false}
+        >
+          <MessageSquare className="w-4 h-4" />
+        </button>
 
         {/* 分隔线 */}
         <div data-tauri-drag-region className="w-px h-4 bg-border-subtle mx-1" />
@@ -510,85 +495,6 @@ function WorkspaceMenuContent({ onCreateWorkspace }: {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-/**
- * View 菜单内容
- */
-function ViewMenuContent({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation('common');
-  const {
-    showToolPanel,
-    showDeveloperPanel,
-    toggleToolPanel,
-    toggleDeveloperPanel,
-    setAIOnlyMode,
-    resetView
-  } = useViewStore();
-
-  const handleToggle = (action: () => void) => {
-    action();
-    onClose();
-  };
-
-  return (
-    <div className="py-1">
-      <button
-        onClick={() => handleToggle(toggleToolPanel)}
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover transition-colors"
-      >
-        <span>{t('menu.toolPanel')}</span>
-        <div className={`w-4 h-4 rounded border ${showToolPanel ? 'bg-primary border-primary' : 'border-border'} flex items-center justify-center`}>
-          {showToolPanel && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </div>
-      </button>
-
-      <button
-        onClick={() => handleToggle(toggleDeveloperPanel)}
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover transition-colors"
-      >
-        <span className="flex items-center gap-2">
-          {t('menu.developerPanel')}
-          <span className="text-xs text-text-tertiary bg-background-surface px-1.5 py-0.5 rounded">{t('workspace.debug')}</span>
-        </span>
-        <div className={`w-4 h-4 rounded border ${showDeveloperPanel ? 'bg-primary border-primary' : 'border-border'} flex items-center justify-center`}>
-          {showDeveloperPanel && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </div>
-      </button>
-
-      <div className="border-t border-border-subtle mt-1 pt-1">
-        <button
-          onClick={() => handleToggle(setAIOnlyMode)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          {t('workspace.aiOnlyMode')}
-        </button>
-      </div>
-
-      <div className="border-t border-border-subtle mt-1 pt-1">
-        <button
-          onClick={() => handleToggle(resetView)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {t('workspace.resetView')}
-        </button>
-      </div>
     </div>
   );
 }

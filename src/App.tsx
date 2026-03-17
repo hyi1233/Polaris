@@ -1,13 +1,13 @@
-import { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Layout, FileExplorer, ResizeHandle, ConnectingOverlay, ErrorBoundary, ToastContainer } from './components/Common';
+import { Layout, FileExplorer, ConnectingOverlay, ErrorBoundary, ToastContainer } from './components/Common';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 
-import { EnhancedChatMessages, ChatInput } from './components/Chat';
+import { AIPopover } from './components/Chat';
 import { ToolPanel } from './components/ToolPanel';
 import { TopMenuBar as TopMenuBarComponent } from './components/TopMenuBar';
 import { GitPanel } from './components/GitPanel';
-import { ActivityBar, LeftPanel, LeftPanelContent, CenterStage, RightPanel } from './components/Layout';
+import { ActivityBar, LeftPanel, LeftPanelContent, CenterStage } from './components/Layout';
 import type { SettingsTabId } from './components/Settings/SettingsSidebar';
 import { SimpleTodoPanel } from './components/TodoPanel/SimpleTodoPanel';
 import { TranslatePanel, SelectionContextMenu } from './components/Translate';
@@ -31,12 +31,11 @@ import type { EngineId } from './types';
 
 function App() {
   const { t } = useTranslation('common');
-  const { healthStatus, isConnecting, connectionState, loadConfig, config, updateConfig } = useConfigStore();
+  const { isConnecting, connectionState, loadConfig, config, updateConfig } = useConfigStore();
   const {
     isStreaming,
     sendMessage,
     interruptChat,
-    error,
     restoreFromStorage,
     saveToStorage,
     initializeEventListeners,
@@ -64,6 +63,7 @@ function App() {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [showEngineSwitchConfirm, setShowEngineSwitchConfirm] = useState(false);
   const [pendingEngineId, setPendingEngineId] = useState<EngineId | null>(null);
+  const [showAIPopover, setShowAIPopover] = useState(false);
   // 使用 ref 确保初始化只执行一次
   const isInitialized = useRef(false);
   const hasCheckedWorkspaces = useRef(false);
@@ -71,13 +71,7 @@ function App() {
   const lastActiveProviderIdRef = useRef<string | undefined>(undefined);
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
-    showToolPanel,
-    showDeveloperPanel,
     showSessionHistory,
-    toolPanelWidth,
-    developerPanelWidth,
-    setToolPanelWidth,
-    setDeveloperPanelWidth,
     toggleSessionHistory,
     // 新布局状态
     leftPanelWidth,
@@ -88,39 +82,12 @@ function App() {
   const hasOpenTabs = tabs.length > 0;
 
   // 计算各面板的显示状态
-  const rightPanelCollapsed = useViewStore((state) => state.rightPanelCollapsed);
   const hasLeftPanel = leftPanelType !== 'none';
   const hasCenterStage = hasOpenTabs;
-  const hasRightPanel = !rightPanelCollapsed;
-  const hasToolPanel = showToolPanel;
-  const hasDeveloperPanel = showDeveloperPanel;
 
   // 计算各面板是否需要填充剩余空间（只有最后一个显示的面板需要填充）
-  const leftPanelFillRemaining = hasLeftPanel && !hasCenterStage && !hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
-  const centerStageFillRemaining = hasCenterStage && !hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
-  const rightPanelFillRemaining = hasRightPanel && !hasToolPanel && !hasDeveloperPanel;
-  const toolPanelFillRemaining = hasToolPanel && !hasDeveloperPanel;
-  const developerPanelFillRemaining = hasDeveloperPanel;
-
-  const engineOptions = useMemo(() => {
-    const options: { id: EngineId; name: string }[] = [
-      { id: 'claude-code', name: 'Claude Code' },
-      { id: 'iflow', name: 'IFlow' },
-      { id: 'codex', name: 'Codex' },
-    ];
-
-    if (config?.openaiProviders && config.openaiProviders.length > 0) {
-      for (const provider of config.openaiProviders) {
-        if (!provider.enabled) continue;
-        options.push({
-          id: provider.id as EngineId,
-          name: provider.name || provider.id,
-        });
-      }
-    }
-
-    return options;
-  }, [config?.openaiProviders]);
+  const leftPanelFillRemaining = hasLeftPanel && !hasCenterStage;
+  const centerStageFillRemaining = hasCenterStage;
 
   const applyEngineSwitch = useCallback(async (engineId: EngineId) => {
     if (!config) return;
@@ -144,13 +111,6 @@ function App() {
     };
     await updateConfig(nextConfig);
   }, [config, isStreaming, interruptChat, clearMessages, updateConfig]);
-
-  const handleEngineSelect = useCallback((engineId: EngineId) => {
-    if (!config) return;
-    if (engineId === config.defaultEngine) return;
-    setPendingEngineId(engineId);
-    setShowEngineSwitchConfirm(true);
-  }, [config]);
 
   // 初始化配置（只执行一次）
   useEffect(() => {
@@ -505,18 +465,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // ToolPanel 拖拽处理（左边手柄）
-  const handleToolPanelResize = (delta: number) => {
-    const newWidth = Math.max(200, Math.min(600, toolPanelWidth - delta));
-    setToolPanelWidth(newWidth);
-  };
-
-  // DeveloperPanel 拖拽处理（左边手柄）
-  const handleDeveloperPanelResize = (delta: number) => {
-    const newWidth = Math.max(300, Math.min(800, developerPanelWidth - delta));
-    setDeveloperPanelWidth(newWidth);
-  };
-
   return (
     <ErrorBoundary>
       <Layout>
@@ -529,14 +477,18 @@ function App() {
           // 新对话功能直接清空消息
         }}
         onCreateWorkspace={() => setShowCreateWorkspace(true)}
+        onOpenAIPopover={() => setShowAIPopover(true)}
       />
 
       {/* 主体内容区域：新布局 */}
       <div className="flex flex-1 overflow-hidden">
         {/* Activity Bar - 始终显示 */}
-        <ActivityBar onOpenSettings={() => setShowSettings(true)} />
+        <ActivityBar
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenAIPopover={() => setShowAIPopover(true)}
+        />
 
-        {/* 左侧可切换面板 (FileExplorer 或 GitPanel 或 TodoPanel) - 条件显示 */}
+        {/* 左侧可切换面板 (FileExplorer 或 GitPanel 或 TodoPanel 或 ToolPanel 或 DeveloperPanel) - 条件显示 */}
         {leftPanelType !== 'none' && (
           <LeftPanel fillRemaining={leftPanelFillRemaining}>
             <LeftPanelContent
@@ -553,76 +505,18 @@ function App() {
               translateContent={<TranslatePanel onSendToChat={sendMessage} />}
               schedulerContent={<SchedulerPanel />}
               terminalContent={<TerminalPanel />}
+              toolsContent={<ToolPanel fillRemaining />}
+              developerContent={
+                <Suspense fallback={<div className="flex items-center justify-center h-full text-text-muted">{t('status.loading')}</div>}>
+                  <DeveloperPanel fillRemaining />
+                </Suspense>
+              }
             />
           </LeftPanel>
         )}
 
         {/* 中间编辑区 (Tab 系统) */}
         <CenterStage fillRemaining={centerStageFillRemaining} />
-
-        {/* 右侧 AI 对话面板 */}
-        <RightPanel fillRemaining={rightPanelFillRemaining}>
-          {/* 状态指示器 */}
-          <div className="flex items-center justify-between px-4 py-2 bg-background-elevated border-b border-border-subtle">
-            <span className="text-sm text-text-primary">{t('labels.aiChat')}</span>
-            <div className="flex items-center gap-3">
-              <select
-                className="bg-background-elevated border border-border-subtle text-text-primary text-xs px-2 py-1 rounded-md"
-                value={config?.defaultEngine || 'claude-code'}
-                onChange={(e) => handleEngineSelect(e.target.value as EngineId)}
-              >
-                {engineOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id} className="bg-background text-text-primary">{opt.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mx-4 mt-4 p-3 bg-danger-faint border border-danger/30 rounded-xl text-danger text-sm">
-              {error}
-            </div>
-          )}
-
-          <EnhancedChatMessages />
-
-          <ChatInput
-            onSend={sendMessage}
-            onInterrupt={interruptChat}
-            disabled={!healthStatus?.claudeAvailable || !currentWorkspace}
-            isStreaming={isStreaming}
-          />
-        </RightPanel>
-
-        {/* 保留: ToolPanel (可选显示) */}
-        {showToolPanel && (
-          <>
-            {!toolPanelFillRemaining && (
-              <ResizeHandle
-                direction="horizontal"
-                position="left"
-                onDrag={handleToolPanelResize}
-              />
-            )}
-            <ToolPanel width={toolPanelWidth} fillRemaining={toolPanelFillRemaining} />
-          </>
-        )}
-
-        {/* 保留: DeveloperPanel (可选显示) */}
-        {showDeveloperPanel && (
-          <>
-            {!developerPanelFillRemaining && (
-              <ResizeHandle
-                direction="horizontal"
-                position="left"
-                onDrag={handleDeveloperPanelResize}
-              />
-            )}
-            <Suspense fallback={<div className="flex items-center justify-center text-text-muted">{t('status.loading')}</div>}>
-              <DeveloperPanel width={developerPanelWidth} fillRemaining={developerPanelFillRemaining} />
-            </Suspense>
-          </>
-        )}
       </div>
 
       {/* 设置模态框 */}
@@ -687,6 +581,12 @@ function App() {
 
       {/* 全局 Toast 通知 */}
       <ToastContainer />
+
+      {/* AI 对话弹出面板 */}
+      <AIPopover
+        isOpen={showAIPopover}
+        onClose={() => setShowAIPopover(false)}
+      />
 
       </Layout>
     </ErrorBoundary>
