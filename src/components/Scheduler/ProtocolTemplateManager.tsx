@@ -27,7 +27,23 @@ function TemplateEditor({
   const [description, setDescription] = useState(template?.description || '');
   const [category, setCategory] = useState<ProtocolTemplateCategory>(template?.category || 'custom');
   const [missionTemplate, setMissionTemplate] = useState(template?.missionTemplate || '');
-  const [fullTemplate, setFullTemplate] = useState(template?.fullTemplate || '');
+  const [fullTemplate, setFullTemplate] = useState(template?.fullTemplate || '# 任务协议\n' +
+      '\n' +
+      '> 任务ID: {taskId}\n' +
+      '> 创建时间: {dateTime}\n' +
+      '\n' +
+      '## 任务目标\n' +
+      '\n' +
+      '{task}\n' +
+      '\n' +
+      '## 用户补充\n' +
+      '\n' +
+      '{userSupplement}\n' +
+      '\n' +
+      '## 工作区\n' +
+      '\n' +
+      '{workDir}\n' +
+      '');
   const [templateParams, setTemplateParams] = useState<TemplateParam[]>(template?.templateParams || []);
   const [defaultTriggerType, setDefaultTriggerType] = useState<'once' | 'cron' | 'interval'>(
     template?.defaultTriggerType || 'interval'
