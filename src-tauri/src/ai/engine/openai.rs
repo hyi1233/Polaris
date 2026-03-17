@@ -40,7 +40,7 @@ fn default_max_tokens() -> u32 {
 }
 
 /// 聊天消息（使用 openai_service 中的多模态支持）
-pub use crate::services::openai_service::{ChatMessage, MessageContent, ContentPart, ImageUrl};
+pub use crate::services::openai_service::{ChatMessage, MessageContent};
 
 /// 工具调用
 #[derive(Debug, Clone, Serialize, Deserialize)]

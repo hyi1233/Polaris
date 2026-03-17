@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use crate::ai::history::{
     HistoryMessage, PagedResult, Pagination, SessionHistoryProvider, SessionMeta,
-    ToolCallInfo, ToolResultInfo, TokenUsage,
 };
 use crate::error::{AppError, Result};
 use crate::models::config::Config;

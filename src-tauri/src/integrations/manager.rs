@@ -18,7 +18,7 @@ use super::traits::PlatformIntegration;
 use super::types::*;
 use super::commands::{BotCommand, CommandParser, get_help_text, PromptMode};
 use super::instance_registry::{InstanceRegistry, PlatformInstance, InstanceConfig, InstanceId};
-use crate::ai::{EngineRegistry, SessionOptions, EngineId};
+use crate::ai::{EngineRegistry, SessionOptions};
 use crate::error::Result;
 use crate::models::config::QQBotConfig;
 

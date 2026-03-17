@@ -1,6 +1,6 @@
-/**
- * 定时任务 Tauri Commands
- */
+#![allow(non_snake_case)]
+// 定时任务 Tauri Commands
+// 注意：Tauri 命令参数使用 camelCase 命名以匹配前端 JavaScript 约定
 
 use crate::error::Result;
 use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskLog, TriggerType, RunTaskResult, PaginatedLogs, LogRetentionConfig};

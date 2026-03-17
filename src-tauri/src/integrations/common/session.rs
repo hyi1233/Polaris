@@ -25,7 +25,7 @@ impl SessionManager {
     ///
     /// 如果会话已存在，返回现有会话；否则创建新会话。
     pub fn get_or_create(&mut self, conversation_id: &str) -> IntegrationSession {
-        let now = Utc::now().timestamp_millis();
+        let _now = Utc::now().timestamp_millis();
 
         self.sessions
             .entry(conversation_id.to_string())

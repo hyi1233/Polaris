@@ -62,7 +62,7 @@ pub fn add_remote(path: &Path, name: &str, url: &str) -> Result<GitRemote, GitSe
     }
 
     // 创建远程仓库
-    let mut remote = repo.remote(name, url)?;
+    let remote = repo.remote(name, url)?;
 
     Ok(GitRemote {
         name: name.to_string(),

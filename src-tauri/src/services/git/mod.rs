@@ -21,12 +21,11 @@ mod stash;
 mod gitignore;
 
 // 重导出公共 API
-pub use utils::*;
-pub use executor::{init_repository, is_repository, open_repository};
+pub use executor::{init_repository, is_repository};
 pub use status::get_status;
 pub use diff::{
     get_diff, get_worktree_diff, get_index_diff, get_worktree_file_diff,
-    get_index_file_diff, compute_line_diff,
+    get_index_file_diff,
 };
 pub use branch::{get_branches, create_branch, checkout_branch, delete_branch, rename_branch, merge_branch};
 pub use tag::{get_tags, create_tag, delete_tag};

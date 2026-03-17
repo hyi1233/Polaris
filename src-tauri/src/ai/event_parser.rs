@@ -8,7 +8,7 @@
 use crate::models::events::StreamEvent;
 use crate::models::{
     AIEvent, AssistantMessageEvent, ErrorEvent, ProgressEvent,
-    SessionEndEvent, SessionEndReason, SessionStartEvent, ThinkingEvent,
+    SessionEndEvent, SessionEndReason, ThinkingEvent,
     ToolCallEndEvent, ToolCallInfo, ToolCallStartEvent, ToolCallStatus, UserMessageEvent,
 };
 use std::collections::HashMap;
@@ -280,7 +280,7 @@ impl EventParser {
                                 "[EventParser] tool_result 找不到对应的 tool_use: {}",
                                 tool_use_id
                             );
-                            let status_emoji = if success { "✅" } else { "❌" };
+                            let _status_emoji = if success { "✅" } else { "❌" };
                             results.push(AIEvent::ToolCallEnd(
                                 ToolCallEndEvent::new("unknown".to_string(), success)
                                     .with_call_id(tool_use_id)

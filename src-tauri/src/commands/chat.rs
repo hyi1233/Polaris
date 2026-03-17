@@ -594,7 +594,7 @@ fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option
 /// 列出 Claude Code 会话（旧接口）
 #[tauri::command]
 pub async fn list_claude_code_sessions(
-    state: tauri::State<'_, crate::AppState>,
+    _state: tauri::State<'_, crate::AppState>,
 ) -> Result<Vec<ClaudeSessionMeta>> {
     tracing::info!("[list_claude_code_sessions] 获取 Claude Code 会话列表");
 
@@ -671,7 +671,7 @@ pub async fn list_claude_code_sessions(
 pub async fn get_claude_code_session_history(
     session_id: String,
     project_path: Option<String>,
-    state: tauri::State<'_, crate::AppState>,
+    _state: tauri::State<'_, crate::AppState>,
 ) -> Result<Vec<ClaudeHistoryMessage>> {
     tracing::info!("[get_claude_code_session_history] 获取会话历史: {}", session_id);
 

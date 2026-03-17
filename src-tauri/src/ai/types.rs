@@ -3,7 +3,6 @@
  */
 
 use serde::{Deserialize, Serialize};
-use super::traits::EngineId;
 
 /// 引擎状态
 #[derive(Debug, Clone, Serialize, Deserialize)]

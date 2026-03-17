@@ -4,7 +4,7 @@
  * 提供分支的创建、切换、删除、重命名、合并等功能
  */
 
-use git2::{BranchType, Repository};
+use git2::BranchType;
 use std::path::Path;
 use tracing::info;
 

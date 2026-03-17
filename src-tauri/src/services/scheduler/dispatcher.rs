@@ -272,7 +272,7 @@ impl SchedulerDispatcher {
             // 用于标记是否已更新完成状态
             let completed = Arc::new(AtomicBool::new(false));
             let completed_clone = completed.clone();
-            let completed_for_timeout = completed.clone();
+            let _completed_for_timeout = completed.clone();
 
             let output_clone = output.clone();
             let thinking_clone = thinking.clone();

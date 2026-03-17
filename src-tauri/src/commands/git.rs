@@ -1,8 +1,7 @@
-/**
- * Git Tauri Commands
- *
- * 前端调用的 Git 操作命令
- */
+#![allow(non_snake_case)]
+// Git Tauri Commands
+// 前端调用的 Git 操作命令
+// 注意：Tauri 命令参数使用 camelCase 命名以匹配前端 JavaScript 约定
 
 use crate::models::git::*;
 use crate::services::git::GitService;

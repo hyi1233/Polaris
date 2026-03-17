@@ -6,4 +6,3 @@ pub mod openai_proxy;
 pub mod openai_service;
 pub mod scheduler;
 
-pub use openai_service::{OpenAIService, OpenAIConfig, ChatMessage, ToolCall};

@@ -1,14 +1,6 @@
-/**
- * Claude Code 引擎实现
- *
- * 封装 Claude Code CLI 的调用逻辑。
- */
-
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
 
 use crate::ai::event_parser::EventParser;
 use crate::ai::session::SessionManager;

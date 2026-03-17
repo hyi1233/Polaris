@@ -6,9 +6,8 @@
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
 
 use crate::ai::event_parser::EventParser;
 use crate::ai::session::SessionManager;
