@@ -14,6 +14,7 @@ import { BaseSession } from '../../ai-runtime/base'
 import { createEventIterable } from '../../ai-runtime/base'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { isTextFile } from '../../types/attachment'
 
 /**
  * OpenAI Provider 会话配置
@@ -405,11 +406,23 @@ export class OpenAIProviderSession extends BaseSession {
           },
         })
       } else {
-        // 文件转换为文本描述
-        parts.push({
-          type: 'text',
-          text: `\n[文件: ${att.fileName}]\n类型: ${att.mimeType}\n`,
-        })
+        // 文件处理：如果是文本文件，发送内容；否则只发送描述
+        const isText = isTextFile(att.mimeType, att.fileName)
+        const decodedContent = this.decodeBase64Content(att.content)
+
+        if (isText && decodedContent) {
+          // 文本文件：发送完整内容
+          parts.push({
+            type: 'text',
+            text: `\n--- 文件: ${att.fileName} ---\n${decodedContent}\n--- 文件结束 ---\n`,
+          })
+        } else {
+          // 二进制文件：只发送描述
+          parts.push({
+            type: 'text',
+            text: `\n[文件: ${att.fileName}]\n类型: ${att.mimeType}\n`,
+          })
+        }
       }
     }
 
@@ -417,6 +430,40 @@ export class OpenAIProviderSession extends BaseSession {
       role: 'user',
       content: parts,
     })
+  }
+
+  /**
+   * 解码 base64 data URL 内容
+   *
+   * @param dataUrl - base64 data URL (data:mime/type;base64,xxx)
+   * @returns 解码后的文本，如果失败返回 null
+   */
+  private decodeBase64Content(dataUrl: string): string | null {
+    try {
+      // 分离前缀和内容
+      const commaIndex = dataUrl.indexOf(',')
+      if (commaIndex === -1) {
+        return null
+      }
+
+      const base64Content = dataUrl.slice(commaIndex + 1)
+
+      // 解码 base64
+      const binaryString = atob(base64Content)
+
+      // 转换为 UTF-8 字符串
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+
+      // 使用 TextDecoder 处理 UTF-8
+      const decoder = new TextDecoder('utf-8', { fatal: false })
+      return decoder.decode(bytes)
+    } catch (e) {
+      console.warn('[OpenAIProviderSession] 解码 base64 内容失败:', e)
+      return null
+    }
   }
 
   /**

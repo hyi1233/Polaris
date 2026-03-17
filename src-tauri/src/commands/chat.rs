@@ -38,9 +38,10 @@ pub struct Attachment {
 // 辅助函数
 // ============================================================================
 
-/// 保存附件到工作区
-fn save_attachments(work_dir: &str, attachments: &[Attachment]) -> Result<()> {
+/// 保存附件到工作区，返回保存的图片路径列表
+fn save_attachments(work_dir: &str, attachments: &[Attachment]) -> Result<Vec<String>> {
     let polaris_dir = PathBuf::from(work_dir).join(".polaris");
+    let mut saved_image_paths = Vec::new();
 
     // 创建 .polaris 目录（如果不存在）
     if !polaris_dir.exists() {
@@ -95,11 +96,14 @@ fn save_attachments(work_dir: &str, attachments: &[Attachment]) -> Result<()> {
                 .map_err(|e| AppError::ProcessError(format!("写入图片文件失败: {}", e)))?;
 
             tracing::info!("[save_attachments] 保存图片: {:?}", file_path);
+
+            // 返回相对路径，便于在消息中引用
+            saved_image_paths.push(format!(".polaris/{}", file_name));
             image_index += 1;
         }
     }
 
-    Ok(())
+    Ok(saved_image_paths)
 }
 
 // ============================================================================
@@ -121,12 +125,26 @@ pub async fn start_chat(
 ) -> Result<String> {
     tracing::info!("[start_chat] 收到消息，长度: {} 字符, 附件数: {:?}, CLI 参数: {:?}", message.len(), attachments.as_ref().map(|a| a.len()), cli_args);
 
-    // 保存附件到工作区
-    if let (Some(ref dir), Some(ref atts)) = (&work_dir, &attachments) {
+    // 保存附件到工作区并获取图片路径
+    let saved_image_paths = if let (Some(ref dir), Some(ref atts)) = (&work_dir, &attachments) {
         if !atts.is_empty() {
-            save_attachments(dir, atts)?;
+            save_attachments(dir, atts)?
+        } else {
+            Vec::new()
         }
-    }
+    } else {
+        Vec::new()
+    };
+
+    // 构建包含图片引用的消息
+    let final_message = if !saved_image_paths.is_empty() {
+        let image_refs: Vec<String> = saved_image_paths.iter()
+            .map(|path| format!("[图片: {}]", path))
+            .collect();
+        format!("{}\n\n{}", image_refs.join("\n"), message)
+    } else {
+        message
+    };
 
     let engine = engine_id
         .as_ref()
@@ -195,7 +213,7 @@ pub async fn start_chat(
     }
 
     let mut registry = state.engine_registry.lock().await;
-    registry.start_session(Some(engine), &message, options)
+    registry.start_session(Some(engine), &final_message, options)
 }
 
 /// 继续聊天会话
@@ -214,12 +232,26 @@ pub async fn continue_chat(
 ) -> Result<()> {
     tracing::info!("[continue_chat] 继续会话: {}, 附件数: {:?}, CLI 参数: {:?}", session_id, attachments.as_ref().map(|a| a.len()), cli_args);
 
-    // 保存附件到工作区
-    if let (Some(dir), Some(atts)) = (&work_dir, &attachments) {
+    // 保存附件到工作区并获取图片路径
+    let saved_image_paths = if let (Some(dir), Some(atts)) = (&work_dir, &attachments) {
         if !atts.is_empty() {
-            save_attachments(dir, atts)?;
+            save_attachments(dir, atts)?
+        } else {
+            Vec::new()
         }
-    }
+    } else {
+        Vec::new()
+    };
+
+    // 构建包含图片引用的消息
+    let final_message = if !saved_image_paths.is_empty() {
+        let image_refs: Vec<String> = saved_image_paths.iter()
+            .map(|path| format!("[图片: {}]", path))
+            .collect();
+        format!("{}\n\n{}", image_refs.join("\n"), message)
+    } else {
+        message
+    };
 
     let engine = engine_id
         .as_ref()
@@ -288,7 +320,7 @@ pub async fn continue_chat(
     }
 
     let mut registry = state.engine_registry.lock().await;
-    registry.continue_session(engine, &session_id, &message, options)
+    registry.continue_session(engine, &session_id, &final_message, options)
 }
 
 /// 中断聊天会话
