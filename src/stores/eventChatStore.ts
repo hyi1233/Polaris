@@ -1040,17 +1040,16 @@ export const useEventChatStore = create<EventChatState>((set, get) => ({
           attachments
         )
       } else {
-        // CLI 引擎：将附件转换为文本描述
+        // CLI 引擎：将非图片附件转换为文本描述（图片由后端处理）
         let messageWithAttachments = normalizedMessage
         if (attachments && attachments.length > 0) {
-          const attachmentDescriptions = attachments.map(a => {
-            if (a.type === 'image') {
-              return `[图片: ${a.fileName}]`
-            } else {
+          const nonImageAttachments = attachments.filter(a => a.type !== 'image')
+          if (nonImageAttachments.length > 0) {
+            const attachmentDescriptions = nonImageAttachments.map(a => {
               return `[文件: ${a.fileName}]`
-            }
-          }).join('\n')
-          messageWithAttachments = `${attachmentDescriptions}\n\n${normalizedMessage}`
+            }).join('\n')
+            messageWithAttachments = `${attachmentDescriptions}\n\n${normalizedMessage}`
+          }
         }
 
         const { invoke } = await import('@tauri-apps/api/core')
