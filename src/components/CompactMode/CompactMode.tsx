@@ -11,7 +11,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Clock } from 'lucide-react'
 import { useConfigStore, useEventChatStore, useWorkspaceStore, useViewStore } from '../../stores'
-import { EnhancedChatMessages } from '../Chat'
+import { CompactMessageList } from './CompactMessageList'
 import { CompactChatInput } from './CompactChatInput'
 import type { EngineId } from '../../types'
 import type { Attachment } from '../../types/attachment'
@@ -127,9 +127,7 @@ export function CompactMode({ onSend, onInterrupt, disabled, isStreaming }: Comp
       )}
 
       {/* 对话消息区域 - 占据剩余空间 */}
-      <div className="flex-1 overflow-hidden">
-        <EnhancedChatMessages />
-      </div>
+      <CompactMessageList />
 
       {/* 底部固定输入框 */}
       <CompactChatInput

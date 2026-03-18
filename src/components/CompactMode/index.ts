@@ -4,3 +4,4 @@
 
 export { CompactMode } from './CompactMode'
 export { CompactChatInput } from './CompactChatInput'
+export { CompactMessageList } from './CompactMessageList'
