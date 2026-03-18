@@ -334,24 +334,28 @@ impl Default for FloatingWindowConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowSettings {
-    /// 是否始终置顶
-    #[serde(default)]
-    pub always_on_top: bool,
+    /// 大窗模式透明度 (0 - 100)
+    #[serde(default = "default_normal_opacity")]
+    pub normal_opacity: u8,
 
-    /// 窗口透明度 (0.5 - 1.0)
-    #[serde(default = "default_window_opacity")]
-    pub opacity: f64,
+    /// 小屏模式透明度 (0 - 100)
+    #[serde(default = "default_compact_opacity")]
+    pub compact_opacity: u8,
 }
 
-fn default_window_opacity() -> f64 {
-    1.0
+fn default_normal_opacity() -> u8 {
+    100
+}
+
+fn default_compact_opacity() -> u8 {
+    100
 }
 
 impl Default for WindowSettings {
     fn default() -> Self {
         Self {
-            always_on_top: false,
-            opacity: default_window_opacity(),
+            normal_opacity: default_normal_opacity(),
+            compact_opacity: default_compact_opacity(),
         }
     }
 }
