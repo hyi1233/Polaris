@@ -42,6 +42,8 @@ import {
   removeIntegrationInstance,
   switchIntegrationInstance,
   disconnectIntegrationInstance,
+  getIntegrationSessions,
+  sendIntegrationMessage,
 } from '../services/tauri';
 
 import { useIntegrationStore } from './integrationStore';
@@ -677,6 +679,200 @@ describe('integrationStore', () => {
 
       // 应只初始化一次
       expect(initIntegration).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('状态刷新', () => {
+    describe('refreshStatus', () => {
+      it('应成功刷新单个平台状态', async () => {
+        vi.mocked(getIntegrationStatus).mockResolvedValueOnce({ connected: true, status: 'online' });
+
+        const { refreshStatus } = useIntegrationStore.getState();
+        await refreshStatus('qqbot');
+
+        expect(getIntegrationStatus).toHaveBeenCalledWith('qqbot');
+      });
+
+      it('刷新失败应记录错误日志', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.mocked(getIntegrationStatus).mockRejectedValueOnce(new Error('刷新失败'));
+
+        const { refreshStatus } = useIntegrationStore.getState();
+        await refreshStatus('qqbot');
+
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+
+      it('状态为 null 时不应更新', async () => {
+        vi.mocked(getIntegrationStatus).mockResolvedValueOnce(null as unknown as { connected: boolean });
+
+        // 重置 store 状态以避免被之前的测试污染
+        useIntegrationStore.setState({
+          platforms: {} as Record<string, unknown>,
+          _updateStatus: useIntegrationStore.getState()._updateStatus,
+        });
+        const originalUpdateStatus = useIntegrationStore.getState()._updateStatus;
+        const updateSpy = vi.fn();
+
+        // 临时覆盖 _updateStatus
+        useIntegrationStore.setState({ _updateStatus: updateSpy as unknown as typeof originalUpdateStatus });
+
+        const { refreshStatus } = useIntegrationStore.getState();
+        await refreshStatus('qqbot');
+
+        expect(updateSpy).not.toHaveBeenCalled();
+
+        // 恢复原始 _updateStatus
+        useIntegrationStore.setState({ _updateStatus: originalUpdateStatus });
+      });
+    });
+
+    describe('refreshAllStatus', () => {
+      it('应成功刷新所有平台状态', async () => {
+        vi.mocked(getAllIntegrationStatus).mockResolvedValueOnce({
+          qqbot: { connected: true },
+          wechat: { connected: false },
+        });
+
+        const { refreshAllStatus } = useIntegrationStore.getState();
+        await refreshAllStatus();
+
+        const platforms = useIntegrationStore.getState().platforms;
+        expect(platforms.qqbot).toEqual({ connected: true });
+        expect(platforms.wechat).toEqual({ connected: false });
+      });
+
+      it('刷新失败应记录错误日志', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.mocked(getAllIntegrationStatus).mockRejectedValueOnce(new Error('刷新失败'));
+
+        const { refreshAllStatus } = useIntegrationStore.getState();
+        await refreshAllStatus();
+
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('refreshSessions', () => {
+      it('应成功刷新会话列表', async () => {
+        const mockSessions = [
+          { id: 'session-1', platform: 'qqbot', name: 'Test Session' },
+        ];
+        vi.mocked(getIntegrationSessions).mockResolvedValueOnce(mockSessions);
+
+        const { refreshSessions } = useIntegrationStore.getState();
+        await refreshSessions();
+
+        expect(useIntegrationStore.getState().sessions).toEqual(mockSessions);
+      });
+
+      it('刷新失败应记录错误日志', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.mocked(getIntegrationSessions).mockRejectedValueOnce(new Error('刷新失败'));
+
+        const { refreshSessions } = useIntegrationStore.getState();
+        await refreshSessions();
+
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+    });
+  });
+
+  describe('平台操作', () => {
+    describe('stopPlatform', () => {
+      beforeEach(() => {
+        vi.mocked(stopIntegration).mockResolvedValue(undefined);
+        vi.mocked(getIntegrationStatus).mockResolvedValue({ connected: false });
+      });
+
+      it('应成功停止平台', async () => {
+        const { stopPlatform } = useIntegrationStore.getState();
+        await stopPlatform('qqbot');
+
+        expect(stopIntegration).toHaveBeenCalledWith('qqbot');
+        expect(getIntegrationStatus).toHaveBeenCalledWith('qqbot');
+      });
+
+      it('停止失败应设置错误信息', async () => {
+        vi.mocked(stopIntegration).mockRejectedValueOnce(new Error('停止失败'));
+
+        const { stopPlatform } = useIntegrationStore.getState();
+        await stopPlatform('qqbot');
+
+        expect(useIntegrationStore.getState().error).toBe('停止失败');
+      });
+    });
+  });
+
+  describe('发送消息', () => {
+    it('应成功发送消息', async () => {
+      vi.mocked(sendIntegrationMessage).mockResolvedValueOnce(undefined);
+
+      const { sendMessage } = useIntegrationStore.getState();
+      await sendMessage('qqbot', { type: 'private', id: 'user-1' }, { type: 'text', content: 'Hello' });
+
+      expect(sendIntegrationMessage).toHaveBeenCalledWith(
+        'qqbot',
+        { type: 'private', id: 'user-1' },
+        { type: 'text', content: 'Hello' }
+      );
+    });
+
+    it('发送失败应设置错误信息并抛出异常', async () => {
+      vi.mocked(sendIntegrationMessage).mockRejectedValueOnce(new Error('发送失败'));
+
+      const { sendMessage } = useIntegrationStore.getState();
+      await expect(
+        sendMessage('qqbot', { type: 'private', id: 'user-1' }, { type: 'text', content: 'Hello' })
+      ).rejects.toThrow('发送失败');
+
+      expect(useIntegrationStore.getState().error).toBe('发送失败');
+    });
+  });
+
+  describe('_updateStatus', () => {
+    it('应更新指定平台的状态', () => {
+      useIntegrationStore.setState({
+        platforms: { qqbot: { connected: false } },
+      });
+
+      const { _updateStatus } = useIntegrationStore.getState();
+      _updateStatus('qqbot', { connected: true, status: 'online' });
+
+      expect(useIntegrationStore.getState().platforms.qqbot).toEqual({
+        connected: true,
+        status: 'online',
+      });
+    });
+
+    it('添加新平台状态时应扩展 platforms 对象', () => {
+      useIntegrationStore.setState({
+        platforms: {},
+      });
+
+      const { _updateStatus } = useIntegrationStore.getState();
+      _updateStatus('wechat', { connected: true });
+
+      expect(useIntegrationStore.getState().platforms.wechat).toEqual({ connected: true });
+    });
+
+    it('应保留其他平台的状态不变', () => {
+      useIntegrationStore.setState({
+        platforms: {
+          qqbot: { connected: true },
+          wechat: { connected: false },
+        },
+      });
+
+      const { _updateStatus } = useIntegrationStore.getState();
+      _updateStatus('qqbot', { connected: false });
+
+      const platforms = useIntegrationStore.getState().platforms;
+      expect(platforms.qqbot).toEqual({ connected: false });
+      expect(platforms.wechat).toEqual({ connected: false });
     });
   });
 });
