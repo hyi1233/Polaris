@@ -8,7 +8,6 @@
     "openaiProviders": "OpenAI Providers",
     "translate": "翻译",
     "qqbot": "QQ Bot",
-    "floatingWindow": "悬浮窗",
     "scheduler": "定时任务",
     "advanced": "高级"
   },
@@ -43,22 +42,6 @@
     "title": "语言设置",
     "current": "当前语言",
     "hint": "切换界面显示语言"
-  },
-  "floatingWindow": {
-    "title": "悬浮窗设置",
-    "enabled": "启用悬浮窗",
-    "enabledHint": "鼠标移出时显示精简悬浮窗",
-    "mode": "悬浮窗模式",
-    "modes": {
-      "auto": "自动",
-      "autoDesc": "鼠标移出主窗口时自动显示悬浮窗",
-      "manual": "手动",
-      "manualDesc": "需要手动触发悬浮窗显示"
-    },
-    "expandOnHover": "移动到悬浮窗时展开",
-    "expandOnHoverHint": "鼠标移到悬浮窗时自动展开主窗口",
-    "collapseDelay": "切换延迟",
-    "collapseDelayHint": "鼠标移出主窗口后切换到悬浮窗的延迟时长"
   },
   "baiduTranslate": {
     "title": "百度翻译",

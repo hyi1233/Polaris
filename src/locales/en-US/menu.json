@@ -23,8 +23,7 @@
   "actions": {
     "newChat": "New Chat",
     "exportChat": "Export Chat",
-    "sessionHistory": "Session History",
-    "switchFloating": "Switch to Floating Window"
+    "sessionHistory": "Session History"
   },
   "confirmNewChat": {
     "title": "Confirm New Chat",

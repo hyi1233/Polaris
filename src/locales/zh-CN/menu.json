@@ -23,8 +23,7 @@
   "actions": {
     "newChat": "新对话",
     "exportChat": "导出对话",
-    "sessionHistory": "会话历史",
-    "switchFloating": "切换到悬浮窗"
+    "sessionHistory": "会话历史"
   },
   "confirmNewChat": {
     "title": "确认新对话",

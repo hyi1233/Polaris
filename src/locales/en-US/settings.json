@@ -8,7 +8,6 @@
     "openaiProviders": "OpenAI Providers",
     "translate": "Translate",
     "qqbot": "QQ Bot",
-    "floatingWindow": "Floating Window",
     "scheduler": "Scheduler",
     "advanced": "Advanced"
   },
@@ -43,22 +42,6 @@
     "title": "Language Settings",
     "current": "Current Language",
     "hint": "Switch interface display language"
-  },
-  "floatingWindow": {
-    "title": "Floating Window Settings",
-    "enabled": "Enable Floating Window",
-    "enabledHint": "Show simplified floating window when mouse leaves",
-    "mode": "Floating Window Mode",
-    "modes": {
-      "auto": "Auto",
-      "autoDesc": "Automatically show floating window when mouse leaves main window",
-      "manual": "Manual",
-      "manualDesc": "Manually trigger floating window display"
-    },
-    "expandOnHover": "Expand on Hover",
-    "expandOnHoverHint": "Automatically expand main window when hovering over floating window",
-    "collapseDelay": "Switch Delay",
-    "collapseDelayHint": "Delay before switching to floating window after mouse leaves main window"
   },
   "baiduTranslate": {
     "title": "Baidu Translate",

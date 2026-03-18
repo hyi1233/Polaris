@@ -285,7 +285,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             // 处理窗口关闭事件
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let label = window.label();
                 tracing::info!("[Window] 窗口关闭请求: {}", label);
 
