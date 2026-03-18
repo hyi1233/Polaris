@@ -24,6 +24,7 @@ export class EventRouter {
   private unlisten: UnlistenFn | null = null
   private initialized = false
   private initPromise: Promise<void> | null = null
+  private destroyed = false
 
   async initialize(): Promise<void> {
     if (this.initialized) return
@@ -133,20 +134,45 @@ export class EventRouter {
     this.handlers.clear()
     this.initialized = false
     this.initPromise = null
+    this.destroyed = true
   }
 
   isInitialized(): boolean {
     return this.initialized
   }
+
+  isDestroyed(): boolean {
+    return this.destroyed
+  }
 }
 
 let routerInstance: EventRouter | null = null
 
+/**
+ * 获取 EventRouter 单例实例
+ *
+ * 如果当前实例已销毁（destroyed = true），
+ * 会创建新实例替换旧实例，确保返回可用的路由器。
+ */
 export function getEventRouter(): EventRouter {
-  if (!routerInstance) {
+  // 如果实例存在但已销毁，创建新实例
+  if (routerInstance && routerInstance.isDestroyed()) {
+    console.log('[EventRouter] 检测到已销毁实例，创建新实例')
+    routerInstance = new EventRouter()
+  } else if (!routerInstance) {
     routerInstance = new EventRouter()
   }
   return routerInstance
+}
+
+/**
+ * 重置单例实例（仅用于测试）
+ */
+export function resetEventRouter(): void {
+  if (routerInstance) {
+    routerInstance.destroy()
+    routerInstance = null
+  }
 }
 
 export async function ensureEventRouterInitialized(): Promise<EventRouter> {

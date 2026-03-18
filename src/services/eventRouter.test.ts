@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { EventRouter, getEventRouter, ensureEventRouterInitialized, createContextId } from './eventRouter'
+import { EventRouter, getEventRouter, ensureEventRouterInitialized, createContextId, resetEventRouter } from './eventRouter'
 
 // Mock Tauri event API
 const mockUnlisten = vi.fn()
@@ -17,6 +17,11 @@ const mockListen = vi.fn(() => Promise.resolve(mockUnlisten))
 vi.mock('@tauri-apps/api/event', () => ({
   listen: (...args: any[]) => mockListen(...args),
 }))
+
+// 全局 afterEach 确保模块级单例被重置
+afterEach(() => {
+  resetEventRouter()
+})
 
 describe('EventRouter', () => {
   let router: EventRouter
@@ -227,7 +232,13 @@ describe('EventRouter', () => {
 // ============================================================
 // 单例函数测试
 // ============================================================
+
 describe('getEventRouter', () => {
+  beforeEach(() => {
+    // 重置单例确保测试隔离
+    resetEventRouter()
+  })
+
   it('应返回单例实例', () => {
     // 由于模块级单例，需要通过模块导入测试
     const router1 = getEventRouter()
