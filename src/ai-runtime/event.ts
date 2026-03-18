@@ -449,6 +449,10 @@ export function isErrorEvent(event: AIEvent): event is ErrorEvent {
   return event.type === 'error'
 }
 
+export function isResultEvent(event: AIEvent): event is ResultEvent {
+  return event.type === 'result'
+}
+
 export function isSessionStartEvent(event: AIEvent): event is SessionStartEvent {
   return event.type === 'session_start'
 }

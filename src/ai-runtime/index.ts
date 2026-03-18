@@ -48,6 +48,7 @@ export {
   isToolCallEndEvent,
   isProgressEvent,
   isErrorEvent,
+  isResultEvent,
   isSessionStartEvent,
   isSessionEndEvent,
   isUserMessageEvent,

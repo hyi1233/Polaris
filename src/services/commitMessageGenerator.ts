@@ -9,6 +9,16 @@ import { invoke } from '@tauri-apps/api/core'
 import { getEventRouter, createContextId } from './eventRouter'
 import type { GitDiffEntry } from '@/types/git'
 import { createLogger } from '../utils/logger'
+import {
+  isAIEvent,
+  isTokenEvent,
+  isAssistantMessageEvent,
+  isSessionStartEvent,
+  isSessionEndEvent,
+  isErrorEvent,
+  isResultEvent,
+  type AIEvent,
+} from '../ai-runtime'
 
 const log = createLogger('CommitMessageGenerator')
 
@@ -141,42 +151,50 @@ async function callAIForCommitMessage(
 
         unregister = router.register(contextId, (payload: unknown) => {
           try {
-            const data = payload as any
-            
-            switch (data.type) {
-              case 'session_start':
-                break
-                
-              case 'assistant':
-                if (data.message?.content) {
-                  const textParts = data.message.content.filter((item: any) => item.type === 'text')
-                  const text = textParts.map((item: any) => item.text || '').join('')
-                  if (text) {
-                    accumulatedText += text
-                  }
-                }
-                break
-                
-              case 'text_delta':
-                if (data.text) {
-                  accumulatedText += data.text
-                }
-                break
-                
-              case 'session_end':
-              case 'result':
-                cleanup()
-                if (accumulatedText) {
-                  resolve(extractCommitMessage(accumulatedText))
-                } else {
-                  reject(new Error('No response from AI'))
-                }
-                break
-                
-              case 'error':
-                cleanup()
-                reject(new Error(data.error || 'AI generation failed'))
-                break
+            // 使用类型守卫验证事件
+            if (!isAIEvent(payload)) {
+              return
+            }
+
+            const event = payload as AIEvent
+
+            if (isSessionStartEvent(event)) {
+              // 会话开始，无需处理
+              return
+            }
+
+            if (isAssistantMessageEvent(event)) {
+              // AI 消息事件
+              if (event.content) {
+                accumulatedText += event.content
+              }
+              return
+            }
+
+            if (isTokenEvent(event)) {
+              // Token 增量事件
+              if (event.value) {
+                accumulatedText += event.value
+              }
+              return
+            }
+
+            if (isSessionEndEvent(event) || isResultEvent(event)) {
+              // 会话结束或结果事件
+              cleanup()
+              if (accumulatedText) {
+                resolve(extractCommitMessage(accumulatedText))
+              } else {
+                reject(new Error('No response from AI'))
+              }
+              return
+            }
+
+            if (isErrorEvent(event)) {
+              // 错误事件
+              cleanup()
+              reject(new Error(event.error || 'AI generation failed'))
+              return
             }
           } catch (e) {
             log.error('Failed to process event:', e instanceof Error ? e : new Error(String(e)))
