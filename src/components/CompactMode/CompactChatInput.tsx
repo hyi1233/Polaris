@@ -97,15 +97,6 @@ export function CompactChatInput({ onSend, onInterrupt, disabled, isStreaming }:
     e.target.value = ''
   }, [addAttachment])
 
-  // 键盘事件
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Shift+Enter = 换行，Enter = 发送
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }, [value, attachments, disabled, isStreaming])
-
   // 发送
   const handleSend = useCallback(() => {
     const trimmed = value.trim()
@@ -116,6 +107,15 @@ export function CompactChatInput({ onSend, onInterrupt, disabled, isStreaming }:
     setValue('')
     setAttachments([])
   }, [value, disabled, isStreaming, attachments, onSend])
+
+  // 键盘事件
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Shift+Enter = 换行，Enter = 发送
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }, [handleSend])
 
   const canSend = (value.trim() || attachments.length > 0) && !disabled && !isStreaming
 

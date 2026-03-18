@@ -1526,3 +1526,36 @@ body {
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+/* ============================================================================
+   布局切换过渡动画
+   ============================================================================ */
+
+/* 布局切换淡入淡出 */
+.layout-fade-enter {
+  opacity: 0;
+}
+
+.layout-fade-enter-active {
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+}
+
+.layout-fade-exit {
+  opacity: 1;
+}
+
+.layout-fade-exit-active {
+  opacity: 0;
+  transition: opacity 0.15s ease-in;
+}
+
+/* 小屏模式过渡 */
+.compact-mode-transition {
+  transition: all 0.2s ease-out;
+}
+
+/* 输入框聚焦效果 */
+.compact-input-focus {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
