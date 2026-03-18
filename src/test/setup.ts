@@ -56,6 +56,39 @@ vi.mock('@tauri-apps/api/event', () => ({
   emit: vi.fn(),
 }));
 
+/**
+ * Mock @tauri-apps/plugin-opener
+ *
+ * 用于测试在默认应用中打开文件/路径的场景。
+ */
+vi.mock('@tauri-apps/plugin-opener', () => ({
+  openPath: vi.fn(() => Promise.resolve()),
+}));
+
+/**
+ * Mock @tauri-apps/plugin-dialog
+ *
+ * 用于测试文件保存对话框场景。
+ */
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  save: vi.fn(() => Promise.resolve(null)),
+}));
+
+/**
+ * Mock @tauri-apps/api/window
+ *
+ * 用于测试窗口控制场景（最小化、最大化、关闭）。
+ */
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: vi.fn(() => ({
+    minimize: vi.fn(() => Promise.resolve()),
+    maximize: vi.fn(() => Promise.resolve()),
+    unmaximize: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
+    isMaximized: vi.fn(() => Promise.resolve(false)),
+  })),
+}));
+
 // ============================================================
 // Browser API Polyfills
 // ============================================================
