@@ -23,6 +23,9 @@ import {
   errorLogger,
   ErrorSource,
 } from '../../types/errors'
+import { createLogger } from '../../utils/logger'
+
+const log = createLogger('EventChatStore')
 
 /**
  * 创建事件处理 Slice
@@ -73,7 +76,7 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
     cleanupCallbacks.push(unregister)
 
     set({ _eventListenersInitialized: true })
-    console.log('[EventChatStore] EventRouter 初始化完成，已注册 main 处理器')
+    log.info('EventRouter 初始化完成，已注册 main 处理器')
 
     const cleanup = () => {
       cleanupCallbacks.forEach((cb) => cb())
@@ -321,7 +324,7 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
           timeout: 300000,
         }
 
-        console.log('[eventChatStore] 创建新 Provider session:', {
+        log.debug('创建新 Provider session', {
           workspaceDir,
           systemPrompt: systemPrompt ? `${systemPrompt.slice(0, 50)}...` : undefined,
           timeout: sessionConfig.timeout,
@@ -452,7 +455,7 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
         try {
           providerSessionCache.session.abort()
         } catch (e) {
-          console.warn('[EventChatStore] Abort provider session failed:', e)
+          log.warn('Abort provider session failed', { error: String(e) })
         }
       }
       set({ isStreaming: false })
@@ -467,7 +470,7 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
       set({ isStreaming: false })
       get().finishMessage()
     } catch (e) {
-      console.error('[EventChatStore] Interrupt failed:', e)
+      log.error('Interrupt failed', e as Error)
     }
   },
 })

@@ -29,6 +29,9 @@ import { clearOpenAIProviderEngines } from './engines/openai-provider';
 import { listen, emit } from '@tauri-apps/api/event';
 import './index.css';
 import type { EngineId } from './types';
+import { createLogger } from './utils/logger';
+
+const log = createLogger('App');
 
 function App() {
   const { t } = useTranslation('common');
@@ -221,22 +224,22 @@ function App() {
         // 初始化集成管理器并自动连接 QQ Bot（如果配置了）
         const qqbotConfig = config?.qqbot;
         if (qqbotConfig?.enabled && qqbotConfig?.appId && qqbotConfig?.clientSecret) {
-          console.log('[App] QQ Bot 已启用，开始初始化...');
+          log.info('QQ Bot 已启用，开始初始化...');
           try {
             const { initialize, startPlatform } = useIntegrationStore.getState();
             await initialize(qqbotConfig);
 
             // 如果配置了自动连接，则启动连接
             if (qqbotConfig.autoConnect !== false) {
-              console.log('[App] 自动连接 QQ Bot...');
+              log.info('自动连接 QQ Bot...');
               await startPlatform('qqbot');
             }
           } catch (error) {
-            console.error('[App] QQ Bot 初始化失败:', error);
+            log.error('QQ Bot 初始化失败', error as Error);
           }
         }
       } catch (error) {
-        console.error('[App] 初始化失败:', error);
+        log.error('初始化失败', error as Error);
         // 失败时重置标志，允许重试
         isInitialized.current = false;
       }
@@ -400,11 +403,11 @@ function App() {
 
     // 窗口失去焦点时，延迟后切换到悬浮窗
     const handleBlur = () => {
-      console.log('[App] 窗口失去焦点，准备切换到悬浮窗')
+      log.debug('窗口失去焦点，准备切换到悬浮窗')
       // 延迟后切换到悬浮窗
       mouseLeaveTimerRef.current = setTimeout(() => {
         if (document.visibilityState === 'visible') {
-          console.log('[App] 窗口仍无焦点，切换到悬浮窗')
+          log.debug('窗口仍无焦点，切换到悬浮窗')
           showFloatingWindow();
         }
       }, delay);
@@ -412,7 +415,7 @@ function App() {
 
     // 窗口获得焦点时，取消切换
     const handleFocus = () => {
-      console.log('[App] 窗口获得焦点，取消自动切换')
+      log.debug('窗口获得焦点，取消自动切换')
       if (mouseLeaveTimerRef.current) {
         clearTimeout(mouseLeaveTimerRef.current);
         mouseLeaveTimerRef.current = null;
@@ -525,7 +528,7 @@ function App() {
         try {
           await tauri.invoke('toggle_devtools');
         } catch (error) {
-          console.error('[App] 切换 DevTools 失败:', error);
+          log.error('切换 DevTools 失败', error as Error);
         }
       }
     };

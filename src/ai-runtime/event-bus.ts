@@ -9,6 +9,9 @@
  */
 
 import type { AIEvent } from './event'
+import { createLogger } from '../utils/logger'
+
+const log = createLogger('EventBus')
 
 /**
  * 事件监听器函数类型
@@ -158,11 +161,11 @@ export class NamespacedEventBus {
   emit(eventType: string, data: unknown): void {
     const typeListeners = this.listeners.get(eventType)
     if (!typeListeners || typeListeners.length === 0) {
-      this.log(`[EventBus] No listeners for "${eventType}"`)
+      this.log(`No listeners`, { eventType })
       return
     }
 
-    this.log(`[EventBus] Emitting "${eventType}" to ${typeListeners.length} listener(s)`)
+    this.log(`Emitting`, { eventType, listenerCount: typeListeners.length })
 
     // 复制数组，避免在遍历过程中修改
     const listeners = [...typeListeners]
@@ -177,7 +180,7 @@ export class NamespacedEventBus {
           toRemove.push(wrapper.id)
         }
       } catch (error) {
-        console.error(`[EventBus] Listener error for "${eventType}":`, error)
+        log.error(`Listener error`, error as Error, { eventType })
       }
     }
 
@@ -205,7 +208,9 @@ export class NamespacedEventBus {
    */
   clear(): void {
     this.listeners.clear()
-    this.log('[EventBus] Cleared all listeners')
+    if (this.config.debug) {
+      log.debug('Cleared all listeners')
+    }
   }
 
   /**
@@ -218,9 +223,9 @@ export class NamespacedEventBus {
   /**
    * 日志输出
    */
-  private log(message: string): void {
+  private log(message: string, context?: Record<string, unknown>): void {
     if (this.config.debug) {
-      console.log(message)
+      log.debug(message, context)
     }
   }
 }

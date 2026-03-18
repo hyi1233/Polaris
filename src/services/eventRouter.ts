@@ -6,6 +6,9 @@
  */
 
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { createLogger } from '../utils/logger'
+
+const log = createLogger('EventRouter')
 
 export type ContextId = 'main' | 'git-commit' | string
 
@@ -98,16 +101,16 @@ export class EventRouter {
   private dispatch(event: RoutedEvent): void {
     const handlers = this.handlers.get(event.contextId)
     if (handlers) {
-      console.log('[EventRouter] dispatch 到', handlers.size, '个 handler')
+      log.debug('dispatch 到 handlers', { contextId: event.contextId, count: handlers.size })
       handlers.forEach(handler => {
         try {
           handler(event.payload)
         } catch (e) {
-          console.error(`[EventRouter] Handler error for ${event.contextId}:`, e)
+          log.error(`Handler error`, e as Error, { contextId: event.contextId })
         }
       })
     } else {
-      console.log('[EventRouter] 没有找到 handler for', event.contextId)
+      log.debug('没有找到 handler', { contextId: event.contextId })
     }
 
     const wildcardHandlers = this.handlers.get('*')
@@ -116,7 +119,7 @@ export class EventRouter {
         try {
           handler(event)
         } catch (e) {
-          console.error('[EventRouter] Wildcard handler error:', e)
+          log.error('Wildcard handler error', e as Error)
         }
       })
     }
