@@ -84,15 +84,121 @@ interface AttachmentInput {
   content: string // base64 data URL
 }
 
+// ========================================
+// OpenAI Provider Payload 类型定义
+// ========================================
+
+/**
+ * 文本增量输出 Payload
+ */
+interface TextDeltaPayload {
+  type: 'text_delta'
+  text: string
+}
+
+/**
+ * 工具调用开始 Payload
+ */
+interface ToolStartPayload {
+  type: 'tool_start'
+  tool_use_id: string
+  tool_name: string
+  input: Record<string, unknown>
+}
+
+/**
+ * 工具调用结束 Payload
+ */
+interface ToolEndPayload {
+  type: 'tool_end'
+  tool_use_id: string
+  tool_name: string
+  output: string
+}
+
+/**
+ * 会话结束 Payload
+ */
+interface SessionEndPayload {
+  type: 'session_end'
+}
+
+/**
+ * 错误 Payload
+ */
+interface ErrorPayload {
+  type: 'error'
+  message: string
+  code?: string
+}
+
+/**
+ * OpenAI Provider Payload 联合类型
+ */
+type OpenAIPayload =
+  | TextDeltaPayload
+  | ToolStartPayload
+  | ToolEndPayload
+  | SessionEndPayload
+  | ErrorPayload
+
+/**
+ * Payload 类型守卫函数
+ */
+function isTextDeltaPayload(payload: OpenAIPayload): payload is TextDeltaPayload {
+  return payload.type === 'text_delta'
+}
+
+function isToolStartPayload(payload: OpenAIPayload): payload is ToolStartPayload {
+  return payload.type === 'tool_start'
+}
+
+function isToolEndPayload(payload: OpenAIPayload): payload is ToolEndPayload {
+  return payload.type === 'tool_end'
+}
+
+function isSessionEndPayload(payload: OpenAIPayload): payload is SessionEndPayload {
+  return payload.type === 'session_end'
+}
+
+function isErrorPayload(payload: OpenAIPayload): payload is ErrorPayload {
+  return payload.type === 'error'
+}
+
+/**
+ * OpenAI Provider 扩展任务输入
+ * 继承 AITaskInput，添加 OpenAI Provider 特有的附件支持
+ */
+interface OpenAIProviderTaskInput {
+  prompt: string
+  files?: string[]
+  extra?: Record<string, unknown>
+  /** OpenAI Provider 特有：附件列表（图片、文件等） */
+  attachments?: AttachmentInput[]
+}
+
+/**
+ * 从任务输入中安全提取附件
+ * 支持两种方式：直接的 attachments 字段或 extra.attachments
+ */
+function getAttachmentsFromTask(task: AITask): AttachmentInput[] | undefined {
+  // 尝试从 extra 中获取
+  const extraAttachments = task.input.extra?.attachments
+  if (Array.isArray(extraAttachments)) {
+    return extraAttachments as AttachmentInput[]
+  }
+
+  // 尝试从扩展字段获取（向后兼容）
+  const extendedInput = task.input as OpenAIProviderTaskInput
+  return extendedInput.attachments
+}
+
 /**
  * Tauri Chat 事件类型（来自 Rust 后端）
  */
 interface TauriChatEvent {
   contextId: string
-  payload: {
-    type: string
-    [key: string]: unknown
-  }
+  payload: OpenAIPayload
 }
 
 /**
@@ -177,7 +283,7 @@ export class OpenAIProviderSession extends BaseSession {
     this.abortRequested = false
 
     // 添加用户消息到历史，包含附件
-    const attachments = (task.input as any).attachments as AttachmentInput[] | undefined
+    const attachments = getAttachmentsFromTask(task)
     this.addUserMessage(task.input.prompt, attachments)
 
     // 设置事件监听
@@ -262,60 +368,39 @@ export class OpenAIProviderSession extends BaseSession {
   private handleChatEvent(event: TauriChatEvent): void {
     const { payload } = event
 
-    switch (payload.type) {
-      case 'text_delta':
-        this.emit({
-          type: 'assistant_message',
-          content: (payload as any).text || '',
-          isDelta: true,
-        })
-        break
-
-      case 'tool_start':
-        {
-          const toolUseId = (payload as any).tool_use_id ?? (payload as any).toolUseId ?? ''
-          const toolName = (payload as any).tool_name ?? (payload as any).toolName ?? ''
-        this.emit({
-          type: 'tool_call_start',
-          callId: toolUseId,
-          tool: toolName,
-          args: (payload as any).input || {},
-        })
-        }
-        break
-
-      case 'tool_end':
-        {
-          const toolUseId = (payload as any).tool_use_id ?? (payload as any).toolUseId ?? ''
-          const toolName = (payload as any).tool_name ?? (payload as any).toolName ?? ''
-        this.emit({
-          type: 'tool_call_end',
-          callId: toolUseId,
-          tool: toolName,
-          result: (payload as any).output || '',
-          success: true,
-        })
-        }
-        break
-
-      case 'session_end':
-        this.emit({
-          type: 'session_end',
-          sessionId: this.id,
-        })
-        break
-
-      case 'error':
-        this.emit({
-          type: 'error',
-          error: (payload as any).message || 'Unknown error',
-        })
-        break
-
-      default:
-        // 忽略未知事件类型
-        break
+    if (isTextDeltaPayload(payload)) {
+      this.emit({
+        type: 'assistant_message',
+        content: payload.text,
+        isDelta: true,
+      })
+    } else if (isToolStartPayload(payload)) {
+      this.emit({
+        type: 'tool_call_start',
+        callId: payload.tool_use_id,
+        tool: payload.tool_name,
+        args: payload.input,
+      })
+    } else if (isToolEndPayload(payload)) {
+      this.emit({
+        type: 'tool_call_end',
+        callId: payload.tool_use_id,
+        tool: payload.tool_name,
+        result: payload.output,
+        success: true,
+      })
+    } else if (isSessionEndPayload(payload)) {
+      this.emit({
+        type: 'session_end',
+        sessionId: this.id,
+      })
+    } else if (isErrorPayload(payload)) {
+      this.emit({
+        type: 'error',
+        error: payload.message,
+      })
     }
+    // 忽略未知事件类型
   }
 
   /**
