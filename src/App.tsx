@@ -210,6 +210,17 @@ function App() {
           },
         });
 
+        // 恢复窗口置顶状态
+        if (config?.window?.alwaysOnTop) {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('set_always_on_top', { alwaysOnTop: true });
+            log.info('窗口置顶状态已恢复');
+          } catch (error) {
+            log.warn('恢复窗口置顶状态失败', { error: String(error) });
+          }
+        }
+
         // 注意：会话状态由 zustand persist 中间件自动恢复，无需手动调用 restoreFromStorage
 
         // 初始化集成管理器并自动连接 QQ Bot（如果配置了）
