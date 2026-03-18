@@ -27,7 +27,7 @@ export const createSessionSlice: SessionSlice = (set, get) => ({
     if (providerSessionCache && currentId !== id) {
       console.log('[EventChatStore] 切换对话，清理 Provider session')
       try {
-        providerSessionCache.session.dispose()
+        providerSessionCache.session?.dispose()
       } catch (e) {
         console.warn('[EventChatStore] 清理 Session 失败:', e)
       }

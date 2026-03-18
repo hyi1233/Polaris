@@ -624,3 +624,44 @@ export function isTodoExecutionProgressEvent(event: AIEvent): event is TodoExecu
 export function isTodoExecutionCompletedEvent(event: AIEvent): event is TodoExecutionCompletedEvent {
   return event.type === 'todo_execution_completed'
 }
+
+// ========================================
+// 通用类型守卫
+// ========================================
+
+/** AIEvent 类型列表 */
+const AI_EVENT_TYPES = new Set([
+  'token',
+  'thinking',
+  'tool_call_start',
+  'tool_call_end',
+  'progress',
+  'result',
+  'error',
+  'session_start',
+  'session_end',
+  'user_message',
+  'assistant_message',
+  'task_metadata',
+  'task_progress',
+  'task_completed',
+  'task_canceled',
+  'todo_created',
+  'todo_updated',
+  'todo_deleted',
+  'todo_execution_started',
+  'todo_execution_progress',
+  'todo_execution_completed',
+])
+
+/**
+ * 检查 unknown 对象是否是有效的 AIEvent
+ * 用于事件路由器等场景，安全地将 unknown 转换为 AIEvent
+ */
+export function isAIEvent(value: unknown): value is AIEvent {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const event = value as Record<string, unknown>
+  return typeof event.type === 'string' && AI_EVENT_TYPES.has(event.type)
+}

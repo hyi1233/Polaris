@@ -11,8 +11,9 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import type { EventHandlerSlice } from './types'
+import type { AISession } from '../../ai-runtime'
 import { handleAIEvent } from './utils'
-import { getEventBus } from '../../ai-runtime'
+import { getEventBus, isAIEvent } from '../../ai-runtime'
 import { getEventRouter } from '../../services/eventRouter'
 import { getEngine, listEngines } from '../../core/engine-bootstrap'
 import { parseWorkspaceReferences, buildSystemPrompt } from '../../services/workspaceReference'
@@ -55,7 +56,11 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
 
     const unregister = router.register('main', (payload: unknown) => {
       try {
-        const aiEvent = payload as any
+        if (!isAIEvent(payload)) {
+          log.warn('收到非 AIEvent 类型的事件', { payload })
+          return
+        }
+        const aiEvent = payload
         console.log('[EventChatStore] 收到 AIEvent:', aiEvent.type)
 
         // 使用依赖注入获取工作区路径
@@ -305,9 +310,9 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
         providerSessionCache.conversationSeed === actualSeed &&
         (Date.now() - providerSessionCache.lastUsed < SESSION_TIMEOUT)
 
-      let session: any
+      let session: AISession
 
-      if (canReuseSession) {
+      if (canReuseSession && providerSessionCache?.session) {
         console.log('[eventChatStore] 复用现有 Provider session')
         session = providerSessionCache.session
 

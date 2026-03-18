@@ -56,6 +56,7 @@ export {
   isTaskProgressEvent,
   isTaskCompletedEvent,
   isTaskCanceledEvent,
+  isAIEvent,
 } from './event'
 
 export type {

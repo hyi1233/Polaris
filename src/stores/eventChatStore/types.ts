@@ -6,6 +6,7 @@
 
 import type { StateCreator } from 'zustand'
 import type { ChatMessage, ContentBlock, ToolStatus, Workspace } from '../../types'
+import type { AISession } from '../../ai-runtime'
 
 /** 最大保留消息数量 */
 export const MAX_MESSAGES = 500
@@ -65,7 +66,7 @@ export interface UnifiedHistoryItem {
  * OpenAI Provider Session 缓存
  */
 export interface ProviderSessionCache {
-  session: any | null
+  session: AISession | null
   conversationId: string | null
   conversationSeed: string | null
   lastUsed: number
