@@ -5,11 +5,36 @@
  * - 单例模式
  * - 事件注册与分发
  * - StrictMode 兼容性
+ *
+ * ## 单例测试最佳实践模式
+ *
+ * 本测试文件演示了 Vitest 中测试单例模块的标准模式：
+ *
+ * 1. **vi.unmock() 声明**（关键）：
+ *    - 在文件开头使用 `vi.unmock()` 确保导入真实模块
+ *    - 防止其他测试文件的 mock 干扰
+ *    - 解决 Vitest worker 隔离中的 mock 跨文件影响问题
+ *
+ * 2. **reset 函数调用**：
+ *    - 单例模块应提供 `reset*()` 函数用于测试隔离
+ *    - 在全局 afterEach 中调用，确保每个测试后状态清理
+ *
+ * 3. **实例级测试**：
+ *    - 对于单例模块，先测试类本身的功能（new EventRouter()）
+ *    - 再测试单例函数（getEventRouter）
+ *
+ * ## 为什么需要 vi.unmock？
+ *
+ * eventHandlerSlice.test.ts 使用了 `vi.mock('../../services/eventRouter')`。
+ * 如果不使用 vi.unmock，Vitest 在某些运行顺序下会返回 mock 版本，
+ * 导致单例测试失败。
+ *
+ * vi.unmock 从 mock 注册表中移除模块，后续导入返回原始模块。
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// 取消其他测试文件可能设置的 mock，确保使用真实模块
+// 关键：取消其他测试文件可能设置的 mock，确保使用真实模块
 vi.unmock('./eventRouter')
 
 import { EventRouter, getEventRouter, ensureEventRouterInitialized, createContextId, resetEventRouter } from './eventRouter'

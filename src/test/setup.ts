@@ -1,17 +1,71 @@
 /// <reference types="vitest/globals" />
 import '@testing-library/jest-dom';
 
-// Mock Tauri APIs for testing
+/**
+ * Vitest 测试配置 - 全局 Setup
+ *
+ * 本文件配置测试环境的全局 mock 和 polyfill。
+ *
+ * ## Vitest Mock 机制说明
+ *
+ * 1. **vi.mock 提升机制**：
+ *    - `vi.mock()` 调用会被静态分析并移动到文件顶部
+ *    - 在 setupFiles 中定义的 mock 会影响所有测试文件
+ *    - 测试文件中的 mock 会覆盖 setupFiles 中的 mock
+ *
+ * 2. **模块隔离**：
+ *    - Vitest 4.x 默认 `isolate: true`，每个测试文件在隔离环境中运行
+ *    - 如果需要在特定测试文件中使用真实模块，使用 `vi.unmock()`
+ *
+ * 3. **单例模块测试策略**：
+ *    - 需要测试真实单例逻辑时：使用 `vi.unmock()` + 提供 `reset*()` 函数
+ *    - 只需要模块存在时：使用 `vi.mock()` 返回 mock 实例
+ *    - 单例需要状态重置时：提供 `clear()`/`reset()` 函数
+ *
+ * 4. **最佳实践**：
+ *    - 在 beforeEach 中调用 vi.clearAllMocks() 清理调用记录
+ *    - 在 afterEach 中重置单例状态（如有 reset 函数）
+ *    - 避免 mock 同一模块的不同版本，统一使用此文件的 mock
+ */
+
+// ============================================================
+// Tauri API Mocks
+// ============================================================
+
+/**
+ * Mock @tauri-apps/api/core
+ *
+ * 用于测试中调用 Tauri invoke 命令的场景。
+ * 测试文件可通过 vi.mocked(invoke).mockResolvedValue() 设置返回值。
+ */
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }));
 
+/**
+ * Mock @tauri-apps/api/event
+ *
+ * 用于测试 Tauri 事件监听和发送场景。
+ * listen() 返回的 unlisten 函数可用于清理监听器。
+ *
+ * 注意：eventRouter.test.ts 需要自定义 mock 来测试事件分发逻辑，
+ * 该文件通过 vi.unmock + vi.mock 覆盖此全局 mock。
+ */
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
   emit: vi.fn(),
 }));
 
-// Mock window.matchMedia for components that use media queries
+// ============================================================
+// Browser API Polyfills
+// ============================================================
+
+/**
+ * Polyfill window.matchMedia
+ *
+ * 用于测试使用媒体查询的组件（如响应式布局）。
+ * 默认返回不匹配任何查询的状态。
+ */
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
