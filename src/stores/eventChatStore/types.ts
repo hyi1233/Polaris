@@ -16,10 +16,6 @@ export const MESSAGE_ARCHIVE_THRESHOLD = 550
 /** 每批次加载的消息数量 */
 export const BATCH_LOAD_COUNT = 20
 
-/** 本地存储键 */
-export const STORAGE_KEY = 'event_chat_state_backup'
-export const STORAGE_VERSION = '5'
-
 /** 会话历史存储键 */
 export const SESSION_HISTORY_KEY = 'event_chat_session_history'
 export const MAX_SESSION_HISTORY = 50

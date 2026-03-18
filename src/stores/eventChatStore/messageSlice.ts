@@ -2,11 +2,15 @@
  * 消息状态 Slice
  *
  * 负责消息的 CRUD 操作和流式消息构建
+ *
+ * 持久化说明：
+ * - 会话元数据由 zustand persist 中间件自动持久化
+ * - 消息数据需要通过 saveToHistory() 手动保存
  */
 
 import type { MessageSlice, CurrentAssistantMessage } from './types'
 import type { ContentBlock, ToolCallBlock } from '../../types'
-import { MESSAGE_ARCHIVE_THRESHOLD, STORAGE_VERSION, STORAGE_KEY } from './types'
+import { MESSAGE_ARCHIVE_THRESHOLD } from './types'
 import { generateToolSummary, calculateDuration } from '../../utils/toolSummary'
 import { clearFileReadCache } from './utils'
 
@@ -32,23 +36,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
         const toArchive = newMessages.slice(0, archiveCount)
         const remaining = newMessages.slice(archiveCount)
 
-        // 归档时立即保存，防止页面刷新时丢失
-        setTimeout(() => {
-          try {
-            const currentState = get()
-            const data = {
-              version: STORAGE_VERSION,
-              timestamp: new Date().toISOString(),
-              messages: currentState.messages,
-              archivedMessages: currentState.archivedMessages,
-              conversationId: currentState.conversationId,
-            }
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-            console.log('[EventChatStore] 归档消息已保存')
-          } catch (e) {
-            console.error('[EventChatStore] 保存归档失败:', e)
-          }
-        }, 0)
+        // 注意：不再手动保存到 sessionStorage，由 zustand persist 自动管理
+        // 但消息数据不会自动持久化，用户需要手动调用 saveToHistory() 保存
 
         return {
           messages: remaining,
@@ -59,11 +48,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       return { messages: newMessages }
     })
 
-    // 只在非归档情况下调用 saveToStorage()，避免重复保存
-    const { messages } = get()
-    if (messages.length <= MESSAGE_ARCHIVE_THRESHOLD) {
-      get().saveToStorage()
-    }
+    // 注意：不再调用 saveToStorage()，由 zustand persist 自动管理
+    // conversationId 会自动持久化，消息数据需手动保存到历史
   },
 
   clearMessages: () => {
@@ -152,7 +138,7 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       set({ isStreaming: false })
     }
 
-    get().saveToStorage()
+    // 注意：不再调用 saveToStorage()，由 zustand persist 自动管理
   },
 
   /**

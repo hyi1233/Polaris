@@ -340,7 +340,7 @@ describe('historySlice', () => {
   })
 
   describe('saveToStorage', () => {
-    it('应保存状态到 sessionStorage', () => {
+    it('saveToStorage 已废弃，应由 persist 中间件处理', () => {
       const store = createTestStore()
 
       const messages = [{ id: 'msg-1', type: 'user' as const, content: 'Test', timestamp: '' }]
@@ -352,38 +352,22 @@ describe('historySlice', () => {
         conversationId: 'conv-123',
       })
 
+      // saveToStorage 已废弃，不应再操作 sessionStorage
       store.getState().saveToStorage()
 
-      expect(sessionStorage.setItem).toHaveBeenCalled()
-      const savedData = JSON.parse(sessionStorageMock['event_chat_state_backup'])
-      expect(savedData.version).toBe('5')
-      expect(savedData.messages.length).toBe(1)
-      expect(savedData.archivedMessages.length).toBe(1)
-      expect(savedData.conversationId).toBe('conv-123')
+      // 验证 sessionStorage.setItem 没有被调用
+      expect(sessionStorage.setItem).not.toHaveBeenCalled()
     })
   })
 
   describe('restoreFromStorage', () => {
-    it('应从 sessionStorage 恢复状态', () => {
+    it('restoreFromStorage 已废弃，应由 persist 中间件处理', () => {
       const store = createTestStore()
 
-      const savedData = {
-        version: '5',
-        timestamp: new Date().toISOString(),
-        messages: [{ id: 'msg-1', type: 'user', content: 'Test', timestamp: '' }],
-        archivedMessages: [],
-        conversationId: 'conv-123',
-      }
-      sessionStorageMock['event_chat_state_backup'] = JSON.stringify(savedData)
-
+      // restoreFromStorage 已废弃，应返回 false
       const result = store.getState().restoreFromStorage()
 
-      expect(result).toBe(true)
-      const state = store.getState()
-      expect(state.messages.length).toBe(1)
-      expect(state.conversationId).toBe('conv-123')
-      expect(state.isInitialized).toBe(true)
-      expect(state.isStreaming).toBe(false)
+      expect(result).toBe(false)
     })
 
     it('无存储数据时应返回 false', () => {
@@ -394,7 +378,7 @@ describe('historySlice', () => {
       expect(result).toBe(false)
     })
 
-    it('版本不匹配时应忽略并返回 false', () => {
+    it('版本不匹配时应返回 false', () => {
       const store = createTestStore()
 
       const savedData = {
@@ -405,12 +389,13 @@ describe('historySlice', () => {
       }
       sessionStorageMock['event_chat_state_backup'] = JSON.stringify(savedData)
 
+      // restoreFromStorage 已废弃，总是返回 false
       const result = store.getState().restoreFromStorage()
 
       expect(result).toBe(false)
     })
 
-    it('超过 1 小时的数据应被忽略', () => {
+    it('超过 1 小时的数据应返回 false', () => {
       const store = createTestStore()
 
       // 创建超过 1 小时前的时间戳
@@ -423,10 +408,10 @@ describe('historySlice', () => {
       }
       sessionStorageMock['event_chat_state_backup'] = JSON.stringify(savedData)
 
+      // restoreFromStorage 已废弃，总是返回 false
       const result = store.getState().restoreFromStorage()
 
       expect(result).toBe(false)
-      expect(sessionStorage.removeItem).toHaveBeenCalledWith('event_chat_state_backup')
     })
   })
 

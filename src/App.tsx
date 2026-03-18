@@ -40,8 +40,6 @@ function App() {
     isStreaming,
     sendMessage,
     interruptChat,
-    restoreFromStorage,
-    saveToStorage,
     initializeEventListeners,
     messages,
     clearMessages,
@@ -215,11 +213,7 @@ function App() {
           },
         });
 
-        // 尝试从本地存储恢复聊天状态
-        const restored = restoreFromStorage();
-        if (restored) {
-          console.log('[App] 已从崩溃中恢复聊天状态');
-        }
+        // 注意：会话状态由 zustand persist 中间件自动恢复，无需手动调用 restoreFromStorage
 
         // 初始化集成管理器并自动连接 QQ Bot（如果配置了）
         const qqbotConfig = config?.qqbot;
@@ -319,16 +313,8 @@ function App() {
     syncWorkspace();
   }, [currentWorkspacePath]);
 
-  // 监听崩溃保存事件
-  useEffect(() => {
-    const handleCrashSave = () => {
-      console.log('[App] 检测到崩溃信号，保存状态...');
-      saveToStorage();
-    };
-
-    window.addEventListener('app:crash-save', handleCrashSave);
-    return () => window.removeEventListener('app:crash-save', handleCrashSave);
-  }, [saveToStorage]);
+  // 注意：崩溃保存和恢复功能已由 zustand persist 中间件自动处理
+  // 不再需要手动监听 app:crash-save 和 app:recover 事件
 
   // 监听导航到设置页面事件
   useEffect(() => {
@@ -340,20 +326,6 @@ function App() {
     window.addEventListener('navigate-to-settings', handleNavigateToSettings as EventListener);
     return () => window.removeEventListener('navigate-to-settings', handleNavigateToSettings as EventListener);
   }, []);
-
-  // 监听恢复事件
-  useEffect(() => {
-    const handleRecover = () => {
-      console.log('[App] 收到恢复信号...');
-      const restored = restoreFromStorage();
-      if (restored) {
-        window.location.reload();
-      }
-    };
-
-    window.addEventListener('app:recover', handleRecover);
-    return () => window.removeEventListener('app:recover', handleRecover);
-  }, [restoreFromStorage]);
 
   // 监听工作区切换事件，清除聊天错误
   useEffect(() => {

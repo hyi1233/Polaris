@@ -7,13 +7,18 @@
  * - configActions: getConfig
  * - workspaceActions: getCurrentWorkspace
  * - toolPanelActions: clearTools, addTool
+ *
+ * 持久化说明：
+ * - 会话元数据由 zustand persist 中间件自动持久化
+ * - 消息数据通过 saveToHistory() 手动保存到历史
+ * - saveToStorage/restoreFromStorage 已废弃，保留空实现以兼容
  */
 
 import type { HistorySlice, HistoryEntry, UnifiedHistoryItem } from './types'
 import { createLogger } from '../../utils/logger'
 
 const log = createLogger('EventChatStore')
-import { MAX_MESSAGES, STORAGE_KEY, STORAGE_VERSION, SESSION_HISTORY_KEY, MAX_SESSION_HISTORY } from './types'
+import { MAX_MESSAGES, SESSION_HISTORY_KEY, MAX_SESSION_HISTORY } from './types'
 import { getIFlowHistoryService } from '../../services/iflowHistoryService'
 import { getClaudeCodeHistoryService } from '../../services/claudeCodeHistoryService'
 import { listCodexSessions, getCodexSessionHistory } from '../../services/tauri'
@@ -79,60 +84,26 @@ export const createHistorySlice: HistorySlice = (set, get) => ({
       archivedMessages: remaining,
     })
 
-    get().saveToStorage()
+    // 注意：不再调用 saveToStorage()，由 zustand persist 自动管理
   },
 
+  /**
+   * @deprecated 已废弃 - 使用 zustand persist 中间件自动持久化
+   * 保留空实现以兼容现有代码
+   */
   saveToStorage: () => {
-    try {
-      const state = get()
-      const data = {
-        version: STORAGE_VERSION,
-        timestamp: new Date().toISOString(),
-        messages: state.messages,
-        archivedMessages: state.archivedMessages,
-        conversationId: state.conversationId,
-      }
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch (e) {
-      console.error('[EventChatStore] 保存状态失败:', e)
-    }
+    // 由 zustand persist 中间件自动处理，无需手动保存
+    log.debug('saveToStorage 已废弃，由 persist 中间件自动处理')
   },
 
+  /**
+   * @deprecated 已废弃 - 使用 zustand persist 中间件自动恢复
+   * 保留空实现以兼容现有代码
+   */
   restoreFromStorage: () => {
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY)
-      if (!stored) return false
-
-      const data = JSON.parse(stored)
-
-      if (data.version !== STORAGE_VERSION) {
-        console.warn('[EventChatStore] 存储版本不匹配，忽略')
-        return false
-      }
-
-      const storedTime = new Date(data.timestamp).getTime()
-      const now = Date.now()
-      if (now - storedTime > 60 * 60 * 1000) {
-        sessionStorage.removeItem(STORAGE_KEY)
-        return false
-      }
-
-      set({
-        messages: data.messages || [],
-        archivedMessages: data.archivedMessages || [],
-        conversationId: data.conversationId || null,
-        isStreaming: false,
-        isInitialized: true,
-        currentMessage: null,
-        toolBlockMap: new Map(),
-      })
-
-      sessionStorage.removeItem(STORAGE_KEY)
-      return true
-    } catch (e) {
-      console.error('[EventChatStore] 恢复状态失败:', e)
-      return false
-    }
+    // 由 zustand persist 中间件自动处理
+    log.debug('restoreFromStorage 已废弃，由 persist 中间件自动处理')
+    return false
   },
 
   saveToHistory: (title) => {
@@ -303,7 +274,7 @@ export const createHistorySlice: HistorySlice = (set, get) => ({
           error: null,
         })
 
-        get().saveToStorage()
+        // 注意：不再调用 saveToStorage()，由 zustand persist 自动管理
         log.info('已从本地历史恢复会话', { title: localSession.title })
         return true
       }
