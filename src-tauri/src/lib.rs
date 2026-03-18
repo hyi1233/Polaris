@@ -24,9 +24,9 @@ use commands::chat::{
 };
 use commands::{validate_workspace_path, get_directory_info, get_home_dir};
 use commands::window::{
-    show_floating_window, show_main_window, toggle_floating_window,
-    is_floating_window_visible, set_floating_window_position, get_floating_window_position,
-    toggle_devtools
+    toggle_devtools,
+    set_always_on_top,
+    is_always_on_top,
 };
 use commands::file_explorer::{
     read_directory, get_file_content, create_file, create_directory,
@@ -289,19 +289,11 @@ pub fn run() {
                 let label = window.label();
                 tracing::info!("[Window] 窗口关闭请求: {}", label);
 
-                // 主窗口关闭时，退出整个应用（包括悬浮窗）
+                // 主窗口关闭时，退出整个应用
                 if label == "main" {
                     tracing::info!("[Window] 主窗口关闭，退出应用");
                     // 退出整个应用
                     std::process::exit(0);
-                }
-                // 悬浮窗关闭时，只隐藏而不是真正关闭
-                if label == "floating" {
-                    // 阻止默认关闭行为
-                    api.prevent_close();
-                    // 隐藏窗口
-                    let _ = window.hide();
-                    tracing::info!("[Window] 悬浮窗已隐藏");
                 }
             }
         })
@@ -356,13 +348,9 @@ pub fn run() {
             copy_path,
             move_path,
             // 窗口管理相关
-            show_floating_window,
-            show_main_window,
-            toggle_floating_window,
-            is_floating_window_visible,
-            set_floating_window_position,
-            get_floating_window_position,
             toggle_devtools,
+            set_always_on_top,
+            is_always_on_top,
             // 上下文管理相关
             context_upsert,
             context_upsert_many,
