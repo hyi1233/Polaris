@@ -14,6 +14,7 @@ import { Button } from '../Common';
 import { SettingsSidebar, type SettingsTabId } from './SettingsSidebar';
 import { AIEngineTab } from './tabs/AIEngineTab';
 import { GeneralTab } from './tabs/GeneralTab';
+import { WindowTab } from './tabs/WindowTab';
 import { OpenAIProvidersTab } from './OpenAIProvidersTab';
 import { TranslateTab } from './tabs/TranslateTab';
 import { QQBotTab } from './tabs/QQBotTab';
@@ -33,6 +34,7 @@ interface SettingsModalProps {
 // Tab 标题映射
 const TAB_TITLES: Record<SettingsTabId, string> = {
   'general': '通用',
+  'window': '窗口',
   'ai-engine': 'AI 引擎',
   'openai-providers': 'OpenAI Providers',
   'translate': '翻译',
@@ -162,6 +164,14 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
 
               {activeTab === 'general' && (
                 <GeneralTab
+                  config={localConfig}
+                  onConfigChange={setLocalConfig}
+                  loading={loading}
+                />
+              )}
+
+              {activeTab === 'window' && (
+                <WindowTab
                   config={localConfig}
                   onConfigChange={setLocalConfig}
                   loading={loading}

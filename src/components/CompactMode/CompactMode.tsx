@@ -90,14 +90,8 @@ export function CompactMode({ onSend, onInterrupt, disabled, isStreaming }: Comp
           </select>
         </div>
 
-        {/* 右侧：工作区 + 快捷操作 */}
+        {/* 右侧：快捷操作 */}
         <div className="flex items-center gap-1">
-          {currentWorkspace && (
-            <span className="text-xs text-text-tertiary truncate max-w-[80px] mr-1">
-              {currentWorkspace.name}
-            </span>
-          )}
-
           {/* 新对话 */}
           <button
             onClick={handleNewChat}

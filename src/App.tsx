@@ -480,12 +480,14 @@ function App() {
 
       {/* 小屏模式：精简对话界面 */}
       {isCompact ? (
-        <CompactMode
-          onSend={sendMessage}
-          onInterrupt={interruptChat}
-          disabled={!currentWorkspace}
-          isStreaming={isStreaming}
-        />
+        <div className="flex-1 overflow-hidden">
+          <CompactMode
+            onSend={sendMessage}
+            onInterrupt={interruptChat}
+            disabled={!currentWorkspace}
+            isStreaming={isStreaming}
+          />
+        </div>
       ) : (
         /* 正常模式：完整布局 */
         <div className="flex flex-1 overflow-hidden">

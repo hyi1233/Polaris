@@ -4,6 +4,7 @@
   "aiEngine": "AI 引擎",
   "nav": {
     "general": "通用",
+    "window": "窗口",
     "aiEngine": "AI 引擎",
     "openaiProviders": "OpenAI Providers",
     "translate": "翻译",

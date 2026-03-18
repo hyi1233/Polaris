@@ -4,6 +4,7 @@
   "aiEngine": "AI Engine",
   "nav": {
     "general": "General",
+    "window": "Window",
     "aiEngine": "AI Engine",
     "openaiProviders": "OpenAI Providers",
     "translate": "Translate",

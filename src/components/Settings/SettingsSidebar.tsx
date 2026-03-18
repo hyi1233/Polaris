@@ -22,6 +22,7 @@ export type SettingsTabId =
   | 'translate'
   | 'qqbot'
   | 'scheduler'
+  | 'window'
   | 'advanced';
 
 export interface SettingsNavItem {
@@ -39,6 +40,7 @@ interface SettingsSidebarProps {
 
 const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'general', icon: <IconGeneral size={16} />, labelKey: 'nav.general' },
+  { id: 'window', icon: <IconSettings size={16} />, labelKey: 'nav.window' },
   { id: 'ai-engine', icon: <IconAIEngine size={16} />, labelKey: 'nav.aiEngine' },
   { id: 'openai-providers', icon: <IconAPI size={16} />, labelKey: 'nav.openaiProviders' },
   { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },

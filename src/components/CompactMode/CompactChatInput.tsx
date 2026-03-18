@@ -120,7 +120,7 @@ export function CompactChatInput({ onSend, onInterrupt, disabled, isStreaming }:
   const canSend = (value.trim() || attachments.length > 0) && !disabled && !isStreaming
 
   return (
-    <div className="border-t border-border bg-background-elevated">
+    <div className="shrink-0 border-t border-border bg-background-elevated">
       {/* 附件预览 - 紧凑版 */}
       {attachments.length > 0 && (
         <div className="px-2 pt-2">
