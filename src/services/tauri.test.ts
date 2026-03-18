@@ -1517,3 +1517,401 @@ describe('错误处理场景', () => {
     });
   });
 });
+
+// ============================================================
+// 集成扩展命令测试
+// ============================================================
+import {
+  sendIntegrationMessage,
+  getIntegrationSessions,
+  initIntegration,
+  onIntegrationMessage,
+} from './tauri';
+import type { IntegrationSession, QQBotConfig } from '../types';
+
+describe('集成扩展命令', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('sendIntegrationMessage', () => {
+    it('应发送集成消息到对话', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await sendIntegrationMessage(
+        'qqbot',
+        { type: 'conversation', conversationId: 'conv-1' },
+        { type: 'text', text: 'Hello' }
+      );
+
+      expect(mockInvoke).toHaveBeenCalledWith('send_integration_message', {
+        platform: 'qqbot',
+        target: { type: 'conversation', conversationId: 'conv-1' },
+        content: { type: 'text', text: 'Hello' },
+      });
+    });
+
+    it('应发送集成消息到频道', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await sendIntegrationMessage(
+        'telegram',
+        { type: 'channel', channelId: 'ch-1' },
+        { type: 'text', text: 'Broadcast' }
+      );
+
+      expect(mockInvoke).toHaveBeenCalledWith('send_integration_message', {
+        platform: 'telegram',
+        target: { type: 'channel', channelId: 'ch-1' },
+        content: { type: 'text', text: 'Broadcast' },
+      });
+    });
+
+    it('应发送集成消息到用户', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await sendIntegrationMessage(
+        'wechat',
+        { type: 'user', userId: 'user-1' },
+        { type: 'text', text: 'Direct message' }
+      );
+
+      expect(mockInvoke).toHaveBeenCalledWith('send_integration_message', {
+        platform: 'wechat',
+        target: { type: 'user', userId: 'user-1' },
+        content: { type: 'text', text: 'Direct message' },
+      });
+    });
+
+    it('应发送消息到 webhook', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await sendIntegrationMessage(
+        'qqbot',
+        { type: 'webhook', url: 'https://example.com/webhook' },
+        { type: 'text', text: 'Webhook message' }
+      );
+
+      expect(mockInvoke).toHaveBeenCalledWith('send_integration_message', {
+        platform: 'qqbot',
+        target: { type: 'webhook', url: 'https://example.com/webhook' },
+        content: { type: 'text', text: 'Webhook message' },
+      });
+    });
+
+    it('应处理发送错误', async () => {
+      const error = new Error('Send failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(
+        sendIntegrationMessage('qqbot', { type: 'conversation', conversationId: 'c' }, { type: 'text', text: 'test' })
+      ).rejects.toThrow('Send failed');
+    });
+  });
+
+  describe('getIntegrationSessions', () => {
+    it('应获取集成会话列表', async () => {
+      const mockSessions: IntegrationSession[] = [
+        {
+          conversationId: 'conv-1',
+          sessionId: 'session-1',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messageCount: 5,
+        },
+      ];
+      mockInvoke.mockResolvedValueOnce(mockSessions);
+
+      const result = await getIntegrationSessions();
+
+      expect(mockInvoke).toHaveBeenCalledWith('get_integration_sessions');
+      expect(result).toEqual(mockSessions);
+    });
+
+    it('应返回空数组', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+
+      const result = await getIntegrationSessions();
+
+      expect(result).toEqual([]);
+    });
+
+    it('应处理获取错误', async () => {
+      const error = new Error('Failed to get sessions');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getIntegrationSessions()).rejects.toThrow('Failed to get sessions');
+    });
+  });
+
+  describe('initIntegration', () => {
+    it('应使用配置初始化集成管理器', async () => {
+      const config: QQBotConfig = {
+        enabled: true,
+        appId: 'test-app-id',
+        clientSecret: 'test-secret',
+        sandbox: false,
+        displayMode: 'chat',
+        autoConnect: true,
+      };
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await initIntegration(config);
+
+      expect(mockInvoke).toHaveBeenCalledWith('init_integration', { qqbotConfig: config });
+    });
+
+    it('应支持 null 配置初始化', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await initIntegration(null);
+
+      expect(mockInvoke).toHaveBeenCalledWith('init_integration', { qqbotConfig: null });
+    });
+
+    it('应处理初始化错误', async () => {
+      const error = new Error('Init failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(initIntegration(null)).rejects.toThrow('Init failed');
+    });
+  });
+
+  describe('onIntegrationMessage', () => {
+    it('应注册集成消息监听器并返回取消函数', async () => {
+      const mockUnlisten = vi.fn();
+      const mockListen = vi.fn().mockResolvedValue(mockUnlisten);
+
+      // 动态导入 listen mock
+      vi.doMock('@tauri-apps/api/event', () => ({
+        listen: mockListen,
+      }));
+
+      const callback = vi.fn();
+      const unlisten = await onIntegrationMessage(callback);
+
+      expect(mockUnlisten).toBeDefined();
+    });
+  });
+});
+
+// ============================================================
+// 实例管理命令测试
+// ============================================================
+import {
+  addIntegrationInstance,
+  removeIntegrationInstance,
+  listIntegrationInstances,
+  listIntegrationInstancesByPlatform,
+  getActiveIntegrationInstance,
+  switchIntegrationInstance,
+  disconnectIntegrationInstance,
+  updateIntegrationInstance,
+} from './tauri';
+import type { PlatformInstance, InstanceId, InstanceConfig } from '../types';
+
+describe('实例管理命令', () => {
+  const mockInstanceConfig: InstanceConfig = {
+    type: 'qqbot',
+    enabled: true,
+    appId: 'test-app',
+    clientSecret: 'test-secret',
+    sandbox: false,
+    displayMode: 'chat',
+    autoConnect: true,
+  };
+
+  const mockInstance: PlatformInstance = {
+    id: 'instance-1',
+    name: 'Test Instance',
+    platform: 'qqbot',
+    config: mockInstanceConfig,
+    createdAt: '2026-01-01T00:00:00Z',
+    enabled: true,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('addIntegrationInstance', () => {
+    it('应添加集成实例并返回 ID', async () => {
+      const mockId: InstanceId = 'new-instance-id';
+      mockInvoke.mockResolvedValueOnce(mockId);
+
+      const result = await addIntegrationInstance(mockInstance);
+
+      expect(mockInvoke).toHaveBeenCalledWith('add_integration_instance', { instance: mockInstance });
+      expect(result).toBe(mockId);
+    });
+
+    it('应处理添加错误', async () => {
+      const error = new Error('Add failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(addIntegrationInstance(mockInstance)).rejects.toThrow('Add failed');
+    });
+  });
+
+  describe('removeIntegrationInstance', () => {
+    it('应移除实例并返回被移除的实例', async () => {
+      mockInvoke.mockResolvedValueOnce(mockInstance);
+
+      const result = await removeIntegrationInstance('instance-1');
+
+      expect(mockInvoke).toHaveBeenCalledWith('remove_integration_instance', { instanceId: 'instance-1' });
+      expect(result).toEqual(mockInstance);
+    });
+
+    it('应返回 null 当实例不存在时', async () => {
+      mockInvoke.mockResolvedValueOnce(null);
+
+      const result = await removeIntegrationInstance('non-existent');
+
+      expect(result).toBeNull();
+    });
+
+    it('应处理移除错误', async () => {
+      const error = new Error('Remove failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(removeIntegrationInstance('id')).rejects.toThrow('Remove failed');
+    });
+  });
+
+  describe('listIntegrationInstances', () => {
+    it('应获取所有实例列表', async () => {
+      const mockInstances: PlatformInstance[] = [mockInstance];
+      mockInvoke.mockResolvedValueOnce(mockInstances);
+
+      const result = await listIntegrationInstances();
+
+      expect(mockInvoke).toHaveBeenCalledWith('list_integration_instances');
+      expect(result).toEqual(mockInstances);
+    });
+
+    it('应返回空数组', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+
+      const result = await listIntegrationInstances();
+
+      expect(result).toEqual([]);
+    });
+
+    it('应处理列表错误', async () => {
+      const error = new Error('List failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(listIntegrationInstances()).rejects.toThrow('List failed');
+    });
+  });
+
+  describe('listIntegrationInstancesByPlatform', () => {
+    it('应按平台获取实例列表', async () => {
+      const mockInstances: PlatformInstance[] = [mockInstance];
+      mockInvoke.mockResolvedValueOnce(mockInstances);
+
+      const result = await listIntegrationInstancesByPlatform('qqbot');
+
+      expect(mockInvoke).toHaveBeenCalledWith('list_integration_instances_by_platform', { platform: 'qqbot' });
+      expect(result).toEqual(mockInstances);
+    });
+
+    it('应返回空数组当平台无实例', async () => {
+      mockInvoke.mockResolvedValueOnce([]);
+
+      const result = await listIntegrationInstancesByPlatform('wechat');
+
+      expect(result).toEqual([]);
+    });
+
+    it('应处理错误', async () => {
+      const error = new Error('Platform list failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(listIntegrationInstancesByPlatform('qqbot')).rejects.toThrow('Platform list failed');
+    });
+  });
+
+  describe('getActiveIntegrationInstance', () => {
+    it('应获取当前激活的实例', async () => {
+      mockInvoke.mockResolvedValueOnce(mockInstance);
+
+      const result = await getActiveIntegrationInstance('qqbot');
+
+      expect(mockInvoke).toHaveBeenCalledWith('get_active_integration_instance', { platform: 'qqbot' });
+      expect(result).toEqual(mockInstance);
+    });
+
+    it('应返回 null 当无激活实例', async () => {
+      mockInvoke.mockResolvedValueOnce(null);
+
+      const result = await getActiveIntegrationInstance('wechat');
+
+      expect(result).toBeNull();
+    });
+
+    it('应处理错误', async () => {
+      const error = new Error('Get active failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getActiveIntegrationInstance('qqbot')).rejects.toThrow('Get active failed');
+    });
+  });
+
+  describe('switchIntegrationInstance', () => {
+    it('应切换到指定实例', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await switchIntegrationInstance('instance-2');
+
+      expect(mockInvoke).toHaveBeenCalledWith('switch_integration_instance', { instanceId: 'instance-2' });
+    });
+
+    it('应处理切换错误', async () => {
+      const error = new Error('Switch failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(switchIntegrationInstance('invalid-id')).rejects.toThrow('Switch failed');
+    });
+  });
+
+  describe('disconnectIntegrationInstance', () => {
+    it('应断开指定平台的连接', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await disconnectIntegrationInstance('qqbot');
+
+      expect(mockInvoke).toHaveBeenCalledWith('disconnect_integration_instance', { platform: 'qqbot' });
+    });
+
+    it('应处理断开错误', async () => {
+      const error = new Error('Disconnect failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(disconnectIntegrationInstance('qqbot')).rejects.toThrow('Disconnect failed');
+    });
+  });
+
+  describe('updateIntegrationInstance', () => {
+    it('应更新实例配置', async () => {
+      const updatedInstance: PlatformInstance = {
+        ...mockInstance,
+        name: 'Updated Instance',
+        enabled: false,
+      };
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await updateIntegrationInstance(updatedInstance);
+
+      expect(mockInvoke).toHaveBeenCalledWith('update_integration_instance', { instance: updatedInstance });
+    });
+
+    it('应处理更新错误', async () => {
+      const error = new Error('Update failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(updateIntegrationInstance(mockInstance)).rejects.toThrow('Update failed');
+    });
+  });
+});
