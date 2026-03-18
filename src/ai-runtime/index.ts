@@ -146,3 +146,20 @@ export {
   globalToolRegistry,
   type ToolRegistry,
 } from './tool-registry'
+
+// 配置验证器导出
+export {
+  validateConfig,
+  validateObject,
+  validateField,
+  validateCLIEngineConfig,
+  validateOpenAIProviderConfig,
+  validateClaudeEngineConfig,
+  ConfigValidator,
+  mergeResults,
+  type ValidationResult,
+  type ValidationError,
+  type ValidationErrorType,
+  type FieldRule,
+  type ObjectRules,
+} from './config-validator'

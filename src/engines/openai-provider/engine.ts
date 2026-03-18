@@ -17,7 +17,7 @@ import type {
   AISession,
   EngineCapabilities,
 } from '../../ai-runtime'
-import { createCapabilities, getEngineRegistry } from '../../ai-runtime'
+import { createCapabilities, getEngineRegistry, validateOpenAIProviderConfig } from '../../ai-runtime'
 import { OpenAIProviderSession, type OpenAIProviderSessionConfig } from './session'
 
 /**
@@ -101,18 +101,14 @@ export class OpenAIProviderEngine implements AIEngine {
    * 构造函数
    *
    * @param config - 引擎配置
-   * @throws {Error} 如果未提供必填参数
+   * @throws {Error} 如果配置验证失败
    */
   constructor(config: OpenAIProviderEngineConfig) {
-    // 验证必填参数
-    if (!config.apiKey) {
-      throw new Error(`[OpenAIProviderEngine] API Key is required`)
-    }
-    if (!config.apiBase) {
-      throw new Error(`[OpenAIProviderEngine] API Base URL is required`)
-    }
-    if (!config.model) {
-      throw new Error(`[OpenAIProviderEngine] Model name is required`)
+    // 使用统一验证器验证配置
+    const validationResult = validateOpenAIProviderConfig(config)
+    if (!validationResult.valid) {
+      const messages = validationResult.errors.map((e) => `${e.field}: ${e.message}`)
+      throw new Error(`[OpenAIProviderEngine] Configuration validation failed:\n${messages.join('\n')}`)
     }
 
     // 生成引擎 ID
