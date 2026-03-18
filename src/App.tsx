@@ -20,7 +20,7 @@ const SettingsModal = lazy(() => import('./components/Settings/SettingsModal').t
 const DeveloperPanel = lazy(() => import('./components/Developer/DeveloperPanel').then(m => ({ default: m.DeveloperPanel })));
 const CreateWorkspaceModal = lazy(() => import('./components/Workspace/CreateWorkspaceModal').then(m => ({ default: m.CreateWorkspaceModal })));
 const SessionHistoryPanel = lazy(() => import('./components/Chat/SessionHistoryPanel').then(m => ({ default: m.SessionHistoryPanel })));
-import { useConfigStore, useEventChatStore, useViewStore, useWorkspaceStore, useFloatingWindowStore, useTabStore, useIntegrationStore } from './stores';
+import { useConfigStore, useEventChatStore, useViewStore, useWorkspaceStore, useFloatingWindowStore, useTabStore, useIntegrationStore, useToolPanelStore, useGitStore } from './stores';
 import * as tauri from './services/tauri';
 import { bootstrapEngines, bootstrapOpenAIProviders } from './core/engine-bootstrap';
 import { bootstrapAgents } from './core/agent-bootstrap';
@@ -43,6 +43,7 @@ function App() {
     messages,
     clearMessages,
     error,
+    setDependencies,
   } = useEventChatStore();
   const workspaces = useWorkspaceStore(state => state.workspaces);
   const currentWorkspace = useWorkspaceStore(state => state.getCurrentWorkspace());
@@ -188,6 +189,28 @@ function App() {
 
         // 注册 AI 工具
         bootstrapTools();
+
+        // 注入外部依赖（解耦 Store 间依赖）
+        setDependencies({
+          toolPanelActions: {
+            clearTools: () => useToolPanelStore.getState().clearTools(),
+            addTool: (tool) => useToolPanelStore.getState().addTool(tool),
+            updateTool: (id, updates) => useToolPanelStore.getState().updateTool(id, updates),
+          },
+          gitActions: {
+            refreshStatusDebounced: (workspacePath) =>
+              useGitStore.getState().refreshStatusDebounced(workspacePath),
+          },
+          configActions: {
+            getConfig: () => useConfigStore.getState().config,
+          },
+          workspaceActions: {
+            getCurrentWorkspace: () => useWorkspaceStore.getState().getCurrentWorkspace(),
+            getWorkspaces: () => useWorkspaceStore.getState().workspaces,
+            getContextWorkspaces: () => useWorkspaceStore.getState().getContextWorkspaces(),
+            getCurrentWorkspaceId: () => useWorkspaceStore.getState().currentWorkspaceId,
+          },
+        });
 
         // 尝试从本地存储恢复聊天状态
         const restored = restoreFromStorage();

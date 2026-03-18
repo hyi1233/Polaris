@@ -13,6 +13,7 @@
  * - sessionSlice: 会话状态（ID、流式状态、错误）
  * - historySlice: 存储持久化和历史管理
  * - eventHandlerSlice: 事件监听和消息发送
+ * - dependencySlice: 依赖注入（解耦 Store 间依赖）
  */
 
 import { create } from 'zustand'
@@ -21,6 +22,7 @@ import { createMessageSlice } from './messageSlice'
 import { createSessionSlice } from './sessionSlice'
 import { createHistorySlice } from './historySlice'
 import { createEventHandlerSlice } from './eventHandlerSlice'
+import { createDependencySlice } from './dependencySlice'
 
 /**
  * 事件驱动的 Chat Store
@@ -32,6 +34,7 @@ export const useEventChatStore = create<EventChatState>()((...a) => ({
   ...createSessionSlice(...a),
   ...createHistorySlice(...a),
   ...createEventHandlerSlice(...a),
+  ...createDependencySlice(...a),
 }))
 
 // 导出类型
@@ -41,9 +44,16 @@ export type {
   SessionState,
   EventHandlerState,
   HistoryState,
+  DependencyState,
+  DependencyActions,
   CurrentAssistantMessage,
   UnifiedHistoryItem,
   ProviderSessionCache,
+  ExternalDependencies,
+  ToolPanelActions,
+  GitActions,
+  ConfigActions,
+  WorkspaceActions,
 } from './types'
 
 // 导出常量

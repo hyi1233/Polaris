@@ -2,6 +2,10 @@
  * 事件处理 Slice
  *
  * 负责事件监听初始化、消息发送、会话控制
+ *
+ * TODO: 解耦外部 Store 依赖（下一次推进）
+ * 当前仍使用 useWorkspaceStore/useConfigStore/useToolPanelStore
+ * 需要逐步迁移到依赖注入模式
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -53,7 +57,10 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
         const aiEvent = payload as any
         console.log('[EventChatStore] 收到 AIEvent:', aiEvent.type)
 
-        const workspacePath = useWorkspaceStore.getState().getCurrentWorkspace()?.path
+        // 尝试使用注入的依赖，如果没有则回退到直接调用
+        const workspaceActions = get().getWorkspaceActions()
+        const workspacePath = workspaceActions?.getCurrentWorkspace()?.path
+          ?? useWorkspaceStore.getState().getCurrentWorkspace()?.path
 
         try {
           eventBus.emit(aiEvent)

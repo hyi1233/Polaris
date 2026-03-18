@@ -12,28 +12,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: any[]) => mockInvoke(...args),
 }))
 
-// Mock toolPanelStore
-const mockClearTools = vi.fn()
-vi.mock('../toolPanelStore', () => ({
-  useToolPanelStore: {
-    getState: () => ({
-      clearTools: mockClearTools,
-    }),
-  },
-}))
-
-// Mock gitStore
-const mockRefreshStatusDebounced = vi.fn()
-vi.mock('../gitStore', () => ({
-  useGitStore: {
-    getState: () => ({
-      refreshStatusDebounced: (...args: any[]) => {
-        mockRefreshStatusDebounced(...args)
-        return Promise.resolve()
-      },
-    }),
-  },
-}))
+// 不再需要 mock toolPanelStore 和 gitStore，因为现在使用依赖注入模式
 
 // Mock diffExtractor
 vi.mock('../../utils/diffExtractor', () => ({
@@ -51,6 +30,12 @@ import {
 } from './utils'
 import type { AIEvent } from '../../ai-runtime'
 import type { EventChatState } from './types'
+
+// Mock 依赖注入的 actions
+const mockClearTools = vi.fn()
+const mockAddTool = vi.fn()
+const mockUpdateTool = vi.fn()
+const mockRefreshStatusDebounced = vi.fn()
 
 // 创建 mock store 函数
 function createMockStoreSet() {
@@ -74,6 +59,20 @@ function createMockStoreSet() {
   })
 
   const get = () => state
+
+  // 添加依赖注入方法
+  state.getToolPanelActions = () => ({
+    clearTools: mockClearTools,
+    addTool: mockAddTool,
+    updateTool: mockUpdateTool,
+  })
+
+  state.getGitActions = () => ({
+    refreshStatusDebounced: (...args: any[]) => {
+      mockRefreshStatusDebounced(...args)
+      return Promise.resolve()
+    },
+  })
 
   return { set, get, state }
 }

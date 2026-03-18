@@ -7,16 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { create } from 'zustand'
 
-// Mock toolPanelStore
-vi.mock('../toolPanelStore', () => ({
-  useToolPanelStore: {
-    getState: () => ({
-      addTool: vi.fn(),
-      updateTool: vi.fn(),
-      clearTools: vi.fn(),
-    }),
-  },
-}))
+// Mock 依赖注入的 actions
+const mockAddTool = vi.fn()
+const mockUpdateTool = vi.fn()
+const mockClearTools = vi.fn()
 
 // Mock utils module
 vi.mock('./utils', () => ({
@@ -35,32 +29,48 @@ import type { EventChatState } from './types'
 
 // 创建测试用的 store
 function createTestStore() {
-  return create<EventChatState>((...args) => ({
-    // 最小状态集合用于测试
-    messages: [],
-    archivedMessages: [],
-    currentMessage: null,
-    toolBlockMap: new Map(),
-    streamingUpdateCounter: 0,
-    conversationId: null,
-    currentConversationSeed: null,
-    isStreaming: false,
-    error: null,
-    progressMessage: null,
-    providerSessionCache: null,
-    _eventListenersInitialized: false,
-    _eventListenersCleanup: null,
-    isInitialized: true,
-    isLoadingHistory: false,
-    isArchiveExpanded: false,
-    maxMessages: 500,
+  return create<EventChatState>((...args) => {
+    const slice = createMessageSlice(...args)
+    
+    return {
+      // 最小状态集合用于测试
+      messages: [],
+      archivedMessages: [],
+      currentMessage: null,
+      toolBlockMap: new Map(),
+      streamingUpdateCounter: 0,
+      conversationId: null,
+      currentConversationSeed: null,
+      isStreaming: false,
+      error: null,
+      progressMessage: null,
+      providerSessionCache: null,
+      _eventListenersInitialized: false,
+      _eventListenersCleanup: null,
+      _dependencies: null,
+      isInitialized: true,
+      isLoadingHistory: false,
+      isArchiveExpanded: false,
+      maxMessages: 500,
 
-    // 需要的方法
-    saveToStorage: vi.fn(),
+      // 需要的方法
+      saveToStorage: vi.fn(),
 
-    // 应用 messageSlice
-    ...createMessageSlice(...args),
-  }) as any)
+      // 依赖注入方法
+      getToolPanelActions: () => ({
+        addTool: mockAddTool,
+        updateTool: mockUpdateTool,
+        clearTools: mockClearTools,
+      }),
+      getGitActions: () => null,
+      getConfigActions: () => null,
+      getWorkspaceActions: () => null,
+      setDependencies: vi.fn(),
+
+      // 应用 messageSlice
+      ...slice,
+    } as any
+  })
 }
 
 describe('messageSlice', () => {

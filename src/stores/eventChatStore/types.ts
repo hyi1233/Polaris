@@ -76,6 +76,80 @@ export interface ProviderSessionCache {
 }
 
 // ============================================================================
+// 依赖注入接口（用于解耦 Store 间依赖）
+// ============================================================================
+
+/**
+ * ToolPanel 操作接口
+ * 用于解耦 eventChatStore 对 toolPanelStore 的直接依赖
+ */
+export interface ToolPanelActions {
+  /** 清空工具列表 */
+  clearTools: () => void
+  /** 添加工具 */
+  addTool: (tool: {
+    id: string
+    name: string
+    status: ToolStatus
+    input?: Record<string, unknown>
+    startedAt: string
+  }) => void
+  /** 更新工具状态 */
+  updateTool: (
+    id: string,
+    updates: { status?: ToolStatus; output?: string; completedAt?: string }
+  ) => void
+}
+
+/**
+ * Git 操作接口
+ * 用于解耦 eventChatStore 对 gitStore 的直接依赖
+ */
+export interface GitActions {
+  /** 防抖刷新 Git 状态 */
+  refreshStatusDebounced: (workspacePath: string) => Promise<void>
+}
+
+/**
+ * Config 操作接口
+ * 用于解耦 eventChatStore 对 configStore 的直接依赖
+ */
+export interface ConfigActions {
+  /** 获取当前配置 */
+  getConfig: () => {
+    defaultEngine?: string
+    openaiProviders?: Array<{ id: string; enabled: boolean; [key: string]: any }>
+    activeProviderId?: string
+    [key: string]: any
+  } | null
+}
+
+/**
+ * Workspace 操作接口
+ * 用于解耦 eventChatStore 对 workspaceStore 的直接依赖
+ */
+export interface WorkspaceActions {
+  /** 获取当前工作区 */
+  getCurrentWorkspace: () => { path: string; [key: string]: any } | null
+  /** 获取所有工作区 */
+  getWorkspaces: () => Array<{ path: string; [key: string]: any }>
+  /** 获取上下文工作区 */
+  getContextWorkspaces: () => Array<{ path: string; [key: string]: any }>
+  /** 获取当前工作区 ID */
+  getCurrentWorkspaceId: () => string | null
+}
+
+/**
+ * 外部依赖集合
+ */
+export interface ExternalDependencies {
+  toolPanelActions?: ToolPanelActions
+  gitActions?: GitActions
+  configActions?: ConfigActions
+  workspaceActions?: WorkspaceActions
+}
+
+// ============================================================================
 // Slice 状态类型定义
 // ============================================================================
 
@@ -121,6 +195,14 @@ export interface EventHandlerState {
   _eventListenersInitialized: boolean
   /** 事件监听器清理函数 */
   _eventListenersCleanup: (() => void) | null
+}
+
+/**
+ * 依赖注入状态
+ */
+export interface DependencyState {
+  /** 外部依赖（用于解耦 Store 间依赖） */
+  _dependencies: ExternalDependencies | null
 }
 
 /**
@@ -229,6 +311,22 @@ export interface HistoryActions {
   clearHistory: () => void
 }
 
+/**
+ * 依赖注入方法
+ */
+export interface DependencyActions {
+  /** 设置外部依赖 */
+  setDependencies: (deps: ExternalDependencies) => void
+  /** 获取工具面板操作 */
+  getToolPanelActions: () => ToolPanelActions | undefined
+  /** 获取 Git 操作 */
+  getGitActions: () => GitActions | undefined
+  /** 获取配置操作 */
+  getConfigActions: () => ConfigActions | undefined
+  /** 获取工作区操作 */
+  getWorkspaceActions: () => WorkspaceActions | undefined
+}
+
 // ============================================================================
 // 组合状态类型
 // ============================================================================
@@ -240,10 +338,12 @@ export type EventChatState = MessageState &
   SessionState &
   EventHandlerState &
   HistoryState &
+  DependencyState &
   MessageActions &
   SessionActions &
   EventHandlerActions &
-  HistoryActions
+  HistoryActions &
+  DependencyActions
 
 // ============================================================================
 // Slice Creator 类型
@@ -260,3 +360,6 @@ export type EventHandlerSlice = StateCreator<EventChatState, [], [], EventHandle
 
 /** 历史 Slice Creator 类型 */
 export type HistorySlice = StateCreator<EventChatState, [], [], HistoryState & HistoryActions>
+
+/** 依赖注入 Slice Creator 类型 */
+export type DependencySlice = StateCreator<EventChatState, [], [], DependencyState & DependencyActions>

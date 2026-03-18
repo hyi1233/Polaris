@@ -6,7 +6,6 @@
 
 import type { MessageSlice, CurrentAssistantMessage } from './types'
 import type { ContentBlock, ToolCallBlock } from '../../types'
-import { useToolPanelStore } from '../toolPanelStore'
 import { MESSAGE_ARCHIVE_THRESHOLD, STORAGE_VERSION, STORAGE_KEY } from './types'
 import { generateToolSummary, calculateDuration } from '../../utils/toolSummary'
 import { clearFileReadCache } from './utils'
@@ -90,6 +89,12 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
     // 清理文件读取缓存
     clearFileReadCache()
 
+    // 使用注入的依赖清理工具面板
+    const toolPanelActions = get().getToolPanelActions()
+    if (toolPanelActions) {
+      toolPanelActions.clearTools()
+    }
+
     set({
       messages: [],
       archivedMessages: [],
@@ -103,7 +108,6 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       _eventListenersInitialized: false,
       _eventListenersCleanup: null,
     })
-    useToolPanelStore.getState().clearTools()
   },
 
   /**
@@ -236,7 +240,7 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
    */
   appendToolCallBlock: (toolId, toolName, input) => {
     const { currentMessage } = get()
-    const toolPanelStore = useToolPanelStore.getState()
+    const toolPanelActions = get().getToolPanelActions()
     const now = new Date().toISOString()
 
     const toolBlock: ToolCallBlock = {
@@ -263,13 +267,15 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       })
 
       // 同步到工具面板
-      toolPanelStore.addTool({
-        id: toolId,
-        name: toolName,
-        status: 'pending',
-        input,
-        startedAt: now,
-      })
+      if (toolPanelActions) {
+        toolPanelActions.addTool({
+          id: toolId,
+          name: toolName,
+          status: 'pending',
+          input,
+          startedAt: now,
+        })
+      }
 
       // 更新进度消息
       const summary = generateToolSummary(toolName, input, 'pending')
@@ -296,13 +302,15 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
     get().updateCurrentAssistantMessage(updatedBlocks)
 
     // 同步到工具面板
-    toolPanelStore.addTool({
-      id: toolId,
-      name: toolName,
-      status: 'pending',
-      input,
-      startedAt: now,
-    })
+    if (toolPanelActions) {
+      toolPanelActions.addTool({
+        id: toolId,
+        name: toolName,
+        status: 'pending',
+        input,
+        startedAt: now,
+      })
+    }
 
     // 更新进度消息
     set({ progressMessage: generateToolSummary(toolName, input, 'pending') })
@@ -313,7 +321,7 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
    */
   updateToolCallBlock: (toolId, status, output, error) => {
     const { currentMessage, toolBlockMap } = get()
-    const toolPanelStore = useToolPanelStore.getState()
+    const toolPanelActions = get().getToolPanelActions()
     const blockIndex = toolBlockMap.get(toolId)
 
     if (!currentMessage || blockIndex === undefined) {
@@ -353,11 +361,13 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
     get().updateCurrentAssistantMessage(updatedBlocks)
 
     // 同步到工具面板
-    toolPanelStore.updateTool(toolId, {
-      status,
-      output: output ? String(output) : undefined,
-      completedAt: now,
-    })
+    if (toolPanelActions) {
+      toolPanelActions.updateTool(toolId, {
+        status,
+        output: output ? String(output) : undefined,
+        completedAt: now,
+      })
+    }
 
     // 更新进度消息
     set({ progressMessage: generateToolSummary(block.name, block.input, status) })

@@ -7,8 +7,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { AIEvent } from '../../ai-runtime'
 import type { EventChatState } from './types'
-import { useToolPanelStore } from '../toolPanelStore'
-import { useGitStore } from '../gitStore'
 import { extractEditDiff, isEditTool } from '../../utils/diffExtractor'
 
 // ============================================================================
@@ -63,6 +61,7 @@ export function clearFileReadCache(): void {
  * - 只处理与本地状态相关的 AIEvent
  * - 不再直接处理 StreamEvent，避免重复逻辑
  * - 与 EventBus 分离，Store 只负责状态管理
+ * - 使用依赖注入模式，通过 state 获取外部依赖
  *
  * @param event 要处理的 AIEvent
  * @param storeSet Zustand 的 set 函数
@@ -83,23 +82,26 @@ export function handleAIEvent(
   })
 
   const state = storeGet()
+  const toolPanelActions = state.getToolPanelActions()
+  const gitActions = state.getGitActions()
 
   switch (event.type) {
     case 'session_start':
       storeSet({ conversationId: event.sessionId, isStreaming: true })
       console.log('[EventChatStore] Session started:', event.sessionId)
-      useToolPanelStore.getState().clearTools()
+      if (toolPanelActions) {
+        toolPanelActions.clearTools()
+      }
       break
 
     case 'session_end':
       state.finishMessage()
       storeSet({ isStreaming: false, progressMessage: null })
       console.log('[EventChatStore] Session ended:', event.reason)
-      
+
       // 会话结束时刷新 Git 状态（防抖）
-      if (workspacePath) {
-        const gitStore = useGitStore.getState()
-        gitStore.refreshStatusDebounced(workspacePath).catch(err => {
+      if (workspacePath && gitActions) {
+        gitActions.refreshStatusDebounced(workspacePath).catch(err => {
           console.warn('[EventChatStore] 会话结束时刷新 Git 状态失败:', err)
         })
       }
@@ -166,16 +168,16 @@ export function handleAIEvent(
       // 对 Edit 工具，提取 Diff 数据
       // 修复：不使用 event.tool 判断，而是在获取 block 后用 block.name 判断
       if (event.success) {
-        const state = storeGet()
-        const blockIndex = state.toolBlockMap.get(event.callId)
+        const currentState = storeGet()
+        const blockIndex = currentState.toolBlockMap.get(event.callId)
 
-        if (state.currentMessage && blockIndex !== undefined) {
-          const block = state.currentMessage.blocks[blockIndex]
+        if (currentState.currentMessage && blockIndex !== undefined) {
+          const block = currentState.currentMessage.blocks[blockIndex]
 
           if (block && block.type === 'tool_call' && isEditTool(block.name)) {
             const diffData = extractEditDiff(block)
             if (diffData) {
-              state.updateToolCallBlockDiff(event.callId, diffData)
+              currentState.updateToolCallBlockDiff(event.callId, diffData)
 
               // 修复：降级策略也使用缓存读取，避免重复请求
               if (!block.diffData?.fullOldContent && diffData.filePath) {
@@ -184,13 +186,13 @@ export function handleAIEvent(
                 readFileWithCache(diffData.filePath)
                   .then(fullContent => {
                     // 再次检查是否还需要设置（避免竞态）
-                    const currentState = storeGet()
-                    const blockIdx = currentState.toolBlockMap.get(callId)
+                    const checkState = storeGet()
+                    const blockIdx = checkState.toolBlockMap.get(callId)
                     if (blockIdx !== undefined) {
-                      const currentBlock = currentState.currentMessage?.blocks[blockIdx]
+                      const currentBlock = checkState.currentMessage?.blocks[blockIdx]
                       if (currentBlock?.type === 'tool_call' && !currentBlock.diffData?.fullOldContent) {
                         console.log('[EventChatStore] 降级策略：从文件系统读取完整内容')
-                        currentState.updateToolCallBlockFullContent(callId, fullContent)
+                        checkState.updateToolCallBlockFullContent(callId, fullContent)
                       }
                     }
                   })
@@ -206,9 +208,8 @@ export function handleAIEvent(
       }
 
       // 工具完成后刷新 Git 状态（防抖）
-      if (workspacePath) {
-        const gitStore = useGitStore.getState()
-        gitStore.refreshStatusDebounced(workspacePath).catch(err => {
+      if (workspacePath && gitActions) {
+        gitActions.refreshStatusDebounced(workspacePath).catch(err => {
           console.warn('[EventChatStore] 工具完成后刷新 Git 状态失败:', err)
         })
       }
