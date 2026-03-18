@@ -1156,3 +1156,364 @@ describe('废弃命令（向后兼容）', () => {
     });
   });
 });
+
+// ============================================================
+// 错误处理场景测试
+// ============================================================
+describe('错误处理场景', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('IPC 调用错误', () => {
+    it('getConfig 应拒绝并传递错误', async () => {
+      const error = new Error('Config not found');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getConfig()).rejects.toThrow('Config not found');
+    });
+
+    it('updateConfig 应拒绝并传递错误', async () => {
+      const error = new Error('Failed to save config');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(updateConfig({} as Config)).rejects.toThrow('Failed to save config');
+    });
+
+    it('findClaudePaths 应拒绝并传递错误', async () => {
+      const error = new Error('Search failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(findClaudePaths()).rejects.toThrow('Search failed');
+    });
+
+    it('validateClaudePath 应拒绝并传递错误', async () => {
+      const error = new Error('Validation error');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(validateClaudePath('/invalid')).rejects.toThrow('Validation error');
+    });
+
+    it('healthCheck 应拒绝并传递错误', async () => {
+      const error = new Error('Health check failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(healthCheck()).rejects.toThrow('Health check failed');
+    });
+
+    it('readDirectory 应拒绝并传递错误', async () => {
+      const error = new Error('Permission denied');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(readDirectory('/protected')).rejects.toThrow('Permission denied');
+    });
+
+    it('getFileContent 应拒绝并传递错误', async () => {
+      const error = new Error('File not found');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getFileContent('/missing.txt')).rejects.toThrow('File not found');
+    });
+
+    it('createFile 应拒绝并传递错误', async () => {
+      const error = new Error('Disk full');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(createFile('/new.txt', 'content')).rejects.toThrow('Disk full');
+    });
+
+    it('deleteFile 应拒绝并传递错误', async () => {
+      const error = new Error('File in use');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(deleteFile('/locked.txt')).rejects.toThrow('File in use');
+    });
+
+    it('schedulerCreateTask 应拒绝并传递错误', async () => {
+      const error = new Error('Invalid trigger');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(schedulerCreateTask({
+        name: 'Test',
+        triggerType: 'interval',
+        triggerValue: 'invalid',
+        engineId: 'claude',
+        prompt: 'test',
+        mode: 'chat',
+        runInTerminal: false,
+        notifyOnComplete: false,
+      })).rejects.toThrow('Invalid trigger');
+    });
+
+    it('startIntegration 应拒绝并传递错误', async () => {
+      const error = new Error('Connection failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(startIntegration('dingtalk')).rejects.toThrow('Connection failed');
+    });
+  });
+
+  describe('saveChatToFile 错误处理', () => {
+    it('用户取消选择时应返回 null', async () => {
+      mockSave.mockResolvedValueOnce(null);
+
+      const result = await saveChatToFile('content', 'chat.md');
+
+      expect(result).toBeNull();
+      expect(mockInvoke).not.toHaveBeenCalled();
+    });
+
+    it('文件写入失败时应抛出错误', async () => {
+      mockSave.mockResolvedValueOnce('/saved/chat.md');
+      const error = new Error('Write failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(saveChatToFile('content', 'chat.md')).rejects.toThrow('Write failed');
+    });
+
+    it('保存对话框失败时应抛出错误', async () => {
+      const error = new Error('Dialog error');
+      mockSave.mockRejectedValueOnce(error);
+
+      await expect(saveChatToFile('content', 'chat.md')).rejects.toThrow('Dialog error');
+    });
+  });
+
+  describe('openInDefaultApp 错误处理', () => {
+    it('openPath 失败时应拒绝', async () => {
+      const error = new Error('No default app');
+      mockOpenPath.mockRejectedValueOnce(error);
+
+      await expect(openInDefaultApp('/unknown.ext')).rejects.toThrow('No default app');
+    });
+  });
+
+  describe('窗口操作错误处理', () => {
+    let mockWindow: {
+      minimize: ReturnType<typeof vi.fn>;
+      maximize: ReturnType<typeof vi.fn>;
+      unmaximize: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+      isMaximized: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockWindow = {
+        minimize: vi.fn(),
+        maximize: vi.fn(),
+        unmaximize: vi.fn(),
+        close: vi.fn(),
+        isMaximized: vi.fn(),
+      };
+      mockGetCurrentWindow.mockReturnValue(mockWindow as unknown as ReturnType<typeof getCurrentWindow>);
+    });
+
+    it('minimizeWindow 应拒绝并传递错误', async () => {
+      const error = new Error('Minimize failed');
+      mockWindow.minimize.mockRejectedValueOnce(error);
+
+      await expect(minimizeWindow()).rejects.toThrow('Minimize failed');
+    });
+
+    it('toggleMaximizeWindow 最小化失败时应拒绝', async () => {
+      mockWindow.isMaximized.mockResolvedValueOnce(false);
+      const error = new Error('Maximize failed');
+      mockWindow.maximize.mockRejectedValueOnce(error);
+
+      await expect(toggleMaximizeWindow()).rejects.toThrow('Maximize failed');
+    });
+
+    it('toggleMaximizeWindow 还原失败时应拒绝', async () => {
+      mockWindow.isMaximized.mockResolvedValueOnce(true);
+      const error = new Error('Unmaximize failed');
+      mockWindow.unmaximize.mockRejectedValueOnce(error);
+
+      await expect(toggleMaximizeWindow()).rejects.toThrow('Unmaximize failed');
+    });
+
+    it('closeWindow 应拒绝并传递错误', async () => {
+      const error = new Error('Close failed');
+      mockWindow.close.mockRejectedValueOnce(error);
+
+      await expect(closeWindow()).rejects.toThrow('Close failed');
+    });
+
+    it('isMaximized 查询失败时应拒绝', async () => {
+      const error = new Error('State query failed');
+      mockWindow.isMaximized.mockRejectedValueOnce(error);
+
+      await expect(toggleMaximizeWindow()).rejects.toThrow('State query failed');
+    });
+  });
+
+  describe('上下文管理错误处理', () => {
+    it('queryContext 应拒绝并传递错误', async () => {
+      const error = new Error('Query failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(queryContext({})).rejects.toThrow('Query failed');
+    });
+
+    it('upsertContext 应拒绝并传递错误', async () => {
+      const error = new Error('Upsert failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(upsertContext({} as ContextEntry)).rejects.toThrow('Upsert failed');
+    });
+
+    it('getAllContext 应拒绝并传递错误', async () => {
+      const error = new Error('Get all failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getAllContext()).rejects.toThrow('Get all failed');
+    });
+
+    it('removeContext 应拒绝并传递错误', async () => {
+      const error = new Error('Remove failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(removeContext('id')).rejects.toThrow('Remove failed');
+    });
+
+    it('clearContext 应拒绝并传递错误', async () => {
+      const error = new Error('Clear failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(clearContext()).rejects.toThrow('Clear failed');
+    });
+
+    it('upsertContextMany 应拒绝并传递错误', async () => {
+      const error = new Error('Batch upsert failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(upsertContextMany([])).rejects.toThrow('Batch upsert failed');
+    });
+  });
+
+  describe('钉钉服务错误处理', () => {
+    it('startDingTalkService 应拒绝并传递错误', async () => {
+      const error = new Error('Service start failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(startDingTalkService()).rejects.toThrow('Service start failed');
+    });
+
+    it('stopDingTalkService 应拒绝并传递错误', async () => {
+      const error = new Error('Service stop failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(stopDingTalkService()).rejects.toThrow('Service stop failed');
+    });
+
+    it('sendDingTalkMessage 应拒绝并传递错误', async () => {
+      const error = new Error('Send failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(sendDingTalkMessage('msg', 'conv')).rejects.toThrow('Send failed');
+    });
+
+    it('isDingTalkServiceRunning 应拒绝并传递错误', async () => {
+      const error = new Error('Status check failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(isDingTalkServiceRunning()).rejects.toThrow('Status check failed');
+    });
+
+    it('getDingTalkServiceStatus 应拒绝并传递错误', async () => {
+      const error = new Error('Get status failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(getDingTalkServiceStatus()).rejects.toThrow('Get status failed');
+    });
+
+    it('testDingTalkConnection 应拒绝并传递错误', async () => {
+      const error = new Error('Connection test failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(testDingTalkConnection('test', 'conv')).rejects.toThrow('Connection test failed');
+    });
+  });
+
+  describe('翻译错误处理', () => {
+    it('baiduTranslate 应拒绝并传递错误', async () => {
+      const error = new Error('API error');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(baiduTranslate('text', 'app', 'key')).rejects.toThrow('API error');
+    });
+  });
+
+  describe('IDE 上报错误处理', () => {
+    it('ideReportCurrentFile 应拒绝并传递错误', async () => {
+      const error = new Error('Report failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(ideReportCurrentFile({
+        workspace_id: 'ws',
+        file_path: '/file.ts',
+        content: 'code',
+        language: 'ts',
+        cursor_offset: 0,
+      })).rejects.toThrow('Report failed');
+    });
+
+    it('ideReportFileStructure 应拒绝并传递错误', async () => {
+      const error = new Error('Structure report failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(ideReportFileStructure({
+        workspace_id: 'ws',
+        file_path: '/file.ts',
+        symbols: [],
+      })).rejects.toThrow('Structure report failed');
+    });
+
+    it('ideReportDiagnostics 应拒绝并传递错误', async () => {
+      const error = new Error('Diagnostics report failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(ideReportDiagnostics({
+        workspace_id: 'ws',
+        file_path: '/file.ts',
+        diagnostics: [],
+      })).rejects.toThrow('Diagnostics report failed');
+    });
+  });
+
+  describe('废弃命令错误处理', () => {
+    it('startChat 应拒绝并传递错误', async () => {
+      const error = new Error('Start failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(startChat('msg')).rejects.toThrow('Start failed');
+    });
+
+    it('continueChat 应拒绝并传递错误', async () => {
+      const error = new Error('Continue failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(continueChat('sid', 'msg')).rejects.toThrow('Continue failed');
+    });
+
+    it('interruptChat 应拒绝并传递错误', async () => {
+      const error = new Error('Interrupt failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(interruptChat('sid')).rejects.toThrow('Interrupt failed');
+    });
+
+    it('startIFlowChat 应拒绝并传递错误', async () => {
+      const error = new Error('IFlow start failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(startIFlowChat('msg')).rejects.toThrow('IFlow start failed');
+    });
+
+    it('startCodexChat 应拒绝并传递错误', async () => {
+      const error = new Error('Codex start failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(startCodexChat('msg')).rejects.toThrow('Codex start failed');
+    });
+  });
+});
