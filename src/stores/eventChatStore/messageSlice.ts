@@ -95,6 +95,14 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       _eventListenersInitialized: false,
       _eventListenersCleanup: null,
     })
+
+    // 重新初始化事件监听器
+    // 注意：必须在状态更新后执行，因为 initializeEventListeners 会检查 _eventListenersInitialized
+    get().initializeEventListeners().then(() => {
+      console.log('[EventChatStore] 新对话：事件监听器已重新初始化')
+    }).catch((e) => {
+      console.error('[EventChatStore] 新对话：事件监听器重新初始化失败:', e)
+    })
   },
 
   /**
