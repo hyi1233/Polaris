@@ -16,27 +16,8 @@
         "title": "Polaris",
         "width": 1200,
         "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
         "decorations": false,
         "hiddenTitle": true,
-        "devtools": true
-      },
-      {
-        "label": "floating",
-        "title": "Polaris - 悬浮窗",
-        "url": "floating.html",
-        "width": 500,
-        "height": 400,
-        "minWidth": 400,
-        "minHeight": 300,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": true,
-        "transparent": false,
-        "visible": false,
-        "center": false,
         "devtools": true
       }
     ],

@@ -17,7 +17,6 @@ import { GeneralTab } from './tabs/GeneralTab';
 import { OpenAIProvidersTab } from './OpenAIProvidersTab';
 import { TranslateTab } from './tabs/TranslateTab';
 import { QQBotTab } from './tabs/QQBotTab';
-import { FloatingWindowTab } from './tabs/FloatingWindowTab';
 import { createLogger } from '../../utils/logger';
 
 const log = createLogger('SettingsModal');
@@ -38,7 +37,6 @@ const TAB_TITLES: Record<SettingsTabId, string> = {
   'openai-providers': 'OpenAI Providers',
   'translate': '翻译',
   'qqbot': 'QQ Bot',
-  'floating-window': '悬浮窗',
   'scheduler': '定时任务',
   'advanced': '高级',
 };
@@ -188,14 +186,6 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
 
               {activeTab === 'qqbot' && (
                 <QQBotTab
-                  config={localConfig}
-                  onConfigChange={setLocalConfig}
-                  loading={loading}
-                />
-              )}
-
-              {activeTab === 'floating-window' && (
-                <FloatingWindowTab
                   config={localConfig}
                   onConfigChange={setLocalConfig}
                   loading={loading}

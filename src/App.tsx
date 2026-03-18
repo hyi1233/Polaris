@@ -20,13 +20,13 @@ const SettingsModal = lazy(() => import('./components/Settings/SettingsModal').t
 const DeveloperPanel = lazy(() => import('./components/Developer/DeveloperPanel').then(m => ({ default: m.DeveloperPanel })));
 const CreateWorkspaceModal = lazy(() => import('./components/Workspace/CreateWorkspaceModal').then(m => ({ default: m.CreateWorkspaceModal })));
 const SessionHistoryPanel = lazy(() => import('./components/Chat/SessionHistoryPanel').then(m => ({ default: m.SessionHistoryPanel })));
-import { useConfigStore, useEventChatStore, useViewStore, useWorkspaceStore, useFloatingWindowStore, useTabStore, useIntegrationStore, useToolPanelStore, useGitStore } from './stores';
+import { useConfigStore, useEventChatStore, useViewStore, useWorkspaceStore, useTabStore, useIntegrationStore, useToolPanelStore, useGitStore } from './stores';
 import * as tauri from './services/tauri';
 import { bootstrapEngines, bootstrapOpenAIProviders } from './core/engine-bootstrap';
 import { bootstrapAgents } from './core/agent-bootstrap';
 import { bootstrapTools } from './core/tool-bootstrap';
 import { clearOpenAIProviderEngines } from './engines/openai-provider';
-import { listen, emit } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 import './index.css';
 import type { EngineId } from './types';
 import { createLogger } from './utils/logger';
@@ -41,7 +41,6 @@ function App() {
     sendMessage,
     interruptChat,
     initializeEventListeners,
-    messages,
     clearMessages,
     error,
     setDependencies,
@@ -72,7 +71,6 @@ function App() {
   const hasCheckedWorkspaces = useRef(false);
   const lastOpenAIProvidersRef = useRef<string>(JSON.stringify([]));
   const lastActiveProviderIdRef = useRef<string | undefined>(undefined);
-  const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     showSessionHistory,
     toggleSessionHistory,
@@ -81,7 +79,6 @@ function App() {
     rightPanelCollapsed,
     toggleRightPanel,
   } = useViewStore();
-  const { showFloatingWindow } = useFloatingWindowStore();
   const { openDiffTab, tabs } = useTabStore();
   const hasOpenTabs = tabs.length > 0;
 
@@ -362,96 +359,6 @@ function App() {
       eventListenerCleanupRef.current = null;
     };
   }, [initializeEventListeners]);
-
-  // 窗口焦点检测 - 自动切换到悬浮窗模式
-  useEffect(() => {
-    // 只在配置启用且模式为 auto 时才监听
-    const floatingConfig = config?.floatingWindow
-    if (!floatingConfig?.enabled || floatingConfig.mode !== 'auto') {
-      return
-    }
-
-    const delay = floatingConfig.collapseDelay || 500
-
-    // 窗口失去焦点时，延迟后切换到悬浮窗
-    const handleBlur = () => {
-      log.debug('窗口失去焦点，准备切换到悬浮窗')
-      // 延迟后切换到悬浮窗
-      mouseLeaveTimerRef.current = setTimeout(() => {
-        if (document.visibilityState === 'visible') {
-          log.debug('窗口仍无焦点，切换到悬浮窗')
-          showFloatingWindow();
-        }
-      }, delay);
-    };
-
-    // 窗口获得焦点时，取消切换
-    const handleFocus = () => {
-      log.debug('窗口获得焦点，取消自动切换')
-      if (mouseLeaveTimerRef.current) {
-        clearTimeout(mouseLeaveTimerRef.current);
-        mouseLeaveTimerRef.current = null;
-      }
-    };
-
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
-      if (mouseLeaveTimerRef.current) {
-        clearTimeout(mouseLeaveTimerRef.current);
-      }
-    };
-    // 使用具体值作为依赖，避免对象引用变化导致重复执行
-  }, [config?.floatingWindow?.enabled, config?.floatingWindow?.mode, config?.floatingWindow?.collapseDelay]);
-
-  // 跨窗口数据同步 - 同步消息到 localStorage（供悬浮窗读取）
-  useEffect(() => {
-    // 将完整消息同步到 localStorage
-    localStorage.setItem('chat_messages_sync', JSON.stringify(messages));
-
-    // 同步流式状态
-    localStorage.setItem('chat_is_streaming', JSON.stringify(isStreaming));
-  }, [messages, isStreaming]);
-
-  // 跨窗口数据同步 - 监听悬浮窗发送的消息
-  useEffect(() => {
-    const unlistenPromise = listen('floating:send_message', async (event: any) => {
-      const { message } = event.payload;
-      await sendMessage(message);
-    });
-
-    return () => {
-      unlistenPromise.then(unlisten => unlisten());
-    };
-  }, [sendMessage]);
-
-  // 跨窗口数据同步 - 监听悬浮窗的中断请求
-  useEffect(() => {
-    const unlistenPromise = listen('floating:interrupt_chat', async () => {
-      interruptChat();
-    });
-
-    return () => {
-      unlistenPromise.then(unlisten => unlisten());
-    };
-  }, [interruptChat]);
-
-  // 跨窗口数据同步 - 同步流式状态
-  useEffect(() => {
-    emit('chat:streaming_changed', { isStreaming });
-  }, [isStreaming]);
-
-  // 配置更新时通知悬浮窗
-  useEffect(() => {
-    if (config) {
-      emit('config:updated', { config });
-      // 同时保存到 localStorage 供悬浮窗读取
-      localStorage.setItem('app_config', JSON.stringify(config));
-    }
-  }, [config]);
 
     // 监听文件打开事件,创建 Editor Tab
     useEffect(() => {

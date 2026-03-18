@@ -40,11 +40,7 @@ export default defineConfig(async () => ({
   build: {
     // Code splitting configuration
     rollupOptions: {
-      // 多入口配置
-      input: {
-        main: './index.html',
-        floating: './floating.html',
-      },
+      input: './index.html',
       output: {
         // Manual chunk splitting to separate large dependencies
         manualChunks: (id) => {
@@ -95,13 +91,8 @@ export default defineConfig(async () => ({
         },
         // Chunk file naming
         chunkFileNames: 'assets/[name]-[hash].js',
-        // Entry file naming - 分别命名主窗口和悬浮窗
-        entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'floating') {
-            return 'assets/floating-[hash].js';
-          }
-          return 'assets/main-[hash].js';
-        },
+        // Entry file naming
+        entryFileNames: 'assets/main-[hash].js',
       },
     },
     // Chunk size warning threshold (kb) - 提高到 1500kb 以适应大型依赖库

@@ -4,9 +4,8 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Minus, Square, X, Clock, Download, Copy, PanelRight } from 'lucide-react';
-import { useWorkspaceStore, useViewStore, useEventChatStore, useConfigStore } from '../../stores';
-import { useFloatingWindowStore } from '../../stores/floatingWindowStore';
+import { Minus, Square, X, Clock, Download, PanelRight } from 'lucide-react';
+import { useWorkspaceStore, useViewStore, useEventChatStore } from '../../stores';
 import * as tauri from '../../services/tauri';
 import { exportToMarkdown, generateFileName } from '../../services/chatExport';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -23,9 +22,7 @@ interface TopMenuBarProps {
 
 export function TopMenuBar({ onNewConversation, onCreateWorkspace, onToggleRightPanel, rightPanelCollapsed }: TopMenuBarProps) {
   const { t } = useTranslation('common');
-  const { config } = useConfigStore();
   const { getCurrentWorkspace } = useWorkspaceStore();
-  const { showFloatingWindow } = useFloatingWindowStore();
   const { toggleSessionHistory } = useViewStore();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
@@ -162,21 +159,6 @@ export function TopMenuBar({ onNewConversation, onCreateWorkspace, onToggleRight
         >
           <PanelRight className="w-4 h-4" />
         </button>
-
-        {/* 分隔线 */}
-        <div data-tauri-drag-region className="w-px h-4 bg-border-subtle mx-1" />
-
-        {/* 悬浮窗切换按钮 - 仅在手动模式且启用悬浮窗时显示 */}
-        {config?.floatingWindow?.enabled && config?.floatingWindow?.mode === 'manual' && (
-          <button
-            onClick={showFloatingWindow}
-            className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors"
-            title={t('menu.switchToFloat')}
-            data-tauri-drag-region={false}
-          >
-            <Copy className="w-4 h-4" />
-          </button>
-        )}
 
         <button
           onClick={handleExportChat}
