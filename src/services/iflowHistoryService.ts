@@ -90,7 +90,7 @@ export class IFlowHistoryService {
   async listSessions(): Promise<IFlowSessionMeta[]> {
     try {
       const sessions = await invoke<IFlowSessionMeta[]>('list_iflow_sessions')
-      return sessions
+      return sessions ?? []
     } catch (e) {
       console.error('[IFlowHistoryService] 列出会话失败:', e)
       return []
@@ -103,7 +103,7 @@ export class IFlowHistoryService {
   async getSessionHistory(sessionId: string): Promise<IFlowHistoryMessage[]> {
     try {
       const messages = await invoke<IFlowHistoryMessage[]>('get_iflow_session_history', { sessionId })
-      return messages
+      return messages ?? []
     } catch (e) {
       console.error('[IFlowHistoryService] 获取会话历史失败:', e)
       return []
@@ -116,7 +116,7 @@ export class IFlowHistoryService {
   async getFileContexts(sessionId: string): Promise<IFlowFileContext[]> {
     try {
       const contexts = await invoke<IFlowFileContext[]>('get_iflow_file_contexts', { sessionId })
-      return contexts
+      return contexts ?? []
     } catch (e) {
       console.error('[IFlowHistoryService] 获取文件上下文失败:', e)
       return []

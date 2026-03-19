@@ -1263,4 +1263,508 @@ describe('IFlowHistoryService', () => {
       expect(result).toHaveLength(500)
     })
   })
+
+  // ===========================================================================
+  // 类型安全测试
+  // ===========================================================================
+
+  describe('类型安全', () => {
+    it('getSessionHistory 应正确处理 undefined parentUuid', async () => {
+      const mockMessages: IFlowHistoryMessage[] = [
+        { uuid: 'msg-1', timestamp: '2026-03-19T10:00:00Z', type: 'user', content: 'Test', toolCalls: [] },
+      ]
+
+      vi.mocked(invoke).mockResolvedValue(mockMessages)
+
+      const result = await service.getSessionHistory('session-1')
+
+      expect(result[0].parentUuid).toBeUndefined()
+    })
+
+    it('convertMessagesToFormat 应正确处理缺少可选字段', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: 'Test',
+          toolCalls: [],
+          // 缺少 model, stopReason, inputTokens, outputTokens, parentUuid
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].id).toBe('msg-1')
+      expect(result[0].role).toBe('assistant')
+    })
+
+    it('extractToolCalls 应正确处理 input 为复杂对象', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: 'tc-1',
+              name: 'complex_tool',
+              input: {
+                nested: {
+                  deep: {
+                    value: 123,
+                    array: [1, 2, 3],
+                  },
+                },
+                nullValue: null,
+                boolValue: true,
+              },
+            },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect((result[0].input as Record<string, unknown>).nested).toBeDefined()
+    })
+
+    it('convertMessagesToFormat toolSummary 应正确处理空名称数组', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: 'Test',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].toolSummary).toBeUndefined()
+    })
+  })
+
+  // ===========================================================================
+  // 特殊日期格式测试
+  // ===========================================================================
+
+  describe('formatTime 特殊日期格式', () => {
+    it('应正确处理 ISO 8601 格式', () => {
+      const result = service.formatTime('2026-03-19T10:00:00.000Z')
+      expect(typeof result).toBe('string')
+    })
+
+    it('应正确处理带时区的日期', () => {
+      const result = service.formatTime('2026-03-19T18:00:00+08:00')
+      expect(typeof result).toBe('string')
+    })
+
+    it('应正确处理 UTC 格式', () => {
+      const result = service.formatTime('2026-03-19T10:00:00Z')
+      expect(typeof result).toBe('string')
+    })
+
+    it('应正确处理简短日期格式', () => {
+      const result = service.formatTime('2026-03-19')
+      expect(typeof result).toBe('string')
+    })
+
+    it('应正确处理带毫秒的日期', () => {
+      const result = service.formatTime('2026-03-19T10:00:00.123456Z')
+      expect(typeof result).toBe('string')
+    })
+
+    it('应正确处理跨年日期', () => {
+      const lastYear = new Date()
+      lastYear.setFullYear(lastYear.getFullYear() - 2)
+      const result = service.formatTime(lastYear.toISOString())
+      expect(result).toMatch(/\d+月\d+日/)
+    })
+  })
+
+  // ===========================================================================
+  // 极端数值测试
+  // ===========================================================================
+
+  describe('极端数值处理', () => {
+    it('formatFileSize 应正确处理 Number.MAX_SAFE_INTEGER', () => {
+      const result = service.formatFileSize(Number.MAX_SAFE_INTEGER)
+      expect(typeof result).toBe('string')
+    })
+
+    it('formatFileSize 应正确处理 Number.MIN_VALUE', () => {
+      const result = service.formatFileSize(Number.MIN_VALUE)
+      expect(typeof result).toBe('string')
+    })
+
+    it('formatFileSize 应正确处理 NaN', () => {
+      const result = service.formatFileSize(NaN)
+      expect(typeof result).toBe('string')
+    })
+
+    it('formatFileSize 应正确处理 Infinity', () => {
+      const result = service.formatFileSize(Infinity)
+      expect(typeof result).toBe('string')
+    })
+
+    it('getSessionSummary 应正确处理极大 Token 数', () => {
+      const meta: IFlowSessionMeta = {
+        sessionId: 's1',
+        title: 'Test',
+        messageCount: 999999,
+        fileSize: 999999999,
+        createdAt: '2026-03-19T10:00:00Z',
+        updatedAt: '2026-03-19T11:00:00Z',
+        inputTokens: 999999999,
+        outputTokens: 999999999,
+      }
+
+      const result = service.getSessionSummary(meta, null)
+
+      // 使用正则匹配避免 toLocaleString 格式差异
+      expect(result).toMatch(/999999 条消息/)
+      expect(result).toMatch(/\d[\d,]* Tokens/)
+    })
+
+    it('getTokenStats 应正确处理极端统计值', async () => {
+      const mockStats: IFlowTokenStats = {
+        totalInputTokens: Number.MAX_SAFE_INTEGER,
+        totalOutputTokens: Number.MAX_SAFE_INTEGER,
+        totalTokens: Number.MAX_SAFE_INTEGER,
+        messageCount: Number.MAX_SAFE_INTEGER,
+        userMessageCount: Number.MAX_SAFE_INTEGER,
+        assistantMessageCount: Number.MAX_SAFE_INTEGER,
+      }
+
+      vi.mocked(invoke).mockResolvedValue(mockStats)
+
+      const result = await service.getTokenStats('session-1')
+
+      expect(result?.totalTokens).toBe(Number.MAX_SAFE_INTEGER)
+    })
+  })
+
+  // ===========================================================================
+  // 输入验证测试
+  // ===========================================================================
+
+  describe('输入验证', () => {
+    it('listSessions 应正确处理返回 null', async () => {
+      vi.mocked(invoke).mockResolvedValue(null)
+
+      const result = await service.listSessions()
+
+      expect(result).toEqual([])
+    })
+
+    it('listSessions 应正确处理返回 undefined', async () => {
+      vi.mocked(invoke).mockResolvedValue(undefined)
+
+      const result = await service.listSessions()
+
+      expect(result).toEqual([])
+    })
+
+    it('getSessionHistory 应正确处理返回 null', async () => {
+      vi.mocked(invoke).mockResolvedValue(null)
+
+      const result = await service.getSessionHistory('session-1')
+
+      expect(result).toEqual([])
+    })
+
+    it('getFileContexts 应正确处理返回 null', async () => {
+      vi.mocked(invoke).mockResolvedValue(null)
+
+      const result = await service.getFileContexts('session-1')
+
+      expect(result).toEqual([])
+    })
+
+    it('getSessionHistory 应正确处理空 sessionId', async () => {
+      vi.mocked(invoke).mockResolvedValue([])
+
+      const result = await service.getSessionHistory('')
+
+      expect(result).toEqual([])
+      expect(invoke).toHaveBeenCalledWith('get_iflow_session_history', { sessionId: '' })
+    })
+
+    it('getFileContexts 应正确处理空 sessionId', async () => {
+      vi.mocked(invoke).mockResolvedValue([])
+
+      const result = await service.getFileContexts('')
+
+      expect(result).toEqual([])
+      expect(invoke).toHaveBeenCalledWith('get_iflow_file_contexts', { sessionId: '' })
+    })
+
+    it('getTokenStats 应正确处理空 sessionId', async () => {
+      vi.mocked(invoke).mockResolvedValue(null)
+
+      const result = await service.getTokenStats('')
+
+      expect(result).toBeNull()
+      expect(invoke).toHaveBeenCalledWith('get_iflow_token_stats', { sessionId: '' })
+    })
+  })
+
+  // ===========================================================================
+  // 服务实例方法完整性测试
+  // ===========================================================================
+
+  describe('服务实例方法完整性', () => {
+    it('服务应包含所有必需的异步方法', () => {
+      expect(typeof service.listSessions).toBe('function')
+      expect(typeof service.getSessionHistory).toBe('function')
+      expect(typeof service.getFileContexts).toBe('function')
+      expect(typeof service.getTokenStats).toBe('function')
+    })
+
+    it('服务应包含所有必需的同步方法', () => {
+      expect(typeof service.convertMessagesToFormat).toBe('function')
+      expect(typeof service.extractToolCalls).toBe('function')
+      expect(typeof service.generateSessionTitle).toBe('function')
+      expect(typeof service.getSessionSummary).toBe('function')
+      expect(typeof service.formatFileSize).toBe('function')
+      expect(typeof service.formatTime).toBe('function')
+    })
+
+    it('getIFlowHistoryService 应返回 IFlowHistoryService 实例', () => {
+      resetIFlowHistoryService()
+      const instance = getIFlowHistoryService()
+      expect(instance).toBeInstanceOf(IFlowHistoryService)
+    })
+
+    it('多次 getIFlowHistoryService 应返回同一实例', () => {
+      resetIFlowHistoryService()
+      const instance1 = getIFlowHistoryService()
+      const instance2 = getIFlowHistoryService()
+      expect(instance1).toBe(instance2)
+    })
+  })
+
+  // ===========================================================================
+  // 消息内容特殊字符测试
+  // ===========================================================================
+
+  describe('消息内容特殊字符', () => {
+    it('应正确处理包含 HTML 标签的内容', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'user',
+          content: '<div>Hello</div><script>alert(1)</script>',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('<div>Hello</div><script>alert(1)</script>')
+    })
+
+    it('应正确处理包含 JSON 字符串的内容', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '{"key": "value", "nested": {"a": 1}}',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toContain('{"key"')
+    })
+
+    it('应正确处理包含换行符的内容', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'user',
+          content: 'Line 1\nLine 2\r\nLine 3',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('Line 1\nLine 2\r\nLine 3')
+    })
+
+    it('应正确处理包含制表符的内容', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: 'Column 1\tColumn 2\tColumn 3',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('Column 1\tColumn 2\tColumn 3')
+    })
+
+    it('应正确处理包含特殊 Unicode 字符的内容', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'user',
+          content: 'Special: \u0000\u0001\u0002\u0003',
+          toolCalls: [],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('Special: \u0000\u0001\u0002\u0003')
+    })
+  })
+
+  // ===========================================================================
+  // 工具调用特殊场景测试
+  // ===========================================================================
+
+  describe('工具调用特殊场景', () => {
+    it('应正确处理空对象 input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'noop', input: {} },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result[0].input).toEqual({})
+    })
+
+    it('应正确处理 null input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'noop', input: null },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result[0].input).toBeNull()
+    })
+
+    it('应正确处理数组 input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'batch', input: [1, 2, 3, 'a', 'b', 'c'] },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result[0].input).toEqual([1, 2, 3, 'a', 'b', 'c'])
+    })
+
+    it('应正确处理字符串 input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'echo', input: 'simple string input' },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result[0].input).toBe('simple string input')
+    })
+
+    it('应正确处理数字 input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'echo', input: 'simple string' },
+            { id: 'tc-2', name: 'echo', input: 'another string' },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result).toHaveLength(2)
+    })
+
+    it('应正确处理数字 input', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'calculate', input: 42 },
+          ],
+        },
+      ]
+
+      const result = service.extractToolCalls(messages)
+
+      expect(result[0].input).toBe(42)
+    })
+
+    it('应正确处理包含特殊字符的工具名称', () => {
+      const messages: IFlowHistoryMessage[] = [
+        {
+          uuid: 'msg-1',
+          timestamp: '2026-03-19T10:00:00Z',
+          type: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'tc-1', name: 'tool-with-dash', input: {} },
+            { id: 'tc-2', name: 'tool_with_underscore', input: {} },
+            { id: 'tc-3', name: 'tool.with.dot', input: {} },
+          ],
+        },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].toolSummary?.names).toEqual(['tool-with-dash', 'tool_with_underscore', 'tool.with.dot'])
+    })
+  })
 })
