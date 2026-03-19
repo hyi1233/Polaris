@@ -38,7 +38,9 @@ export function parseWorkspaceReferences(
   // 预构建名称索引，O(1) 查找
   const workspaceByName = new Map<string, Workspace>();
   for (const w of workspaces) {
-    workspaceByName.set(w.name.toLowerCase(), w);
+    if (w.name) {
+      workspaceByName.set(w.name.toLowerCase(), w);
+    }
   }
 
   // 存储匹配结果和位置，避免正则 lastIndex 问题
@@ -89,7 +91,7 @@ export function parseWorkspaceReferences(
       actualWorkspaceName = currentWorkspace?.name || '当前工作区';
     }
 
-    if (workspace) {
+    if (workspace && workspace.path) {
       // 使用平台特定的路径分隔符
       const pathSeparator = workspace.path.includes('\\') ? '\\' : '/';
       const absolutePath = workspace.path + pathSeparator + relativePath;
@@ -124,11 +126,12 @@ export function parseWorkspaceReferences(
  */
 function generateContextHeader(
   references: WorkspaceReference[],
-  contextWorkspaces: Workspace[],
+  contextWorkspaces: Workspace[] | null | undefined,
   allWorkspaces: Workspace[],
   currentWorkspaceId: string | null
 ): string {
-  if (references.length === 0 && contextWorkspaces.length === 0) {
+  const safeContextWorkspaces = contextWorkspaces ?? [];
+  if (references.length === 0 && safeContextWorkspaces.length === 0) {
     return '';
   }
 
@@ -144,9 +147,9 @@ function generateContextHeader(
     header += `  引用语法: @/path\n`;
   }
 
-  if (contextWorkspaces.length > 0) {
+  if (safeContextWorkspaces.length > 0) {
     header += '\n关联工作区:\n';
-    contextWorkspaces.forEach(w => {
+    safeContextWorkspaces.forEach(w => {
       header += `  • ${w.name}\n`;
       header += `    路径: ${w.path}\n`;
       header += `    引用语法: @${w.name}:path\n`;
