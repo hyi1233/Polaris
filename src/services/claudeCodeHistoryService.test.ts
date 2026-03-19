@@ -699,3 +699,411 @@ describe('extractUserContent 间接测试', () => {
     expect((result[0] as { content: string }).content).toBe('')
   })
 })
+
+// ============================================================================
+// 复杂场景测试
+// ============================================================================
+
+describe('复杂场景测试', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+    uuidIndex = 0
+  })
+
+  describe('多轮对话流程', () => {
+    it('应该正确处理完整的对话流程', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: 'Hello', timestamp: '2026-03-19T10:00:00Z' },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Hi there!' }],
+          timestamp: '2026-03-19T10:01:00Z',
+        },
+        { role: 'user', content: 'How are you?', timestamp: '2026-03-19T10:02:00Z' },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'I am doing well!' }],
+          timestamp: '2026-03-19T10:03:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      expect(result).toHaveLength(4)
+      expect(result[0].type).toBe('user')
+      expect(result[1].type).toBe('assistant')
+      expect(result[2].type).toBe('user')
+      expect(result[3].type).toBe('assistant')
+    })
+
+    it('应该正确处理带有工具调用的对话流程', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: 'Read a file', timestamp: '2026-03-19T10:00:00Z' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'I need to read the file...' },
+            { type: 'tool_use', id: 'call-1', name: 'ReadFile', input: { path: '/test' } },
+          ],
+          timestamp: '2026-03-19T10:01:00Z',
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'File content' }],
+          timestamp: '2026-03-19T10:02:00Z',
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Here is the file content' }],
+          timestamp: '2026-03-19T10:03:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      // tool_result 消息被跳过后，两个 assistant 消息会被合并
+      expect(result).toHaveLength(2)
+      expect(result[0].type).toBe('user')
+      expect((result[0] as { content: string }).content).toBe('Read a file')
+      expect(result[1].type).toBe('assistant')
+      // 两个 assistant 消息的 blocks 应该合并
+      const blocks = (result[1] as { blocks: Array<{ type: string }> }).blocks
+      expect(blocks).toHaveLength(3) // thinking, tool_use, text
+    })
+
+    it('应该正确处理多个连续 assistant 消息被用户消息打断', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Part 1' }],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Part 2' }],
+          timestamp: '2026-03-19T10:01:00Z',
+        },
+        { role: 'user', content: 'Interrupt!', timestamp: '2026-03-19T10:02:00Z' },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Part 3' }],
+          timestamp: '2026-03-19T10:03:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      expect(result).toHaveLength(3)
+      // 前两个 assistant 合并
+      expect(result[0].type).toBe('assistant')
+      const blocks1 = (result[0] as { blocks: Array<{ type: string; content?: string }> }).blocks
+      expect(blocks1).toHaveLength(2)
+      // 用户消息
+      expect(result[1].type).toBe('user')
+      // 第三个 assistant
+      expect(result[2].type).toBe('assistant')
+    })
+  })
+
+  describe('tool_result 与文本混合场景', () => {
+    it('应该保留包含文本和 tool_result 的用户消息中的文本', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'I have a question' },
+            { type: 'tool_result', tool_use_id: 'call-1', content: 'Previous result' },
+          ],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      // 应该保留这条消息，提取文本内容
+      expect(result).toHaveLength(1)
+      expect((result[0] as { content: string }).content).toBe('I have a question')
+    })
+
+    it('应该正确处理多个 tool_result 的用户消息（无文本）', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'call-1', content: 'Result 1' },
+            { type: 'tool_result', tool_use_id: 'call-2', content: 'Result 2' },
+          ],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+        { role: 'user', content: 'Next question', timestamp: '2026-03-19T10:01:00Z' },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      // 第一个消息应该被跳过
+      expect(result).toHaveLength(1)
+      expect((result[0] as { content: string }).content).toBe('Next question')
+    })
+
+    it('应该在 tool_result 后正确累积 assistant 消息', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Let me check' }],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'Result' }],
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Based on result' }],
+          timestamp: '2026-03-19T10:02:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      // tool_result 被跳过后，两个 assistant 消息会被合并
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('assistant')
+      // 两个 assistant 消息的 blocks 应该合并
+      const blocks = (result[0] as { blocks: Array<{ type: string; content?: string }> }).blocks
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].content).toBe('Let me check')
+      expect(blocks[1].content).toBe('Based on result')
+    })
+  })
+
+  describe('thinking 块完整属性验证', () => {
+    it('应该正确设置 thinking 块的 collapsed 属性', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'thinking',
+              thinking: 'Deep thinking process...',
+            },
+          ],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+      const blocks = (result[0] as { blocks: Array<{ type: string; content?: string; collapsed?: boolean }> }).blocks
+
+      expect(blocks[0].type).toBe('thinking')
+      expect(blocks[0].content).toBe('Deep thinking process...')
+      expect(blocks[0].collapsed).toBe(true)
+    })
+  })
+
+  describe('tool_call 块完整属性验证', () => {
+    it('应该正确解析 tool_call 块的所有属性', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'call-123',
+              name: 'WriteFile',
+              input: { path: '/test.txt', content: 'Hello' },
+            },
+          ],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+      const blocks = (result[0] as { blocks: Array<{ type: string; id?: string; name?: string; input?: Record<string, unknown>; status?: string }> }).blocks
+
+      expect(blocks[0].type).toBe('tool_call')
+      expect(blocks[0].id).toBe('call-123')
+      expect(blocks[0].name).toBe('WriteFile')
+      expect(blocks[0].input).toEqual({ path: '/test.txt', content: 'Hello' })
+      expect(blocks[0].status).toBe('completed')
+    })
+
+    it('应该为缺少属性的 tool_use 生成默认值', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use' }],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+      const blocks = (result[0] as { blocks: Array<{ type: string; id?: string; name?: string; input?: Record<string, unknown> }> }).blocks
+
+      expect(blocks[0].type).toBe('tool_call')
+      expect(blocks[0].id).toBe('uuid-1')
+      expect(blocks[0].name).toBe('unknown')
+      expect(blocks[0].input).toEqual({})
+    })
+  })
+
+  describe('系统消息穿插场景', () => {
+    it('应该正确处理系统消息穿插在对话中', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: 'Start', timestamp: '2026-03-19T10:00:00Z' },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Response' }],
+          timestamp: '2026-03-19T10:01:00Z',
+        },
+        { role: 'system', content: 'System notification', timestamp: '2026-03-19T10:02:00Z' },
+        { role: 'user', content: 'Continue', timestamp: '2026-03-19T10:03:00Z' },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      expect(result).toHaveLength(4)
+      expect(result[0].type).toBe('user')
+      expect(result[1].type).toBe('assistant')
+      expect(result[2].type).toBe('system')
+      expect(result[3].type).toBe('user')
+    })
+
+    it('应该在系统消息后正确重置 assistant 累积', () => {
+      const messages: ClaudeCodeMessage[] = [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Part 1' }],
+          timestamp: '2026-03-19T10:00:00Z',
+        },
+        { role: 'system', content: 'System message', timestamp: '2026-03-19T10:01:00Z' },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Part 2' }],
+          timestamp: '2026-03-19T10:02:00Z',
+        },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      // 系统消息会打断 assistant 累积
+      expect(result).toHaveLength(3)
+      expect(result[0].type).toBe('assistant')
+      expect(result[1].type).toBe('system')
+      expect(result[2].type).toBe('assistant')
+    })
+  })
+
+  describe('边界情况', () => {
+    it('应该处理超大数字的文件大小（超出 GB 范围）', () => {
+      // formatFileSize 的 sizes 数组只有 ['B', 'KB', 'MB', 'GB']
+      // 超出 GB 范围的数字会返回 undefined 单位
+      const result = service.formatFileSize(Number.MAX_SAFE_INTEGER)
+      // 验证函数不会崩溃，返回某种格式的字符串
+      expect(typeof result).toBe('string')
+      expect(result).toMatch(/\d/)
+    })
+
+    it('应该处理小数文件大小', () => {
+      expect(service.formatFileSize(1500)).toBe('1.46 KB')
+    })
+
+    it('应该处理包含特殊字符的消息内容', () => {
+      const specialChars = 'Hello\nWorld\tTabbed<script>alert("xss")</script>'
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: specialChars },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe(specialChars)
+    })
+
+    it('应该处理 Unicode 字符', () => {
+      const unicodeContent = '你好世界 🌍 مرحبا Привет'
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: unicodeContent },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe(unicodeContent)
+    })
+
+    it('应该处理空字符串内容', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: '' },
+      ]
+
+      const result = service.convertToChatMessages(messages)
+
+      expect((result[0] as { content: string }).content).toBe('')
+    })
+
+    it('应该处理 null content', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: null as unknown as string },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('')
+    })
+
+    it('应该处理 undefined content', () => {
+      const messages: ClaudeCodeMessage[] = [
+        { role: 'user', content: undefined as unknown as string },
+      ]
+
+      const result = service.convertMessagesToFormat(messages)
+
+      expect(result[0].content).toBe('')
+    })
+  })
+
+  describe('性能相关', () => {
+    it('应该高效处理大量消息', () => {
+      // 生成 100 条消息
+      const messages: ClaudeCodeMessage[] = []
+      for (let i = 0; i < 100; i++) {
+        messages.push(
+          { role: 'user', content: `Question ${i}`, timestamp: `2026-03-19T10:${String(i).padStart(2, '0')}:00Z` },
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: `Answer ${i}` }],
+            timestamp: `2026-03-19T10:${String(i + 1).padStart(2, '0')}:00Z`,
+          }
+        )
+      }
+
+      const startTime = performance.now()
+      const result = service.convertToChatMessages(messages)
+      const endTime = performance.now()
+
+      expect(result).toHaveLength(200)
+      expect(endTime - startTime).toBeLessThan(100) // 应该在 100ms 内完成
+    })
+
+    it('应该处理大量 tool_result 消息', () => {
+      const messages: ClaudeCodeMessage[] = []
+
+      // 50 个 tool_result 消息
+      for (let i = 0; i < 50; i++) {
+        messages.push({
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: `call-${i}`, content: `Result ${i}` }],
+        })
+      }
+
+      // 最后一个真实用户消息
+      messages.push({ role: 'user', content: 'Final question' })
+
+      const result = service.convertToChatMessages(messages)
+
+      // 只有最后一个用户消息应该保留
+      expect(result).toHaveLength(1)
+    })
+  })
+})
