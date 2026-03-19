@@ -1163,3 +1163,495 @@ describe('更多边界值', () => {
     });
   });
 });
+
+// ============================================================
+// 性能测试
+// ============================================================
+describe('性能测试', () => {
+  let service: CodexHistoryService;
+
+  beforeEach(() => {
+    service = new CodexHistoryService();
+  });
+
+  describe('大量数据处理性能', () => {
+    it('转换 1000 条消息应在合理时间内完成', () => {
+      const messages = Array.from({ length: 1000 }, (_, i) =>
+        createMockMessage({
+          uuid: `msg-${i}`,
+          content: `Message content ${i}`,
+          toolCalls: i % 10 === 0 ? [{ id: `tc-${i}`, name: 'read_file', input: {} }] : [],
+        })
+      );
+
+      const start = performance.now();
+      const result = service.convertMessagesToFormat(messages);
+      const duration = performance.now() - start;
+
+      expect(result).toHaveLength(1000);
+      expect(duration).toBeLessThan(100); // 应在 100ms 内完成
+    });
+
+    it('提取 500 条工具调用应在合理时间内完成', () => {
+      const messages = Array.from({ length: 100 }, (_, i) =>
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: Array.from({ length: 5 }, (_, j) => ({
+            id: `tc-${i}-${j}`,
+            name: `tool_${j}`,
+            input: { index: i * 5 + j },
+          })),
+        })
+      );
+
+      const start = performance.now();
+      const result = service.extractToolCalls(messages);
+      const duration = performance.now() - start;
+
+      expect(result).toHaveLength(500);
+      expect(duration).toBeLessThan(50); // 应在 50ms 内完成
+    });
+
+    it('生成大量标题应在合理时间内完成', () => {
+      const messagesArray = Array.from({ length: 100 }, (_, i) => [
+        createMockMessage({ type: 'user', content: `User message ${i}` }),
+        createMockMessage({ type: 'assistant', content: `Assistant message ${i}` }),
+      ]);
+
+      const start = performance.now();
+      const titles = messagesArray.map(msgs => service.generateSessionTitle(msgs));
+      const duration = performance.now() - start;
+
+      expect(titles).toHaveLength(100);
+      expect(duration).toBeLessThan(20); // 应在 20ms 内完成
+    });
+  });
+
+  describe('格式化函数性能', () => {
+    it('格式化 1000 次文件大小应在合理时间内完成', () => {
+      const start = performance.now();
+      for (let i = 0; i < 1000; i++) {
+        service.formatFileSize(i * 1024 * 1024);
+      }
+      const duration = performance.now() - start;
+
+      expect(duration).toBeLessThan(50); // 应在 50ms 内完成
+    });
+
+    it('格式化 1000 次时间应在合理时间内完成', () => {
+      const timestamps = Array.from({ length: 1000 }, (_, i) =>
+        new Date(Date.now() - i * 3600000).toISOString()
+      );
+
+      const start = performance.now();
+      timestamps.forEach(ts => service.formatTime(ts));
+      const duration = performance.now() - start;
+
+      expect(duration).toBeLessThan(100); // 应在 100ms 内完成
+    });
+  });
+});
+
+// ============================================================
+// 工具调用边界情况测试
+// ============================================================
+describe('工具调用边界情况', () => {
+  let service: CodexHistoryService;
+
+  beforeEach(() => {
+    service = new CodexHistoryService();
+  });
+
+  describe('工具调用 input 类型', () => {
+    it('input 为空对象时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: {} }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toEqual({});
+    });
+
+    it('input 为 null 时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: null }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toBeNull();
+    });
+
+    it('input 为 undefined 时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: undefined }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toBeUndefined();
+    });
+
+    it('input 为数组时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: ['a', 'b', 'c'] }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toEqual(['a', 'b', 'c']);
+    });
+
+    it('input 为字符串时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: 'string input' }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toBe('string input');
+    });
+
+    it('input 为数字时应正确处理', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: 42 }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toBe(42);
+    });
+
+    it('input 为嵌套对象时应正确处理', () => {
+      const nestedInput = {
+        level1: {
+          level2: {
+            level3: {
+              value: 'deep',
+            },
+          },
+        },
+        array: [1, 2, 3],
+      };
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'test_tool', input: nestedInput }],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].input).toEqual(nestedInput);
+    });
+  });
+
+  describe('工具调用字段完整性', () => {
+    it('应正确提取所有工具调用字段', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          timestamp: '2026-03-19T10:30:00.000Z',
+          toolCalls: [
+            {
+              id: 'call-abc123',
+              name: 'execute_command',
+              input: { command: 'npm test' },
+            },
+          ],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result[0].id).toBe('call-abc123');
+      expect(result[0].name).toBe('execute_command');
+      expect(result[0].status).toBe('completed');
+      expect(result[0].startedAt).toBe('2026-03-19T10:30:00.000Z');
+      expect(result[0].input).toEqual({ command: 'npm test' });
+    });
+
+    it('多个工具调用应全部提取', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [
+            { id: 'tc-1', name: 'read_file', input: {} },
+            { id: 'tc-2', name: 'edit_file', input: {} },
+            { id: 'tc-3', name: 'write_file', input: {} },
+          ],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result).toHaveLength(3);
+      expect(result.map(t => t.name)).toEqual(['read_file', 'edit_file', 'write_file']);
+    });
+
+    it('不同消息中的工具调用应全部提取', () => {
+      const messages = [
+        createMockMessage({
+          uuid: 'msg-1',
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'tool1', input: {} }],
+        }),
+        createMockMessage({
+          uuid: 'msg-2',
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-2', name: 'tool2', input: {} }],
+        }),
+        createMockMessage({
+          uuid: 'msg-3',
+          type: 'assistant',
+          toolCalls: [
+            { id: 'tc-3', name: 'tool3', input: {} },
+            { id: 'tc-4', name: 'tool4', input: {} },
+          ],
+        }),
+      ];
+
+      const result = service.extractToolCalls(messages);
+
+      expect(result).toHaveLength(4);
+      expect(result.map(t => t.id)).toEqual(['tc-1', 'tc-2', 'tc-3', 'tc-4']);
+    });
+  });
+
+  describe('toolSummary 生成', () => {
+    it('无工具调用时不应添加 toolSummary', () => {
+      const messages = [
+        createMockMessage({ type: 'assistant', toolCalls: [] }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].toolSummary).toBeUndefined();
+    });
+
+    it('一个工具调用应正确生成 toolSummary', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [{ id: 'tc-1', name: 'read_file', input: {} }],
+        }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].toolSummary).toEqual({
+        count: 1,
+        names: ['read_file'],
+      });
+    });
+
+    it('相同名称的工具调用应去重', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [
+            { id: 'tc-1', name: 'read_file', input: {} },
+            { id: 'tc-2', name: 'read_file', input: {} },
+            { id: 'tc-3', name: 'read_file', input: {} },
+          ],
+        }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].toolSummary?.count).toBe(3);
+      expect(result[0].toolSummary?.names).toEqual(['read_file']);
+    });
+
+    it('工具名称顺序应保持首次出现顺序', () => {
+      const messages = [
+        createMockMessage({
+          type: 'assistant',
+          toolCalls: [
+            { id: 'tc-1', name: 'z_tool', input: {} },
+            { id: 'tc-2', name: 'a_tool', input: {} },
+            { id: 'tc-3', name: 'z_tool', input: {} },
+          ],
+        }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      // Set 保持插入顺序
+      expect(result[0].toolSummary?.names).toEqual(['z_tool', 'a_tool']);
+    });
+  });
+});
+
+// ============================================================
+// 消息转换完整性测试
+// ============================================================
+describe('消息转换完整性', () => {
+  let service: CodexHistoryService;
+
+  beforeEach(() => {
+    service = new CodexHistoryService();
+  });
+
+  describe('字段保留', () => {
+    it('应保留所有必要字段', () => {
+      const messages = [
+        createMockMessage({
+          uuid: 'msg-uuid-123',
+          type: 'user',
+          content: 'Test content',
+          timestamp: '2026-03-19T10:00:00.000Z',
+        }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0]).toEqual({
+        id: 'msg-uuid-123',
+        role: 'user',
+        content: 'Test content',
+        timestamp: '2026-03-19T10:00:00.000Z',
+        toolSummary: undefined,
+      });
+    });
+
+    it('应保留 parentUuid 通过 toolSummary', () => {
+      const messages = [
+        createMockMessage({
+          uuid: 'msg-1',
+          parentUuid: 'parent-uuid',
+          type: 'assistant',
+        }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].id).toBe('msg-1');
+    });
+  });
+
+  describe('消息顺序', () => {
+    it('应保持消息的原始顺序', () => {
+      const messages = [
+        createMockMessage({ uuid: 'msg-a', content: 'A' }),
+        createMockMessage({ uuid: 'msg-b', content: 'B' }),
+        createMockMessage({ uuid: 'msg-c', content: 'C' }),
+        createMockMessage({ uuid: 'msg-d', content: 'D' }),
+        createMockMessage({ uuid: 'msg-e', content: 'E' }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result.map(m => m.content)).toEqual(['A', 'B', 'C', 'D', 'E']);
+    });
+
+    it('复杂场景消息顺序应正确', () => {
+      const messages = [
+        createMockMessage({ uuid: 'user-1', type: 'user', content: 'First question' }),
+        createMockMessage({ uuid: 'asst-1', type: 'assistant', content: 'First answer' }),
+        createMockMessage({
+          uuid: 'tool-1',
+          type: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'tc-1', name: 'read_file', input: {} }],
+        }),
+        createMockMessage({ uuid: 'user-2', type: 'user', content: 'Second question' }),
+        createMockMessage({ uuid: 'asst-2', type: 'assistant', content: 'Second answer' }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result).toHaveLength(5);
+      expect(result[0].role).toBe('user');
+      expect(result[1].role).toBe('assistant');
+      expect(result[2].toolSummary?.count).toBe(1);
+      expect(result[3].role).toBe('user');
+      expect(result[4].role).toBe('assistant');
+    });
+  });
+
+  describe('内容处理', () => {
+    it('空内容应正确处理', () => {
+      const messages = [
+        createMockMessage({ type: 'user', content: '' }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].content).toBe('');
+    });
+
+    it('仅空白字符的内容应保留', () => {
+      const messages = [
+        createMockMessage({ type: 'user', content: '   \n\t  ' }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].content).toBe('   \n\t  ');
+    });
+
+    it('多行内容应保留', () => {
+      const multiline = `Line 1
+Line 2
+Line 3
+
+Line 5`;
+      const messages = [
+        createMockMessage({ type: 'user', content: multiline }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].content).toBe(multiline);
+    });
+
+    it('代码块内容应正确处理', () => {
+      const codeBlock = '```typescript\nconst x = 1;\nconsole.log(x);\n```';
+      const messages = [
+        createMockMessage({ type: 'assistant', content: codeBlock }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].content).toBe(codeBlock);
+    });
+
+    it('Markdown 内容应正确处理', () => {
+      const markdown = `# Heading
+
+Some **bold** and *italic* text.
+
+- Item 1
+- Item 2
+
+[Link](https://example.com)`;
+      const messages = [
+        createMockMessage({ type: 'assistant', content: markdown }),
+      ];
+
+      const result = service.convertMessagesToFormat(messages);
+
+      expect(result[0].content).toBe(markdown);
+    });
+  });
+});
