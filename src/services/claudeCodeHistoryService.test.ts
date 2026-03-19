@@ -1107,3 +1107,578 @@ describe('复杂场景测试', () => {
     })
   })
 })
+
+// ============================================================================
+// extractContentText 更多边界情况测试（通过 convertMessagesToFormat 间接测试）
+// ============================================================================
+
+describe('extractContentText 边界情况', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+  })
+
+  it('应该处理数组中的 null 项', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [null, { type: 'text', text: 'Hello' }, null] as unknown[],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    expect(result[0].content).toBe('Hello')
+  })
+
+  it('应该处理数组中的 undefined 项', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [undefined, { type: 'text', text: 'World' }] as unknown[],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    expect(result[0].content).toBe('World')
+  })
+
+  it('应该处理数组中的原始类型', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [123, true, { type: 'text', text: 'Text' }] as unknown[],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    // 原始类型不是对象，应该被跳过
+    expect(result[0].content).toBe('Text')
+  })
+
+  it('应该处理嵌套的对象结构', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Start' },
+          { nested: { type: 'text', text: 'Nested' } }, // 没有 type 字段
+          { type: 'text', text: 'End' },
+        ],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    // 只有正确的 text 块应该被提取
+    expect(result[0].content).toBe('StartEnd')
+  })
+
+  it('应该处理 text 字段为非字符串的情况', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 123 } as unknown,
+          { type: 'text', text: null } as unknown,
+          { type: 'text', text: undefined } as unknown,
+        ],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    // String() 转换：123 -> "123", null -> "null", undefined -> "undefined"
+    expect(result[0].content).toBe('123nullundefined')
+  })
+
+  it('应该连接多个文本块', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Part1' },
+          { type: 'text', text: 'Part2' },
+          { type: 'text', text: 'Part3' },
+        ],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    expect(result[0].content).toBe('Part1Part2Part3')
+  })
+
+  it('应该处理空数组内容', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    expect(result[0].content).toBe('')
+  })
+
+  it('应该处理数组中只有非文本类型的情况', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'image', data: 'base64...' },
+          { type: 'audio', data: 'audio...' },
+        ],
+      },
+    ]
+
+    const result = service.convertMessagesToFormat(messages)
+
+    expect(result[0].content).toBe('')
+  })
+})
+
+// ============================================================================
+// parseAssistantBlocks 更多边界情况测试（通过 convertToChatMessages 间接测试）
+// ============================================================================
+
+describe('parseAssistantBlocks 边界情况', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+    uuidIndex = 0
+  })
+
+  it('应该跳过未知类型的块', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'unknown', data: 'something' },
+          { type: 'text', text: 'Hello' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string }> }).blocks
+
+    // 只有 text 块应该被保留
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].type).toBe('text')
+  })
+
+  it('应该处理 tool_use 缺少 input 的情况', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'call-1', name: 'Test' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; input?: Record<string, unknown> }> }).blocks
+
+    expect(blocks[0].input).toEqual({})
+  })
+
+  it('应该处理 tool_use 的 input 为 null 的情况', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'call-1', name: 'Test', input: null },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; input?: Record<string, unknown> }> }).blocks
+
+    expect(blocks[0].input).toEqual({})
+  })
+
+  it('应该正确处理复杂的 tool_use input', () => {
+    const complexInput = {
+      path: '/test/path',
+      options: {
+        recursive: true,
+        filters: ['*.ts', '*.tsx'],
+      },
+      metadata: {
+        created: '2026-03-19',
+        tags: ['important', 'draft'],
+      },
+    }
+
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'call-1', name: 'SearchFiles', input: complexInput },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; input?: Record<string, unknown> }> }).blocks
+
+    expect(blocks[0].input).toEqual(complexInput)
+  })
+
+  it('应该正确处理空白 thinking 内容', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '' },
+          { type: 'thinking', thinking: '   ' },
+          { type: 'thinking', thinking: '\n\t' },
+          { type: 'text', text: 'Real content' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string }> }).blocks
+
+    // 空白 thinking 应该被跳过
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].type).toBe('text')
+  })
+
+  it('应该正确处理多行 thinking 内容', () => {
+    const thinkingContent = `Line 1
+Line 2
+Line 3
+  Indented line`
+
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: thinkingContent },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; content?: string }> }).blocks
+
+    expect(blocks[0].content).toBe(thinkingContent)
+  })
+
+  it('应该处理混合类型的复杂助手消息', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Let me analyze...' },
+          { type: 'text', text: 'I will help you.' },
+          { type: 'tool_use', id: 'call-1', name: 'ReadFile', input: { path: '/test' } },
+          { type: 'text', text: 'Here is the result.' },
+          { type: 'unknown', data: 'ignored' },
+          { type: 'tool_use', id: 'call-2', name: 'WriteFile', input: { path: '/out' } },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string }> }).blocks
+
+    // thinking + text + tool_use + text + tool_use = 5
+    expect(blocks).toHaveLength(5)
+    expect(blocks[0].type).toBe('thinking')
+    expect(blocks[1].type).toBe('text')
+    expect(blocks[2].type).toBe('tool_call')
+    expect(blocks[3].type).toBe('text')
+    expect(blocks[4].type).toBe('tool_call')
+  })
+})
+
+// ============================================================================
+// extractUserContent 更多边界情况测试（通过 convertToChatMessages 间接测试）
+// ============================================================================
+
+describe('extractUserContent 边界情况', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+  })
+
+  it('应该处理用户消息数组中的非对象项', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'user',
+        content: ['string', 123, true, null, undefined] as unknown[],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    // 非对象项应该被跳过，结果是空字符串
+    expect((result[0] as { content: string }).content).toBe('')
+  })
+
+  it('应该处理用户消息数组中缺少 type 的对象', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { text: 'No type field' },
+          { type: 'text', text: 'Has type' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    // 缺少 type 的对象应该被跳过
+    expect((result[0] as { content: string }).content).toBe('Has type')
+  })
+
+  it('应该正确过滤 tool_result 并保留文本', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'call-1', content: 'Result 1' },
+          { type: 'text', text: 'User message' },
+          { type: 'tool_result', tool_use_id: 'call-2', content: 'Result 2' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    expect((result[0] as { content: string }).content).toBe('User message')
+  })
+
+  it('应该处理用户消息中的空白文本', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '' },
+          { type: 'text', text: '   ' },
+          { type: 'text', text: 'Real text' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    // 空白文本应该被保留（由上层决定是否过滤）
+    expect((result[0] as { content: string }).content).toBe('   Real text')
+  })
+})
+
+// ============================================================================
+// 错误恢复场景测试
+// ============================================================================
+
+describe('错误恢复场景', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+    uuidIndex = 0
+  })
+
+  it('应该从 Tauri invoke 错误中恢复并返回空数组', async () => {
+    mockInvoke.mockRejectedValueOnce(new Error('Network error'))
+
+    const result = await service.listSessions('/path')
+
+    expect(result).toEqual([])
+  })
+
+  it('应该从 Tauri invoke 返回无效数据中恢复', async () => {
+    // 返回非数组数据
+    mockInvoke.mockResolvedValueOnce({ invalid: 'data' })
+
+    const result = await service.listSessions('/path')
+
+    // 由于类型转换，应该返回原始数据
+    expect(result).toEqual({ invalid: 'data' })
+  })
+
+  it('应该处理会话历史获取失败', async () => {
+    mockInvoke.mockRejectedValueOnce(new Error('Session not found'))
+
+    const result = await service.getSessionHistory('invalid-session')
+
+    expect(result).toEqual([])
+  })
+
+  it('应该处理消息转换中的错误数据', () => {
+    const messages: ClaudeCodeMessage[] = [
+      // @ts-expect-error 故意传入错误数据
+      { role: 'invalid-role', content: 'test' },
+      { role: 'user', content: 'valid' },
+    ]
+
+    // 不应该抛出异常
+    const result = service.convertToChatMessages(messages)
+
+    expect(result.length).toBeGreaterThan(0)
+  })
+})
+
+// ============================================================================
+// 类型安全测试
+// ============================================================================
+
+describe('类型安全测试', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.clearAllMocks()
+    uuidIndex = 0
+  })
+
+  it('应该正确设置 ChatMessage 的 id', () => {
+    const messages: ClaudeCodeMessage[] = [
+      { role: 'user', content: 'Hello' },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    expect(result[0].id).toBeDefined()
+    expect(typeof result[0].id).toBe('string')
+  })
+
+  it('应该正确设置 ChatMessage 的 timestamp', () => {
+    const messages: ClaudeCodeMessage[] = [
+      { role: 'user', content: 'Hello', timestamp: '2026-03-19T10:00:00Z' },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    expect(result[0].timestamp).toBe('2026-03-19T10:00:00Z')
+  })
+
+  it('应该为缺少 timestamp 的消息生成默认时间戳', () => {
+    const messages: ClaudeCodeMessage[] = [
+      { role: 'user', content: 'Hello' },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    expect(result[0].timestamp).toBeDefined()
+    // 验证是有效的 ISO 格式
+    expect(() => new Date(result[0].timestamp!)).not.toThrow()
+  })
+
+  it('应该正确设置 assistant 消息的 isStreaming 属性', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Hello' }],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+
+    expect((result[0] as { isStreaming: boolean }).isStreaming).toBe(false)
+  })
+
+  it('应该正确设置 tool_call 块的 status 属性', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'call-1', name: 'Test', input: {} },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; status?: string }> }).blocks
+
+    expect(blocks[0].status).toBe('completed')
+  })
+
+  it('应该正确设置 thinking 块的 collapsed 属性', () => {
+    const messages: ClaudeCodeMessage[] = [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Deep thought' },
+        ],
+      },
+    ]
+
+    const result = service.convertToChatMessages(messages)
+    const blocks = (result[0] as { blocks: Array<{ type: string; collapsed?: boolean }> }).blocks
+
+    expect(blocks[0].collapsed).toBe(true)
+  })
+})
+
+// ============================================================================
+// 时间格式化边界情况测试
+// ============================================================================
+
+describe('formatTime 边界情况', () => {
+  let service: ClaudeCodeHistoryService
+
+  beforeEach(() => {
+    service = new ClaudeCodeHistoryService()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('应该处理刚好 1 分钟前的时间', () => {
+    const timestamp = '2026-03-19T11:59:00Z'
+    expect(service.formatTime(timestamp)).toBe('1 分钟前')
+  })
+
+  it('应该处理刚好 1 小时前的时间', () => {
+    const timestamp = '2026-03-19T11:00:00Z'
+    expect(service.formatTime(timestamp)).toBe('1 小时前')
+  })
+
+  it('应该处理刚好 1 天前的时间', () => {
+    const timestamp = '2026-03-18T12:00:00Z'
+    expect(service.formatTime(timestamp)).toBe('1 天前')
+  })
+
+  it('应该处理刚好 7 天前的时间（边界值）', () => {
+    const timestamp = '2026-03-12T12:00:00Z'
+    const result = service.formatTime(timestamp)
+    // 7 天应该显示日期
+    expect(result).toMatch(/3月/)
+  })
+
+  it('应该处理未来时间', () => {
+    const timestamp = '2026-03-19T13:00:00Z'
+    const result = service.formatTime(timestamp)
+    // 未来时间可能显示负数或特定格式
+    expect(typeof result).toBe('string')
+  })
+
+  it('应该处理无效的时间戳', () => {
+    const timestamp = 'invalid-timestamp'
+    const result = service.formatTime(timestamp)
+    // 应该返回某种格式，而不是抛出异常
+    expect(typeof result).toBe('string')
+  })
+})
