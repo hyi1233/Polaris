@@ -1,5 +1,15 @@
 /**
  * unifiedHistoryService 单元测试
+ *
+ * 测试覆盖：
+ * 1. listAllSessions - 列出所有 Provider 会话
+ * 2. listSessionsByProvider - 按 Provider 列出会话
+ * 3. getSessionHistory - 获取会话历史
+ * 4. searchSessions - 搜索会话
+ * 5. filterSessionsByTimeRange - 按时间范围过滤
+ * 6. getStats - 获取统计信息
+ * 7. 工具函数: formatFileSize, formatTime, getProviderName, getProviderIcon
+ * 8. 单例模式
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -10,6 +20,19 @@ import {
   type ProviderType,
   type UnifiedSessionMeta,
 } from './unifiedHistoryService'
+
+// 创建可重用的 mock 函数
+const mockClaudeListSessions = vi.fn()
+const mockClaudeGetSessionHistory = vi.fn()
+const mockClaudeConvertMessages = vi.fn()
+
+const mockIFlowListSessions = vi.fn()
+const mockIFlowGetSessionHistory = vi.fn()
+const mockIFlowConvertMessages = vi.fn()
+
+const mockCodexListSessions = vi.fn()
+const mockCodexGetSessionHistory = vi.fn()
+const mockCodexConvertMessages = vi.fn()
 
 // Mock Tauri invoke
 vi.mock('@tauri-apps/api/core', () => ({
@@ -26,28 +49,28 @@ vi.mock('../utils/logger', () => ({
   }),
 }))
 
-// Mock 依赖服务
+// Mock 依赖服务 - 使用共享的 mock 函数
 vi.mock('./claudeCodeHistoryService', () => ({
   getClaudeCodeHistoryService: () => ({
-    listSessions: vi.fn(),
-    getSessionHistory: vi.fn(),
-    convertMessagesToFormat: vi.fn(),
+    listSessions: mockClaudeListSessions,
+    getSessionHistory: mockClaudeGetSessionHistory,
+    convertMessagesToFormat: mockClaudeConvertMessages,
   }),
 }))
 
 vi.mock('./iflowHistoryService', () => ({
   getIFlowHistoryService: () => ({
-    listSessions: vi.fn(),
-    getSessionHistory: vi.fn(),
-    convertMessagesToFormat: vi.fn(),
+    listSessions: mockIFlowListSessions,
+    getSessionHistory: mockIFlowGetSessionHistory,
+    convertMessagesToFormat: mockIFlowConvertMessages,
   }),
 }))
 
 vi.mock('./codexHistoryService', () => ({
   getCodexHistoryService: () => ({
-    listSessions: vi.fn(),
-    getSessionHistory: vi.fn(),
-    convertMessagesToFormat: vi.fn(),
+    listSessions: mockCodexListSessions,
+    getSessionHistory: mockCodexGetSessionHistory,
+    convertMessagesToFormat: mockCodexConvertMessages,
   }),
 }))
 
@@ -132,7 +155,6 @@ describe('UnifiedHistoryService', () => {
       const lastYear = new Date()
       lastYear.setFullYear(lastYear.getFullYear() - 1)
       const result = service.formatTime(lastYear.toISOString())
-      // 应包含年份
       expect(result).toMatch(/\d{4}年/)
     })
   })
@@ -174,235 +196,456 @@ describe('UnifiedHistoryService', () => {
   })
 
   // ===========================================================================
-  // 核心方法测试
+  // listAllSessions 测试
+  // ===========================================================================
+
+  describe('listAllSessions', () => {
+    it('应并发查询所有 Provider 并返回合并结果', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'Claude Session', messageCount: 5, fileSize: 1024, created: '2026-03-19T10:00:00Z', modified: '2026-03-19T11:00:00Z' },
+      ])
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-1', title: 'IFlow Session', messageCount: 3, fileSize: 512, createdAt: '2026-03-19T09:00:00Z', updatedAt: '2026-03-19T10:00:00Z' },
+      ])
+      mockCodexListSessions.mockResolvedValue([
+        { sessionId: 'cx-1', title: 'Codex Session', messageCount: 2, fileSize: 256, createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T09:00:00Z', filePath: '/path/to/file' },
+      ])
+
+      const result = await service.listAllSessions()
+
+      expect(result).toHaveLength(3)
+      expect(mockClaudeListSessions).toHaveBeenCalled()
+      expect(mockIFlowListSessions).toHaveBeenCalled()
+      expect(mockCodexListSessions).toHaveBeenCalled()
+    })
+
+    it('应按 updatedAt 排序结果', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'Old', messageCount: 1, fileSize: 100, created: '2026-03-18T10:00:00Z', modified: '2026-03-18T11:00:00Z' },
+      ])
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-1', title: 'New', messageCount: 1, fileSize: 100, createdAt: '2026-03-19T10:00:00Z', updatedAt: '2026-03-19T11:00:00Z' },
+      ])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const result = await service.listAllSessions()
+
+      expect(result[0].sessionId).toBe('if-1')
+      expect(result[1].sessionId).toBe('cc-1')
+    })
+
+    it('应支持过滤指定 Provider', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      await service.listAllSessions({ providers: ['claude-code'] })
+
+      expect(mockClaudeListSessions).toHaveBeenCalled()
+      expect(mockIFlowListSessions).not.toHaveBeenCalled()
+      expect(mockCodexListSessions).not.toHaveBeenCalled()
+    })
+
+    it('应正确处理部分 Provider 失败的情况', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'Success', messageCount: 1, fileSize: 100, created: '2026-03-19T10:00:00Z', modified: '2026-03-19T11:00:00Z' },
+      ])
+      mockIFlowListSessions.mockRejectedValue(new Error('IFlow error'))
+      mockCodexListSessions.mockResolvedValue([
+        { sessionId: 'cx-1', title: 'Codex', messageCount: 1, fileSize: 100, createdAt: '2026-03-19T09:00:00Z', updatedAt: '2026-03-19T10:00:00Z', filePath: '/path' },
+      ])
+
+      const result = await service.listAllSessions()
+
+      expect(result).toHaveLength(2)
+    })
+
+    it('应传递 projectPath 给 Claude Code 服务', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      await service.listAllSessions({ projectPath: '/my/project' })
+
+      expect(mockClaudeListSessions).toHaveBeenCalledWith('/my/project')
+    })
+
+    it('应传递 workDir 给 Codex 服务', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      await service.listAllSessions({ workDir: '/my/workdir' })
+
+      expect(mockCodexListSessions).toHaveBeenCalledWith('/my/workdir')
+    })
+
+    it('应正确处理没有 updatedAt 的会话', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'No time', messageCount: 1, fileSize: 100, created: undefined, modified: undefined },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const result = await service.listAllSessions()
+
+      expect(result).toHaveLength(1)
+      expect(result[0].updatedAt).toBeUndefined()
+    })
+  })
+
+  // ===========================================================================
+  // listSessionsByProvider 测试
   // ===========================================================================
 
   describe('listSessionsByProvider', () => {
-    it('应返回 Claude Code 会话列表', async () => {
-      const mockSessions: UnifiedSessionMeta[] = [
-        {
-          sessionId: 'cc-1',
-          provider: 'claude-code',
-          title: 'Test Session',
-          messageCount: 5,
-          fileSize: 1024,
-        },
-      ]
+    it('应正确返回 Claude Code 会话', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'Test', messageCount: 5, fileSize: 1024, created: '2026-03-19T10:00:00Z', modified: '2026-03-19T11:00:00Z' },
+      ])
 
-      // 直接测试私有方法返回值格式
-      const result = mockSessions.filter(s => s.provider === 'claude-code')
+      const result = await service.listSessionsByProvider('claude-code', { projectPath: '/project' })
+
       expect(result).toHaveLength(1)
       expect(result[0].provider).toBe('claude-code')
+      expect(result[0].title).toBe('Test')
+      expect(result[0].projectPath).toBe('/project')
+    })
+
+    it('应正确返回 IFlow 会话', async () => {
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-1', title: 'IFlow Test', messageCount: 3, fileSize: 512, createdAt: '2026-03-19T10:00:00Z', updatedAt: '2026-03-19T11:00:00Z' },
+      ])
+
+      const result = await service.listSessionsByProvider('iflow')
+
+      expect(result).toHaveLength(1)
+      expect(result[0].provider).toBe('iflow')
+      expect(result[0].title).toBe('IFlow Test')
+    })
+
+    it('应正确返回 Codex 会话', async () => {
+      mockCodexListSessions.mockResolvedValue([
+        { sessionId: 'cx-1', title: 'Codex Test', messageCount: 2, fileSize: 256, createdAt: '2026-03-19T10:00:00Z', updatedAt: '2026-03-19T11:00:00Z', filePath: '/path/to/file' },
+      ])
+
+      const result = await service.listSessionsByProvider('codex', { workDir: '/workdir' })
+
+      expect(result).toHaveLength(1)
+      expect(result[0].provider).toBe('codex')
+      expect(result[0].filePath).toBe('/path/to/file')
+    })
+
+    it('对于空会话列表应返回空数组', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+
+      const result = await service.listSessionsByProvider('claude-code')
+
+      expect(result).toEqual([])
     })
 
     it('应返回空数组对于未知 provider', async () => {
       const result = await service.listSessionsByProvider('unknown' as ProviderType)
       expect(result).toEqual([])
     })
+
+    it('应使用默认标题当 firstPrompt 为空时', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: '', messageCount: 1, fileSize: 100 },
+      ])
+
+      const result = await service.listSessionsByProvider('claude-code')
+
+      expect(result[0].title).toBe('Claude Code 对话')
+    })
+
+    it('应使用默认标题当 IFlow title 为空时', async () => {
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-1', title: '', messageCount: 1, fileSize: 100 },
+      ])
+
+      const result = await service.listSessionsByProvider('iflow')
+
+      expect(result[0].title).toBe('IFlow 对话')
+    })
+
+    it('应使用默认标题当 Codex title 为空时', async () => {
+      mockCodexListSessions.mockResolvedValue([
+        { sessionId: 'cx-1', title: null, messageCount: 1, fileSize: 100, filePath: '/path' },
+      ])
+
+      const result = await service.listSessionsByProvider('codex')
+
+      expect(result[0].title).toBe('Codex 对话')
+    })
   })
 
+  // ===========================================================================
+  // getSessionHistory 测试
+  // ===========================================================================
+
+  describe('getSessionHistory', () => {
+    it('应获取 Claude Code 会话历史并转换格式', async () => {
+      const mockMessages = [{ role: 'user', content: 'Hello' }]
+      const mockConverted = [{ id: '1', role: 'user', content: 'Hello' }]
+
+      mockClaudeGetSessionHistory.mockResolvedValue(mockMessages)
+      mockClaudeConvertMessages.mockReturnValue(mockConverted)
+
+      const result = await service.getSessionHistory('claude-code', 'session-1', { projectPath: '/project' })
+
+      expect(mockClaudeGetSessionHistory).toHaveBeenCalledWith('session-1', '/project')
+      expect(mockClaudeConvertMessages).toHaveBeenCalledWith(mockMessages)
+      expect(result).toEqual(mockConverted)
+    })
+
+    it('应获取 IFlow 会话历史并转换格式', async () => {
+      const mockMessages = [{ role: 'assistant', content: 'Hi' }]
+      const mockConverted = [{ id: '1', role: 'assistant', content: 'Hi' }]
+
+      mockIFlowGetSessionHistory.mockResolvedValue(mockMessages)
+      mockIFlowConvertMessages.mockReturnValue(mockConverted)
+
+      const result = await service.getSessionHistory('iflow', 'session-1')
+
+      expect(mockIFlowGetSessionHistory).toHaveBeenCalledWith('session-1')
+      expect(mockIFlowConvertMessages).toHaveBeenCalledWith(mockMessages)
+      expect(result).toEqual(mockConverted)
+    })
+
+    it('应获取 Codex 会话历史并转换格式', async () => {
+      const mockMessages = [{ role: 'user', content: 'Code' }]
+      const mockConverted = [{ id: '1', role: 'user', content: 'Code' }]
+
+      mockCodexGetSessionHistory.mockResolvedValue(mockMessages)
+      mockCodexConvertMessages.mockReturnValue(mockConverted)
+
+      const result = await service.getSessionHistory('codex', 'session-1', { filePath: '/path/to/file.json' })
+
+      expect(mockCodexGetSessionHistory).toHaveBeenCalledWith('/path/to/file.json')
+      expect(mockCodexConvertMessages).toHaveBeenCalledWith(mockMessages)
+      expect(result).toEqual(mockConverted)
+    })
+
+    it('Codex 没有 filePath 时应返回空数组', async () => {
+      const result = await service.getSessionHistory('codex', 'session-1')
+      expect(result).toEqual([])
+    })
+
+    it('未知 provider 应返回空数组', async () => {
+      const result = await service.getSessionHistory('unknown' as ProviderType, 'session-1')
+      expect(result).toEqual([])
+    })
+  })
+
+  // ===========================================================================
+  // searchSessions 测试
+  // ===========================================================================
+
   describe('searchSessions', () => {
-    it('应按标题匹配搜索', async () => {
-      const sessions: UnifiedSessionMeta[] = [
-        { sessionId: '1', provider: 'claude-code', title: 'React 开发', messageCount: 5, fileSize: 1024 },
-        { sessionId: '2', provider: 'iflow', title: 'Vue 项目', messageCount: 3, fileSize: 512 },
-        { sessionId: '3', provider: 'codex', title: 'React 测试', messageCount: 2, fileSize: 256 },
-      ]
+    it('应搜索所有 Provider 的会话', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-react', firstPrompt: 'React开发', messageCount: 5, fileSize: 1024, created: '2026-03-19T10:00:00Z', modified: '2026-03-19T11:00:00Z' },
+      ])
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-vue', title: 'Vue项目', messageCount: 3, fileSize: 512, createdAt: '2026-03-19T09:00:00Z', updatedAt: '2026-03-19T10:00:00Z' },
+      ])
+      mockCodexListSessions.mockResolvedValue([
+        { sessionId: 'cx-react', title: 'React测试', messageCount: 2, fileSize: 256, createdAt: '2026-03-19T08:00:00Z', updatedAt: '2026-03-19T09:00:00Z', filePath: '/path' },
+      ])
 
-      const query = 'react'
-      const lowerQuery = query.toLowerCase()
-      const results = sessions.filter(s =>
-        s.title.toLowerCase().includes(lowerQuery) ||
-        s.sessionId.toLowerCase().includes(lowerQuery)
-      )
+      const result = await service.searchSessions('react')
 
-      expect(results).toHaveLength(2)
-      expect(results.map(r => r.sessionId)).toContain('1')
-      expect(results.map(r => r.sessionId)).toContain('3')
+      expect(result).toHaveLength(2)
+      expect(result.map(r => r.sessionId)).toContain('cc-react')
+      expect(result.map(r => r.sessionId)).toContain('cx-react')
     })
 
-    it('应按 sessionId 匹配搜索', async () => {
-      const sessions: UnifiedSessionMeta[] = [
-        { sessionId: 'session-abc-123', provider: 'claude-code', title: 'Test', messageCount: 5, fileSize: 1024 },
-        { sessionId: 'session-xyz-456', provider: 'iflow', title: 'Another', messageCount: 3, fileSize: 512 },
-      ]
+    it('应支持 sessionId 搜索', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'session-abc-123', firstPrompt: 'Test', messageCount: 1, fileSize: 100 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
 
-      const query = 'abc'
-      const lowerQuery = query.toLowerCase()
-      const results = sessions.filter(s =>
-        s.title.toLowerCase().includes(lowerQuery) ||
-        s.sessionId.toLowerCase().includes(lowerQuery)
-      )
+      const result = await service.searchSessions('abc')
 
-      expect(results).toHaveLength(1)
-      expect(results[0].sessionId).toBe('session-abc-123')
-    })
-
-    it('应返回空数组当无匹配时', async () => {
-      const sessions: UnifiedSessionMeta[] = [
-        { sessionId: '1', provider: 'claude-code', title: 'React', messageCount: 5, fileSize: 1024 },
-      ]
-
-      const query = 'nonexistent'
-      const lowerQuery = query.toLowerCase()
-      const results = sessions.filter(s =>
-        s.title.toLowerCase().includes(lowerQuery) ||
-        s.sessionId.toLowerCase().includes(lowerQuery)
-      )
-
-      expect(results).toHaveLength(0)
+      expect(result).toHaveLength(1)
+      expect(result[0].sessionId).toBe('session-abc-123')
     })
 
     it('应不区分大小写', async () => {
-      const sessions: UnifiedSessionMeta[] = [
-        { sessionId: '1', provider: 'claude-code', title: 'REACT Development', messageCount: 5, fileSize: 1024 },
-      ]
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: '1', firstPrompt: 'REACT Development', messageCount: 5, fileSize: 1024 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
 
-      const query = 'react'
-      const lowerQuery = query.toLowerCase()
-      const results = sessions.filter(s =>
-        s.title.toLowerCase().includes(lowerQuery) ||
-        s.sessionId.toLowerCase().includes(lowerQuery)
-      )
+      const result = await service.searchSessions('react')
 
-      expect(results).toHaveLength(1)
+      expect(result).toHaveLength(1)
+    })
+
+    it('应返回空数组当无匹配时', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: '1', firstPrompt: 'React', messageCount: 5, fileSize: 1024 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const result = await service.searchSessions('nonexistent')
+
+      expect(result).toHaveLength(0)
+    })
+
+    it('应传递 options 参数', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      await service.searchSessions('test', { projectPath: '/project', workDir: '/workdir', providers: ['claude-code'] })
+
+      expect(mockClaudeListSessions).toHaveBeenCalledWith('/project')
+      expect(mockIFlowListSessions).not.toHaveBeenCalled()
+      expect(mockCodexListSessions).not.toHaveBeenCalled()
     })
   })
 
+  // ===========================================================================
+  // filterSessionsByTimeRange 测试
+  // ===========================================================================
+
   describe('filterSessionsByTimeRange', () => {
-    it('应过滤在时间范围内的会话', () => {
+    it('应按时间范围过滤会话', async () => {
       const now = new Date()
-      const sessions: UnifiedSessionMeta[] = [
-        {
-          sessionId: '1',
-          provider: 'claude-code',
-          title: 'Test 1',
-          messageCount: 5,
-          fileSize: 1024,
-          createdAt: new Date(now.getTime() - 2 * 86400000).toISOString(), // 2 天前
-        },
-        {
-          sessionId: '2',
-          provider: 'iflow',
-          title: 'Test 2',
-          messageCount: 3,
-          fileSize: 512,
-          createdAt: new Date(now.getTime() - 10 * 86400000).toISOString(), // 10 天前
-        },
-      ]
+      const twoDaysAgo = new Date(now.getTime() - 2 * 86400000)
+      const tenDaysAgo = new Date(now.getTime() - 10 * 86400000)
 
-      const startDate = new Date(now.getTime() - 5 * 86400000) // 5 天前
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'recent', firstPrompt: 'Recent', messageCount: 1, fileSize: 100, created: twoDaysAgo.toISOString() },
+      ])
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'old', title: 'Old', messageCount: 1, fileSize: 100, createdAt: tenDaysAgo.toISOString() },
+      ])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const startDate = new Date(now.getTime() - 5 * 86400000)
       const endDate = now
+      const result = await service.filterSessionsByTimeRange(startDate, endDate)
 
-      const results = sessions.filter(session => {
-        if (!session.createdAt) return false
-        const sessionDate = new Date(session.createdAt)
-        return sessionDate >= startDate && sessionDate <= endDate
-      })
-
-      expect(results).toHaveLength(1)
-      expect(results[0].sessionId).toBe('1')
+      expect(result).toHaveLength(1)
+      expect(result[0].sessionId).toBe('recent')
     })
 
-    it('应排除没有 createdAt 的会话', () => {
-      const sessions: UnifiedSessionMeta[] = [
-        {
-          sessionId: '1',
-          provider: 'claude-code',
-          title: 'Test',
-          messageCount: 5,
-          fileSize: 1024,
-          // 没有 createdAt
-        },
-      ]
+    it('应排除没有 createdAt 的会话', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: '1', firstPrompt: 'Test', messageCount: 5, fileSize: 1024 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
 
       const startDate = new Date(Date.now() - 7 * 86400000)
       const endDate = new Date()
+      const result = await service.filterSessionsByTimeRange(startDate, endDate)
 
-      const results = sessions.filter(session => {
-        if (!session.createdAt) return false
-        const sessionDate = new Date(session.createdAt)
-        return sessionDate >= startDate && sessionDate <= endDate
-      })
-
-      expect(results).toHaveLength(0)
+      expect(result).toHaveLength(0)
     })
 
-    it('应正确处理边界情况', () => {
+    it('应正确处理边界情况', async () => {
       const targetDate = new Date('2026-03-15T12:00:00Z')
-      const sessions: UnifiedSessionMeta[] = [
-        {
-          sessionId: '1',
-          provider: 'claude-code',
-          title: 'Test',
-          messageCount: 5,
-          fileSize: 1024,
-          createdAt: targetDate.toISOString(),
-        },
-      ]
+
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: '1', firstPrompt: 'Test', messageCount: 5, fileSize: 1024, created: targetDate.toISOString() },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
 
       const startDate = new Date('2026-03-15T00:00:00Z')
       const endDate = new Date('2026-03-15T23:59:59Z')
+      const result = await service.filterSessionsByTimeRange(startDate, endDate)
 
-      const results = sessions.filter(session => {
-        if (!session.createdAt) return false
-        const sessionDate = new Date(session.createdAt)
-        return sessionDate >= startDate && sessionDate <= endDate
-      })
+      expect(result).toHaveLength(1)
+    })
 
-      expect(results).toHaveLength(1)
+    it('应传递 options 参数', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const startDate = new Date('2026-03-01')
+      const endDate = new Date('2026-03-31')
+      await service.filterSessionsByTimeRange(startDate, endDate, { providers: ['iflow'] })
+
+      expect(mockClaudeListSessions).not.toHaveBeenCalled()
+      expect(mockIFlowListSessions).toHaveBeenCalled()
+      expect(mockCodexListSessions).not.toHaveBeenCalled()
     })
   })
 
+  // ===========================================================================
+  // getStats 测试
+  // ===========================================================================
+
   describe('getStats', () => {
-    it('应正确计算统计数据', async () => {
-      const sessions: UnifiedSessionMeta[] = [
-        { sessionId: '1', provider: 'claude-code', title: 'A', messageCount: 5, fileSize: 1024 },
-        { sessionId: '2', provider: 'claude-code', title: 'B', messageCount: 3, fileSize: 512 },
-        { sessionId: '3', provider: 'iflow', title: 'C', messageCount: 10, fileSize: 2048 },
-      ]
+    it('应正确计算各 Provider 的统计数据', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'A', messageCount: 5, fileSize: 1024 },
+        { sessionId: 'cc-2', firstPrompt: 'B', messageCount: 3, fileSize: 512 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([
+        { sessionId: 'if-1', title: 'C', messageCount: 10, fileSize: 2048 },
+      ])
+      mockCodexListSessions.mockResolvedValue([])
 
-      const statsMap = new Map<ProviderType, { provider: ProviderType; sessionCount: number; totalMessages: number; totalSize: number }>()
+      const result = await service.getStats()
 
-      for (const session of sessions) {
-        const existing = statsMap.get(session.provider)
+      expect(result).toHaveLength(2)
 
-        if (existing) {
-          existing.sessionCount++
-          existing.totalMessages += session.messageCount
-          existing.totalSize += session.fileSize
-        } else {
-          statsMap.set(session.provider, {
-            provider: session.provider,
-            sessionCount: 1,
-            totalMessages: session.messageCount,
-            totalSize: session.fileSize,
-          })
-        }
-      }
-
-      const stats = Array.from(statsMap.values())
-
-      expect(stats).toHaveLength(2)
-      
-      const claudeStats = stats.find(s => s.provider === 'claude-code')
+      const claudeStats = result.find(s => s.provider === 'claude-code')
       expect(claudeStats?.sessionCount).toBe(2)
       expect(claudeStats?.totalMessages).toBe(8)
       expect(claudeStats?.totalSize).toBe(1536)
 
-      const iflowStats = stats.find(s => s.provider === 'iflow')
+      const iflowStats = result.find(s => s.provider === 'iflow')
       expect(iflowStats?.sessionCount).toBe(1)
       expect(iflowStats?.totalMessages).toBe(10)
       expect(iflowStats?.totalSize).toBe(2048)
     })
 
-    it('应返回空数组当没有会话时', async () => {
-      const sessions: UnifiedSessionMeta[] = []
-      const statsMap = new Map()
-      for (const session of sessions) {
-        // 空循环
-      }
-      expect(Array.from(statsMap.values())).toHaveLength(0)
+    it('无会话时应返回空数组', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const result = await service.getStats()
+
+      expect(result).toEqual([])
+    })
+
+    it('应传递 options 参数', async () => {
+      mockClaudeListSessions.mockResolvedValue([])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      await service.getStats({ projectPath: '/project', workDir: '/workdir' })
+
+      expect(mockClaudeListSessions).toHaveBeenCalledWith('/project')
+      expect(mockCodexListSessions).toHaveBeenCalledWith('/workdir')
+    })
+
+    it('应正确计算单个 Provider 的统计', async () => {
+      mockClaudeListSessions.mockResolvedValue([
+        { sessionId: 'cc-1', firstPrompt: 'A', messageCount: 5, fileSize: 1000 },
+      ])
+      mockIFlowListSessions.mockResolvedValue([])
+      mockCodexListSessions.mockResolvedValue([])
+
+      const result = await service.getStats()
+
+      expect(result).toHaveLength(1)
+      expect(result[0].sessionCount).toBe(1)
+      expect(result[0].totalMessages).toBe(5)
+      expect(result[0].totalSize).toBe(1000)
     })
   })
 
@@ -448,7 +691,7 @@ describe('UnifiedHistoryService', () => {
         messageCount: 5,
         fileSize: 1024,
       }
-      
+
       expect(meta.sessionId).toBe('test-id')
       expect(meta.provider).toBe('claude-code')
       expect(meta.title).toBe('Test Session')
@@ -468,7 +711,7 @@ describe('UnifiedHistoryService', () => {
         filePath: '/path/to/file',
         projectPath: '/path/to/project',
       }
-      
+
       expect(meta.createdAt).toBeDefined()
       expect(meta.updatedAt).toBeDefined()
       expect(meta.filePath).toBeDefined()
