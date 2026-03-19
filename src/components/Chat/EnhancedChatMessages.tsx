@@ -174,9 +174,9 @@ const PreviewTextContent = memo(function PreviewTextContent({ content }: { conte
  * - 避免对整个长文本进行多次遍历
  */
 const StreamingTextContent = memo(function StreamingTextContent({ content }: { content: string }) {
-  // 如果内容为空，渲染占位符
+  // 如果内容为空，不渲染任何内容（避免与底部流式光标重复显示）
   if (!content) {
-    return <span className="text-text-muted">...</span>;
+    return null;
   }
 
   // 性能优化：对于长文本，只处理最后 2000 字符
