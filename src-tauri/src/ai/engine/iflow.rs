@@ -659,7 +659,7 @@ impl IFlowEngine {
         let stderr = child.stderr.take()?;
         let reader = BufReader::new(stderr);
 
-        for line in reader.lines().flatten() {
+        for line in reader.lines().filter_map(|r| r.ok()) {
             tracing::debug!("[iflow stderr] {}", line);
 
             // 从 stderr 提取 session_id
@@ -761,7 +761,7 @@ impl AIEngine for IFlowEngine {
         if let Some(stderr) = stderr {
             std::thread::spawn(move || {
                 let reader = BufReader::new(stderr);
-                for line in reader.lines().flatten() {
+                for line in reader.lines().filter_map(|r| r.ok()) {
                     tracing::info!("[IFlowEngine] CLI stderr: {}", line);
 
                     // 尝试从 stderr 解析 session-id
@@ -794,7 +794,7 @@ impl AIEngine for IFlowEngine {
         if let Some(stdout) = stdout {
             std::thread::spawn(move || {
                 let reader = BufReader::new(stdout);
-                for line in reader.lines().flatten() {
+                for line in reader.lines().filter_map(|r| r.ok()) {
                     tracing::debug!("[IFlowEngine] CLI stdout: {}", line);
                 }
             });
@@ -1060,7 +1060,7 @@ impl AIEngine for IFlowEngine {
         if let Some(stderr) = stderr {
             std::thread::spawn(move || {
                 let reader = BufReader::new(stderr);
-                for line in reader.lines().flatten() {
+                for line in reader.lines().filter_map(|r| r.ok()) {
                     tracing::info!("[IFlowEngine] CLI stderr ({}): {}", temp_id_for_stderr, line);
 
                     // 尝试从 stderr 解析 session-id
@@ -1096,7 +1096,7 @@ impl AIEngine for IFlowEngine {
             let sid = real_session_id.clone();
             std::thread::spawn(move || {
                 let reader = BufReader::new(stdout);
-                for line in reader.lines().flatten() {
+                for line in reader.lines().filter_map(|r| r.ok()) {
                     tracing::debug!("[IFlowEngine] CLI stdout ({}): {}", sid, line);
                 }
             });
