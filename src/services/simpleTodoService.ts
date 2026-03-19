@@ -64,7 +64,8 @@ export class SimpleTodoService {
       const content = await invoke('read_file_absolute', { path: filePath })
 
       const data = JSON.parse(content as string)
-      this.todos = data.todos || []
+      // 确保 todos 是数组类型，防止文件内容异常
+      this.todos = Array.isArray(data.todos) ? data.todos : []
     } catch (error) {
       // 文件不存在或读取失败,初始化为空
       console.log('[SimpleTodoService] 文件不存在或读取失败,初始化为空:', error)
@@ -227,7 +228,13 @@ export class SimpleTodoService {
    * 通知监听器
    */
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener())
+    this.listeners.forEach(listener => {
+      try {
+        listener()
+      } catch (error) {
+        log.error('监听器执行出错:', error instanceof Error ? error : new Error(String(error)))
+      }
+    })
   }
 
   /**
