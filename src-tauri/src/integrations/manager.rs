@@ -233,16 +233,17 @@ impl IntegrationManager {
 
         // 2. 普通 AI 消息处理
         if let Some(ref registry) = engine_registry {
-            Self::process_ai_message(
-                registry.clone(),
+            let ctx = ProcessAiMessageContext {
+                engine_registry: registry.clone(),
                 conversation_id,
-                text.to_string(),
+                message: text.to_string(),
                 app_handle,
                 platform,
                 adapters,
                 conversation_states,
                 active_sessions,
-            ).await;
+            };
+            Self::process_ai_message(ctx).await;
         } else {
             tracing::warn!("[IntegrationManager] ⚠️ engine_registry 未设置，无法调用 AI");
             Self::send_reply(&adapters, platform, &conversation_id, "⚠️ AI 服务未初始化").await;
@@ -412,8 +413,8 @@ impl IntegrationManager {
         }
     }
 
-    /// 处理 AI 消息
-    async fn process_ai_message(
+    /// AI 消息处理上下文
+    struct ProcessAiMessageContext {
         engine_registry: Arc<Mutex<EngineRegistry>>,
         conversation_id: String,
         message: String,
@@ -422,7 +423,20 @@ impl IntegrationManager {
         adapters: Arc<Mutex<HashMap<Platform, Box<dyn PlatformIntegration>>>>,
         conversation_states: Arc<Mutex<ConversationStore>>,
         active_sessions: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
-    ) {
+    }
+
+    /// 处理 AI 消息
+    async fn process_ai_message(ctx: ProcessAiMessageContext) {
+        let ProcessAiMessageContext {
+            engine_registry,
+            conversation_id,
+            message,
+            app_handle,
+            platform,
+            adapters,
+            conversation_states,
+            active_sessions,
+        } = ctx;
         tracing::info!("[IntegrationManager] 🤖 开始 AI 回复: conversation={}, message_len={}", conversation_id, message.len());
 
         // 获取会话状态（包括已有的 ai_session_id 和消息历史）
