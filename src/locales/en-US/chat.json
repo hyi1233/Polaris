@@ -96,5 +96,22 @@
     "showMore": "Show more ({{count}})",
     "customInputPlaceholder": "Enter custom answer...",
     "pendingAnswer": "Pending question to answer"
+  },
+  "plan": {
+    "defaultTitle": "Execution Plan",
+    "pendingApproval": "Plan pending approval",
+    "approve": "Approve",
+    "reject": "Reject",
+    "statusDrafting": "Drafting",
+    "statusPendingApproval": "Pending Approval",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "statusExecuting": "Executing",
+    "statusCompleted": "Completed",
+    "statusCanceled": "Canceled",
+    "stagePending": "Pending",
+    "stageInProgress": "In Progress",
+    "stageCompleted": "Completed",
+    "stageFailed": "Failed"
   }
 }

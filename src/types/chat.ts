@@ -63,7 +63,7 @@ export interface PermissionRequest {
  */
 
 /** 内容块类型 - 用于 Assistant 消息的内容分段 */
-export type ContentBlock = TextBlock | ThinkingBlock | ToolCallBlock | QuestionBlock;
+export type ContentBlock = TextBlock | ThinkingBlock | ToolCallBlock | QuestionBlock | PlanModeBlock;
 
 /** 文本内容块 */
 export interface TextBlock {
@@ -141,6 +141,67 @@ export interface QuestionBlock {
   status: QuestionStatus;
   /** 用户答案 */
   answer?: QuestionAnswer;
+}
+
+/** ========================================
+ * PlanMode 相关类型
+ * ======================================== */
+
+/** PlanMode 状态 */
+export type PlanModeStatus = 
+  | 'drafting'         // 正在起草计划
+  | 'pending_approval' // 等待审批
+  | 'approved'         // 已批准
+  | 'rejected'         // 已拒绝
+  | 'executing'        // 正在执行
+  | 'completed'        // 已完成
+  | 'canceled';        // 已取消
+
+/** 计划任务（内容块内） */
+export interface PlanTaskBlock {
+  /** 任务 ID */
+  taskId: string;
+  /** 任务描述 */
+  description: string;
+  /** 任务状态 */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+}
+
+/** 计划阶段（内容块内） */
+export interface PlanStageBlock {
+  /** 阶段 ID */
+  stageId: string;
+  /** 阶段名称 */
+  name: string;
+  /** 阶段描述 */
+  description?: string;
+  /** 阶段状态 */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  /** 阶段内的任务列表 */
+  tasks: PlanTaskBlock[];
+  /** 是否折叠 */
+  collapsed?: boolean;
+}
+
+/** PlanMode 内容块 - 用于计划模式 */
+export interface PlanModeBlock {
+  type: 'plan_mode';
+  /** 计划 ID */
+  id: string;
+  /** 会话 ID */
+  sessionId: string;
+  /** 计划标题 */
+  title?: string;
+  /** 计划描述 */
+  description?: string;
+  /** 阶段列表 */
+  stages: PlanStageBlock[];
+  /** 当前计划状态 */
+  status: PlanModeStatus;
+  /** 修改建议（拒绝时的反馈） */
+  feedback?: string;
+  /** 是否激活（正在编辑/审批中） */
+  isActive?: boolean;
 }
 
 /** 聊天消息类型标识符 */
@@ -289,4 +350,9 @@ export function isToolCallBlock(block: ContentBlock): block is ToolCallBlock {
 /** 类型守卫：判断是否为问题块 */
 export function isQuestionBlock(block: ContentBlock): block is QuestionBlock {
   return block.type === 'question';
+}
+
+/** 类型守卫：判断是否为计划模式块 */
+export function isPlanModeBlock(block: ContentBlock): block is PlanModeBlock {
+  return block.type === 'plan_mode';
 }

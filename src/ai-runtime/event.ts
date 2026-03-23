@@ -299,6 +299,134 @@ export interface QuestionAnswerData {
   customInput?: string
 }
 
+// ========================================
+// PlanMode 相关事件
+// ========================================
+
+/** PlanMode 状态 */
+export type PlanStatus = 
+  | 'drafting'      // 正在起草计划
+  | 'pending_approval' // 等待审批
+  | 'approved'      // 已批准
+  | 'rejected'      // 已拒绝
+  | 'executing'     // 正在执行
+  | 'completed'     // 已完成
+  | 'canceled'      // 已取消
+
+/** 计划任务 */
+export interface PlanTask {
+  /** 任务 ID */
+  taskId: string
+  /** 任务描述 */
+  description: string
+  /** 任务状态 */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped'
+}
+
+/** 计划阶段 */
+export interface PlanStage {
+  /** 阶段 ID */
+  stageId: string
+  /** 阶段名称 */
+  name: string
+  /** 阶段描述 */
+  description?: string
+  /** 阶段状态 */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  /** 阶段内的任务列表 */
+  tasks: PlanTask[]
+}
+
+/**
+ * Plan 开始事件
+ */
+export interface PlanStartEvent {
+  type: 'plan_start'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+}
+
+/**
+ * Plan 内容事件 - 发送完整的计划内容
+ */
+export interface PlanContentEvent {
+  type: 'plan_content'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+  /** 计划标题 */
+  title?: string
+  /** 计划描述 */
+  description?: string
+  /** 阶段列表 */
+  stages: PlanStage[]
+  /** 当前计划状态 */
+  status: PlanStatus
+}
+
+/**
+ * Plan 阶段更新事件
+ */
+export interface PlanStageUpdateEvent {
+  type: 'plan_stage_update'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+  /** 阶段 ID */
+  stageId: string
+  /** 阶段状态 */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  /** 更新的任务列表（可选） */
+  tasks?: PlanTask[]
+}
+
+/**
+ * Plan 审批请求事件
+ */
+export interface PlanApprovalRequestEvent {
+  type: 'plan_approval_request'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+  /** 请求消息 */
+  message?: string
+}
+
+/**
+ * Plan 审批结果事件
+ */
+export interface PlanApprovalResultEvent {
+  type: 'plan_approval_result'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+  /** 审批结果 */
+  approved: boolean
+  /** 修改建议（拒绝时可能有） */
+  feedback?: string
+}
+
+/**
+ * Plan 结束事件
+ */
+export interface PlanEndEvent {
+  type: 'plan_end'
+  /** 会话 ID */
+  sessionId: string
+  /** 计划 ID */
+  planId: string
+  /** 结束状态 */
+  status: 'completed' | 'canceled' | 'rejected'
+  /** 结束原因 */
+  reason?: string
+}
+
 /**
  * 问题已回答事件
  */
@@ -341,6 +469,12 @@ export type AIEvent =
   | TodoExecutionProgressEvent
   | TodoExecutionCompletedEvent
   | QuestionAnsweredEvent
+  | PlanStartEvent
+  | PlanContentEvent
+  | PlanStageUpdateEvent
+  | PlanApprovalRequestEvent
+  | PlanApprovalResultEvent
+  | PlanEndEvent
 
 /**
  * 事件监听器类型
@@ -685,6 +819,12 @@ const AI_EVENT_TYPES = new Set([
   'todo_execution_progress',
   'todo_execution_completed',
   'question_answered',
+  'plan_start',
+  'plan_content',
+  'plan_stage_update',
+  'plan_approval_request',
+  'plan_approval_result',
+  'plan_end',
 ])
 
 /**
@@ -705,4 +845,37 @@ export function isAIEvent(value: unknown): value is AIEvent {
 
 export function isQuestionAnsweredEvent(event: AIEvent): event is QuestionAnsweredEvent {
   return event.type === 'question_answered'
+}
+
+// ========================================
+// PlanMode 事件类型守卫
+// ========================================
+
+export function isPlanStartEvent(event: AIEvent): event is PlanStartEvent {
+  return event.type === 'plan_start'
+}
+
+export function isPlanContentEvent(event: AIEvent): event is PlanContentEvent {
+  return event.type === 'plan_content'
+}
+
+export function isPlanStageUpdateEvent(event: AIEvent): event is PlanStageUpdateEvent {
+  return event.type === 'plan_stage_update'
+}
+
+export function isPlanApprovalRequestEvent(event: AIEvent): event is PlanApprovalRequestEvent {
+  return event.type === 'plan_approval_request'
+}
+
+export function isPlanApprovalResultEvent(event: AIEvent): event is PlanApprovalResultEvent {
+  return event.type === 'plan_approval_result'
+}
+
+export function isPlanEndEvent(event: AIEvent): event is PlanEndEvent {
+  return event.type === 'plan_end'
+}
+
+/** 判断是否为任意 PlanMode 事件 */
+export function isPlanEvent(event: AIEvent): event is PlanStartEvent | PlanContentEvent | PlanStageUpdateEvent | PlanApprovalRequestEvent | PlanApprovalResultEvent | PlanEndEvent {
+  return event.type.startsWith('plan_')
 }

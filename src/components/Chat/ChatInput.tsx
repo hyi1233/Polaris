@@ -95,6 +95,18 @@ export function ChatInput({
     return false
   })
 
+  // 检查是否有活跃的计划（等待审批）
+  const hasActivePlan = useEventChatStore(state => {
+    if (!state.activePlanId || !state.currentMessage) return false
+    const planBlockIndex = state.planBlockMap.get(state.activePlanId)
+    if (planBlockIndex === undefined) return false
+    const block = state.currentMessage.blocks[planBlockIndex]
+    if (block?.type === 'plan_mode') {
+      return block.status === 'pending_approval' || block.status === 'drafting'
+    }
+    return false
+  })
+
   const [isTranslating, setIsTranslating] = useState(false)
 
   // 过滤工作区列表
@@ -690,6 +702,11 @@ export function ChatInput({
               <span className="flex items-center gap-1 text-accent">
                 <span className="w-1 h-1 bg-accent rounded-full animate-pulse" />
                 {t('question.pendingAnswer')}
+              </span>
+            ) : hasActivePlan ? (
+              <span className="flex items-center gap-1 text-violet-500">
+                <span className="w-1 h-1 bg-violet-500 rounded-full animate-pulse" />
+                {t('plan.pendingApproval')}
               </span>
             ) : isStreaming ? (
               <span className="flex items-center gap-2">

@@ -96,5 +96,22 @@
     "showMore": "显示更多 ({{count}})",
     "customInputPlaceholder": "输入自定义答案...",
     "pendingAnswer": "有待回答的问题"
+  },
+  "plan": {
+    "defaultTitle": "执行计划",
+    "pendingApproval": "计划待审批",
+    "approve": "批准",
+    "reject": "拒绝",
+    "statusDrafting": "起草中",
+    "statusPendingApproval": "待审批",
+    "statusApproved": "已批准",
+    "statusRejected": "已拒绝",
+    "statusExecuting": "执行中",
+    "statusCompleted": "已完成",
+    "statusCanceled": "已取消",
+    "stagePending": "待开始",
+    "stageInProgress": "进行中",
+    "stageCompleted": "已完成",
+    "stageFailed": "失败"
   }
 }

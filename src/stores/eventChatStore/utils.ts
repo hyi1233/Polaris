@@ -303,6 +303,126 @@ export function handleAIEvent(
       break
     }
 
+    // ========================================
+    // PlanMode 事件处理
+    // ========================================
+
+    case 'plan_start': {
+      // 计划开始：创建新的 PlanModeBlock
+      const planEvent = event as { sessionId: string; planId: string }
+      state.appendPlanModeBlock(
+        planEvent.planId,
+        planEvent.sessionId
+      )
+      console.log('[EventChatStore] Plan started:', planEvent.planId)
+      break
+    }
+
+    case 'plan_content': {
+      // 计划内容：更新完整的计划内容
+      const planEvent = event as {
+        sessionId: string
+        planId: string
+        title?: string
+        description?: string
+        stages: Array<{
+          stageId: string
+          name: string
+          description?: string
+          status: 'pending' | 'in_progress' | 'completed' | 'failed'
+          tasks: Array<{
+            taskId: string
+            description: string
+            status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped'
+          }>
+        }>
+        status: string
+      }
+
+      state.updatePlanModeBlock(planEvent.planId, {
+        title: planEvent.title,
+        description: planEvent.description,
+        stages: planEvent.stages,
+        status: planEvent.status as 'drafting' | 'pending_approval' | 'approved' | 'rejected' | 'executing' | 'completed' | 'canceled',
+      })
+      console.log('[EventChatStore] Plan content updated:', planEvent.planId, 'stages:', planEvent.stages?.length)
+      break
+    }
+
+    case 'plan_stage_update': {
+      // 阶段更新：更新单个阶段的状态
+      const planEvent = event as {
+        sessionId: string
+        planId: string
+        stageId: string
+        status: 'pending' | 'in_progress' | 'completed' | 'failed'
+        tasks?: Array<{
+          taskId: string
+          description: string
+          status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped'
+        }>
+      }
+
+      state.updatePlanStageStatus(
+        planEvent.planId,
+        planEvent.stageId,
+        planEvent.status,
+        planEvent.tasks
+      )
+      console.log('[EventChatStore] Plan stage updated:', planEvent.stageId, 'status:', planEvent.status)
+      break
+    }
+
+    case 'plan_approval_request': {
+      // 审批请求：标记计划为等待审批
+      const planEvent = event as { sessionId: string; planId: string; message?: string }
+
+      state.updatePlanModeBlock(planEvent.planId, {
+        status: 'pending_approval',
+        isActive: true,
+      })
+      console.log('[EventChatStore] Plan approval requested:', planEvent.planId)
+      break
+    }
+
+    case 'plan_approval_result': {
+      // 审批结果：更新计划的审批状态
+      const planEvent = event as {
+        sessionId: string
+        planId: string
+        approved: boolean
+        feedback?: string
+      }
+
+      state.updatePlanModeBlock(planEvent.planId, {
+        status: planEvent.approved ? 'approved' : 'rejected',
+        feedback: planEvent.feedback,
+        isActive: !planEvent.approved, // 拒绝时保持激活，允许修改
+      })
+      console.log('[EventChatStore] Plan approval result:', planEvent.planId, 'approved:', planEvent.approved)
+      break
+    }
+
+    case 'plan_end': {
+      // 计划结束：标记计划为完成/取消/拒绝
+      const planEvent = event as {
+        sessionId: string
+        planId: string
+        status: 'completed' | 'canceled' | 'rejected'
+        reason?: string
+      }
+
+      state.updatePlanModeBlock(planEvent.planId, {
+        status: planEvent.status,
+        isActive: false,
+      })
+
+      // 清除活跃计划
+      storeSet({ activePlanId: null })
+      console.log('[EventChatStore] Plan ended:', planEvent.planId, 'status:', planEvent.status)
+      break
+    }
+
     default:
       console.log('[EventChatStore] 未处理的 AIEvent 类型:', (event as { type: string }).type)
   }

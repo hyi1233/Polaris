@@ -9,7 +9,7 @@
  */
 
 import type { MessageSlice, CurrentAssistantMessage } from './types'
-import type { ContentBlock, ToolCallBlock, QuestionBlock } from '../../types'
+import type { ContentBlock, ToolCallBlock, QuestionBlock, PlanModeBlock } from '../../types'
 import { MESSAGE_ARCHIVE_THRESHOLD } from './types'
 import { isTextBlock } from '../../types'
 import { generateToolSummary, calculateDuration } from '../../utils/toolSummary'
@@ -25,6 +25,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
   currentMessage: null,
   toolBlockMap: new Map(),
   questionBlockMap: new Map(),
+  planBlockMap: new Map(),
+  activePlanId: null,
   streamingUpdateCounter: 0,
 
   // ===== 方法 =====
@@ -88,6 +90,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       currentMessage: null,
       toolBlockMap: new Map(),
       questionBlockMap: new Map(),
+      planBlockMap: new Map(),
+      activePlanId: null,
       providerSessionCache: null,
       // 不重置事件监听器状态，保持其在应用生命周期内活跃
     })
@@ -536,5 +540,150 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
 
     // 更新消息列表中的消息
     get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 添加计划模式块
+   */
+  appendPlanModeBlock: (planId, sessionId, title, description, stages) => {
+    const { currentMessage } = get()
+
+    const planBlock: PlanModeBlock = {
+      type: 'plan_mode',
+      id: planId,
+      sessionId,
+      title,
+      description,
+      stages: stages || [],
+      status: 'drafting',
+      isActive: true,
+    }
+
+    // 如果没有当前消息，创建一个新的
+    if (!currentMessage) {
+      const newMessage: CurrentAssistantMessage = {
+        id: crypto.randomUUID(),
+        blocks: [planBlock],
+        isStreaming: true,
+      }
+      set({
+        currentMessage: newMessage,
+        isStreaming: true,
+        planBlockMap: new Map([[planId, 0]]),
+        activePlanId: planId,
+      })
+      return
+    }
+
+    // 添加计划块
+    const updatedBlocks: ContentBlock[] = [...currentMessage.blocks, planBlock]
+    const blockIndex = updatedBlocks.length - 1
+
+    // 更新 planBlockMap
+    const existingMap = get().planBlockMap
+    existingMap.set(planId, blockIndex)
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+      planBlockMap: existingMap,
+      activePlanId: planId,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 更新计划模式块
+   */
+  updatePlanModeBlock: (planId, updates) => {
+    const { currentMessage, planBlockMap } = get()
+    const blockIndex = planBlockMap.get(planId)
+
+    if (!currentMessage || blockIndex === undefined) {
+      console.warn('[EventChatStore] Plan block not found:', planId)
+      return
+    }
+
+    const block = currentMessage.blocks[blockIndex]
+    if (!block || block.type !== 'plan_mode') {
+      console.warn('[EventChatStore] Invalid plan block at index:', blockIndex)
+      return
+    }
+
+    // 更新计划块
+    const updatedBlock: PlanModeBlock = {
+      ...block,
+      ...updates,
+    }
+
+    const updatedBlocks = [...currentMessage.blocks]
+    updatedBlocks[blockIndex] = updatedBlock
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 更新计划阶段状态
+   */
+  updatePlanStageStatus: (planId, stageId, status, tasks) => {
+    const { currentMessage, planBlockMap } = get()
+    const blockIndex = planBlockMap.get(planId)
+
+    if (!currentMessage || blockIndex === undefined) {
+      console.warn('[EventChatStore] Plan block not found:', planId)
+      return
+    }
+
+    const block = currentMessage.blocks[blockIndex]
+    if (!block || block.type !== 'plan_mode') {
+      console.warn('[EventChatStore] Invalid plan block at index:', blockIndex)
+      return
+    }
+
+    // 更新阶段状态
+    const updatedStages = block.stages.map((stage) => {
+      if (stage.stageId === stageId) {
+        return {
+          ...stage,
+          status,
+          tasks: tasks !== undefined ? tasks : stage.tasks,
+        }
+      }
+      return stage
+    })
+
+    const updatedBlock: PlanModeBlock = {
+      ...block,
+      stages: updatedStages,
+    }
+
+    const updatedBlocks = [...currentMessage.blocks]
+    updatedBlocks[blockIndex] = updatedBlock
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 设置活跃计划
+   */
+  setActivePlan: (planId) => {
+    set({ activePlanId: planId })
   },
 })

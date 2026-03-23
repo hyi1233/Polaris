@@ -164,6 +164,10 @@ export interface MessageState {
   toolBlockMap: Map<string, number>
   /** 问题块映射 (questionId -> blockIndex) */
   questionBlockMap: Map<string, number>
+  /** PlanMode 块映射 (planId -> blockIndex) */
+  planBlockMap: Map<string, number>
+  /** 当前活跃的计划 ID（用于追踪正在编辑/审批的计划） */
+  activePlanId: string | null
   /** 流式更新计数器 - 用于强制触发React重新渲染 */
   streamingUpdateCounter: number
 }
@@ -252,6 +256,15 @@ export interface MessageActions {
   appendQuestionBlock: (questionId: string, header: string, options: Array<{ value: string; label?: string }>, multiSelect?: boolean, allowCustomInput?: boolean) => void
   /** 更新问题块答案 */
   updateQuestionBlock: (questionId: string, answer: { selected: string[]; customInput?: string }) => void
+
+  /** 添加计划模式块 */
+  appendPlanModeBlock: (planId: string, sessionId: string, title?: string, description?: string, stages?: import('../../types/chat').PlanStageBlock[]) => void
+  /** 更新计划模式块 */
+  updatePlanModeBlock: (planId: string, updates: Partial<import('../../types/chat').PlanModeBlock>) => void
+  /** 更新计划阶段状态 */
+  updatePlanStageStatus: (planId: string, stageId: string, status: 'pending' | 'in_progress' | 'completed' | 'failed', tasks?: import('../../types/chat').PlanTaskBlock[]) => void
+  /** 设置活跃计划 */
+  setActivePlan: (planId: string | null) => void
 }
 
 /**
