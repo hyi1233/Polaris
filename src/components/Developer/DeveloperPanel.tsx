@@ -258,7 +258,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
           </div>
 
           {/* 事件列表 */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
+          <div className="flex min-h-0 flex-1 overflow-y-auto px-2 py-2">
             {filteredEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
                 <svg className="w-12 h-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -452,7 +452,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
           </div>
 
           {/* 事件列表 */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
+          <div className="flex min-h-0 flex-1 overflow-y-auto px-2 py-2">
             {filteredEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
                 <svg className="w-12 h-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

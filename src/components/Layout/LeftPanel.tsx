@@ -33,9 +33,9 @@ export function LeftPanel({ children, className = '', fillRemaining = false }: L
   // 填充模式：使用 flex-1 自动扩展，不显示拖拽手柄
   if (fillRemaining) {
     return (
-      <aside className={`flex flex-col bg-background-elevated border-r border-border min-w-[200px] flex-1 ${className}`}>
+      <aside className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-background-elevated border-r border-border min-w-[200px] ${className}`}>
         {/* 面板内容 */}
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
       </aside>
     )
   }
