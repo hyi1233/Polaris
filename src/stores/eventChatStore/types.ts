@@ -151,6 +151,31 @@ export interface ExternalDependencies {
 // ============================================================================
 
 /**
+ * 待聚合的工具组（用于智能聚合）
+ */
+export interface PendingToolGroup {
+  /** 工具组 ID */
+  groupId: string
+  /** 包含的工具列表 */
+  tools: Array<{
+    id: string
+    name: string
+    input?: Record<string, unknown>
+    status: 'pending' | 'running' | 'completed' | 'failed'
+    startedAt: string
+    completedAt?: string
+    output?: string
+    summary?: string
+  }>
+  /** 工具组开始时间 */
+  startedAt: string
+  /** 最后一个工具的时间戳 */
+  lastToolAt: number
+  /** 聚合计时器 ID */
+  timerId?: ReturnType<typeof setTimeout>
+}
+
+/**
  * 消息状态
  */
 export interface MessageState {
@@ -172,6 +197,10 @@ export interface MessageState {
   agentRunBlockMap: Map<string, number>
   /** 当前活跃的任务 ID（用于追踪正在运行的 Agent） */
   activeTaskId: string | null
+  /** ToolGroup 块映射 (groupId -> blockIndex) */
+  toolGroupBlockMap: Map<string, number>
+  /** 待聚合的工具组（用于智能聚合） */
+  pendingToolGroup: PendingToolGroup | null
   /** 流式更新计数器 - 用于强制触发React重新渲染 */
   streamingUpdateCounter: number
 }
@@ -280,6 +309,19 @@ export interface MessageActions {
   updateAgentToolCallStatus: (taskId: string, toolId: string, status: 'pending' | 'running' | 'completed' | 'failed', summary?: string) => void
   /** 设置活跃任务 */
   setActiveTask: (taskId: string | null) => void
+
+  /** 添加工具组块 */
+  appendToolGroupBlock: (groupId: string, tools: Array<{ id: string; name: string; status: 'pending' | 'running' | 'completed' | 'failed'; startedAt: string }>, summary: string) => void
+  /** 更新工具组块 */
+  updateToolGroupBlock: (groupId: string, updates: Partial<import('../../types/chat').ToolGroupBlock>) => void
+  /** 更新工具组内的工具状态 */
+  updateToolInGroup: (groupId: string, toolId: string, updates: { status?: 'pending' | 'running' | 'completed' | 'failed'; output?: string; summary?: string }) => void
+  /** 设置待聚合的工具组 */
+  setPendingToolGroup: (group: PendingToolGroup | null) => void
+  /** 添加工具到待聚合组 */
+  addToolToPendingGroup: (tool: { id: string; name: string; input?: Record<string, unknown>; startedAt: string }) => void
+  /** 完成待聚合组并创建 ToolGroupBlock */
+  finalizePendingToolGroup: () => void
 }
 
 /**

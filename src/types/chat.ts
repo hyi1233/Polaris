@@ -63,7 +63,7 @@ export interface PermissionRequest {
  */
 
 /** 内容块类型 - 用于 Assistant 消息的内容分段 */
-export type ContentBlock = TextBlock | ThinkingBlock | ToolCallBlock | QuestionBlock | PlanModeBlock | AgentRunBlock;
+export type ContentBlock = TextBlock | ThinkingBlock | ToolCallBlock | QuestionBlock | PlanModeBlock | AgentRunBlock | ToolGroupBlock;
 
 /** 文本内容块 */
 export interface TextBlock {
@@ -257,6 +257,58 @@ export interface AgentRunBlock {
   completedAt?: string;
 }
 
+/** ========================================
+ * ToolGroup 相关类型
+ * ======================================== */
+
+/** 工具组状态 */
+export type ToolGroupStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
+
+/** 工具组内的单个工具信息 */
+export interface ToolGroupItem {
+  /** 工具调用 ID */
+  id: string;
+  /** 工具名称 */
+  name: string;
+  /** 工具状态 */
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  /** 简短描述 */
+  summary?: string;
+  /** 工具输入（用于详情展示） */
+  input?: Record<string, unknown>;
+  /** 工具输出 */
+  output?: string;
+  /** 开始时间 */
+  startedAt: string;
+  /** 完成时间 */
+  completedAt?: string;
+  /** 执行时长（毫秒） */
+  duration?: number;
+}
+
+/** 工具组内容块 - 用于多个工具调用的聚合展示 */
+export interface ToolGroupBlock {
+  type: 'tool_group';
+  /** 工具组 ID */
+  id: string;
+  /** 包含的工具列表 */
+  tools: ToolGroupItem[];
+  /** 工具名称列表（用于快速统计） */
+  toolNames: string[];
+  /** 工具组整体状态 */
+  status: ToolGroupStatus;
+  /** 智能摘要 */
+  summary: string;
+  /** 开始时间 */
+  startedAt: string;
+  /** 完成时间 */
+  completedAt?: string;
+  /** 执行时长（毫秒） */
+  duration?: number;
+  /** 是否折叠 */
+  collapsed?: boolean;
+}
+
 /** 聊天消息类型标识符 */
 export type ChatMessageType = 'user' | 'assistant' | 'system' | 'tool' | 'tool_group';
 
@@ -413,4 +465,9 @@ export function isPlanModeBlock(block: ContentBlock): block is PlanModeBlock {
 /** 类型守卫：判断是否为 Agent 运行块 */
 export function isAgentRunBlock(block: ContentBlock): block is AgentRunBlock {
   return block.type === 'agent_run';
+}
+
+/** 类型守卫：判断是否为工具组块 */
+export function isToolGroupBlock(block: ContentBlock): block is ToolGroupBlock {
+  return block.type === 'tool_group';
 }

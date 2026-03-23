@@ -119,5 +119,12 @@
     "completed": "完成",
     "toolCalls": "工具调用",
     "output": "输出"
+  },
+  "toolGroup": {
+    "tools": "个工具",
+    "completed": "完成",
+    "running": "进行中",
+    "failed": "失败",
+    "showAll": "查看全部 {{count}} 个工具"
   }
 }

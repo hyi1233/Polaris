@@ -119,5 +119,12 @@
     "completed": "completed",
     "toolCalls": "Tool Calls",
     "output": "Output"
+  },
+  "toolGroup": {
+    "tools": "tools",
+    "completed": "completed",
+    "running": "running",
+    "failed": "failed",
+    "showAll": "Show all {{count}} tools"
   }
 }

@@ -29,6 +29,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
   activePlanId: null,
   agentRunBlockMap: new Map(),
   activeTaskId: null,
+  toolGroupBlockMap: new Map(),
+  pendingToolGroup: null,
   streamingUpdateCounter: 0,
 
   // ===== 方法 =====
@@ -96,6 +98,8 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
       activePlanId: null,
       agentRunBlockMap: new Map(),
       activeTaskId: null,
+      toolGroupBlockMap: new Map(),
+      pendingToolGroup: null,
       providerSessionCache: null,
       // 不重置事件监听器状态，保持其在应用生命周期内活跃
     })
@@ -874,5 +878,250 @@ export const createMessageSlice: MessageSlice = (set, get) => ({
    */
   setActiveTask: (taskId) => {
     set({ activeTaskId: taskId })
+  },
+
+  // ========================================
+  // ToolGroup 方法
+  // ========================================
+
+  /**
+   * 添加工具组块
+   */
+  appendToolGroupBlock: (groupId, tools, summary) => {
+    const { currentMessage } = get()
+
+    const toolGroupBlock: import('../../types/chat').ToolGroupBlock = {
+      type: 'tool_group',
+      id: groupId,
+      tools: tools.map(t => ({
+        id: t.id,
+        name: t.name,
+        status: t.status,
+        startedAt: t.startedAt,
+      })),
+      toolNames: [...new Set(tools.map(t => t.name))],
+      status: 'running',
+      summary,
+      startedAt: tools[0]?.startedAt || new Date().toISOString(),
+    }
+
+    // 如果没有当前消息，创建一个新的
+    if (!currentMessage) {
+      const newMessage: CurrentAssistantMessage = {
+        id: crypto.randomUUID(),
+        blocks: [toolGroupBlock],
+        isStreaming: true,
+      }
+      set({
+        currentMessage: newMessage,
+        isStreaming: true,
+        toolGroupBlockMap: new Map([[groupId, 0]]),
+      })
+      return
+    }
+
+    // 添加工具组块
+    const updatedBlocks: ContentBlock[] = [...currentMessage.blocks, toolGroupBlock]
+    const blockIndex = updatedBlocks.length - 1
+
+    // 更新 toolGroupBlockMap
+    const existingMap = get().toolGroupBlockMap
+    existingMap.set(groupId, blockIndex)
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+      toolGroupBlockMap: existingMap,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 更新工具组块
+   */
+  updateToolGroupBlock: (groupId, updates) => {
+    const { currentMessage, toolGroupBlockMap } = get()
+    const blockIndex = toolGroupBlockMap.get(groupId)
+
+    if (!currentMessage || blockIndex === undefined) {
+      console.warn('[EventChatStore] ToolGroup block not found:', groupId)
+      return
+    }
+
+    const block = currentMessage.blocks[blockIndex]
+    if (!block || block.type !== 'tool_group') {
+      console.warn('[EventChatStore] Invalid tool_group block at index:', blockIndex)
+      return
+    }
+
+    // 更新工具组块
+    const updatedBlock: import('../../types/chat').ToolGroupBlock = {
+      ...block,
+      ...updates,
+    }
+
+    const updatedBlocks = [...currentMessage.blocks]
+    updatedBlocks[blockIndex] = updatedBlock
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 更新工具组内的工具状态
+   */
+  updateToolInGroup: (groupId, toolId, updates) => {
+    const { currentMessage, toolGroupBlockMap } = get()
+    const blockIndex = toolGroupBlockMap.get(groupId)
+
+    if (!currentMessage || blockIndex === undefined) {
+      console.warn('[EventChatStore] ToolGroup block not found:', groupId)
+      return
+    }
+
+    const block = currentMessage.blocks[blockIndex]
+    if (!block || block.type !== 'tool_group') {
+      console.warn('[EventChatStore] Invalid tool_group block at index:', blockIndex)
+      return
+    }
+
+    // 更新工具组内的工具状态
+    const updatedTools = block.tools.map((t) => {
+      if (t.id === toolId) {
+        return { ...t, ...updates }
+      }
+      return t
+    })
+
+    // 计算整体状态
+    const allCompleted = updatedTools.every(t => t.status === 'completed')
+    const anyFailed = updatedTools.some(t => t.status === 'failed')
+    const anyRunning = updatedTools.some(t => t.status === 'running' || t.status === 'pending')
+
+    let groupStatus: import('../../types/chat').ToolGroupStatus = 'running'
+    if (allCompleted) {
+      groupStatus = 'completed'
+    } else if (anyFailed && !anyRunning) {
+      groupStatus = 'failed'
+    } else if (anyFailed) {
+      groupStatus = 'partial'
+    }
+
+    const now = new Date().toISOString()
+    const duration = block.startedAt ? calculateDuration(block.startedAt, now) : undefined
+
+    const updatedBlock: import('../../types/chat').ToolGroupBlock = {
+      ...block,
+      tools: updatedTools,
+      status: groupStatus,
+      completedAt: allCompleted || (!anyRunning && anyFailed) ? now : undefined,
+      duration,
+    }
+
+    const updatedBlocks = [...currentMessage.blocks]
+    updatedBlocks[blockIndex] = updatedBlock
+
+    set((state) => ({
+      currentMessage: state.currentMessage
+        ? { ...state.currentMessage, blocks: updatedBlocks }
+        : null,
+    }))
+
+    // 更新消息列表中的消息
+    get().updateCurrentAssistantMessage(updatedBlocks)
+  },
+
+  /**
+   * 设置待聚合的工具组
+   */
+  setPendingToolGroup: (group) => {
+    // 清理旧的计时器
+    const { pendingToolGroup } = get()
+    if (pendingToolGroup?.timerId) {
+      clearTimeout(pendingToolGroup.timerId)
+    }
+    set({ pendingToolGroup: group })
+  },
+
+  /**
+   * 添加工具到待聚合组
+   */
+  addToolToPendingGroup: (tool) => {
+    const { pendingToolGroup } = get()
+
+    if (!pendingToolGroup) {
+      // 创建新的待聚合组
+      const newGroup: import('./types').PendingToolGroup = {
+        groupId: crypto.randomUUID(),
+        tools: [{
+          id: tool.id,
+          name: tool.name,
+          input: tool.input,
+          status: 'running',
+          startedAt: tool.startedAt,
+        }],
+        startedAt: tool.startedAt,
+        lastToolAt: Date.now(),
+      }
+      set({ pendingToolGroup: newGroup })
+      return
+    }
+
+    // 添加到现有组
+    const updatedGroup: import('./types').PendingToolGroup = {
+      ...pendingToolGroup,
+      tools: [...pendingToolGroup.tools, {
+        id: tool.id,
+        name: tool.name,
+        input: tool.input,
+        status: 'running',
+        startedAt: tool.startedAt,
+      }],
+      lastToolAt: Date.now(),
+    }
+    set({ pendingToolGroup: updatedGroup })
+  },
+
+  /**
+   * 完成待聚合组并创建 ToolGroupBlock
+   */
+  finalizePendingToolGroup: () => {
+    const { pendingToolGroup } = get()
+
+    if (!pendingToolGroup || pendingToolGroup.tools.length < 2) {
+      // 工具数量不足，不创建工具组
+      set({ pendingToolGroup: null })
+      return
+    }
+
+    // 生成摘要
+    const toolNames = [...new Set(pendingToolGroup.tools.map(t => t.name))]
+    const summary = toolNames.length === 1
+      ? `${toolNames[0]} ×${pendingToolGroup.tools.length}`
+      : `${pendingToolGroup.tools.length} 个工具`
+
+    // 创建 ToolGroupBlock
+    get().appendToolGroupBlock(
+      pendingToolGroup.groupId,
+      pendingToolGroup.tools.map(t => ({
+        id: t.id,
+        name: t.name,
+        status: t.status,
+        startedAt: t.startedAt,
+      })),
+      summary
+    )
+
+    // 清除待聚合组
+    set({ pendingToolGroup: null })
   },
 })
