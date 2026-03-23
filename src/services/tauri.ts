@@ -150,6 +150,87 @@ export async function interruptChat(sessionId: string): Promise<void> {
 }
 
 // ============================================================================
+// AskUserQuestion 相关命令
+// ============================================================================
+
+/** 问题选项 */
+export interface QuestionOption {
+  value: string;
+  label?: string;
+}
+
+/** 问题状态 */
+export type QuestionStatus = 'pending' | 'answered';
+
+/** 待回答问题 */
+export interface PendingQuestion {
+  callId: string;
+  sessionId: string;
+  header: string;
+  multiSelect: boolean;
+  options: QuestionOption[];
+  allowCustomInput: boolean;
+  status: QuestionStatus;
+}
+
+/** 问题答案 */
+export interface QuestionAnswer {
+  selected: string[];
+  customInput?: string;
+}
+
+/**
+ * 注册待回答问题
+ * @internal 内部使用，由事件处理器调用
+ */
+export async function registerPendingQuestion(
+  sessionId: string,
+  callId: string,
+  header: string,
+  multiSelect: boolean,
+  options: QuestionOption[],
+  allowCustomInput: boolean
+): Promise<void> {
+  return invoke('register_pending_question', {
+    sessionId,
+    callId,
+    header,
+    multiSelect,
+    options,
+    allowCustomInput,
+  });
+}
+
+/**
+ * 回答问题
+ */
+export async function answerQuestion(
+  sessionId: string,
+  callId: string,
+  answer: QuestionAnswer
+): Promise<void> {
+  return invoke('answer_question', {
+    sessionId,
+    callId,
+    answer,
+  });
+}
+
+/**
+ * 获取待回答问题列表
+ */
+export async function getPendingQuestions(sessionId?: string): Promise<PendingQuestion[]> {
+  return invoke<PendingQuestion[]>('get_pending_questions', { sessionId });
+}
+
+/**
+ * 清除已回答的问题
+ */
+export async function clearAnsweredQuestions(): Promise<number> {
+  return invoke<number>('clear_answered_questions');
+}
+
+// ============================================================================
 // IFlow 聊天相关命令（废弃，使用统一聊天接口）
 // ============================================================================
 

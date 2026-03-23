@@ -978,3 +978,130 @@ pub fn get_codex_session_history(file_path: String) -> Result<Vec<CodexHistoryMe
 
     Ok(messages)
 }
+
+// ============================================================================
+// AskUserQuestion 相关命令
+// ============================================================================
+
+use crate::state::{PendingQuestion, QuestionOption, QuestionStatus, QuestionAnswer};
+
+/// 注册待回答问题
+///
+/// 当收到 ask_user_question 工具调用时调用此函数
+#[tauri::command]
+pub fn register_pending_question(
+    session_id: String,
+    call_id: String,
+    header: String,
+    multi_select: bool,
+    options: Vec<QuestionOption>,
+    allow_custom_input: bool,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<()> {
+    tracing::info!(
+        "[register_pending_question] 注册问题: session={}, call={}, header={}",
+        session_id, call_id, header
+    );
+
+    let question = PendingQuestion {
+        call_id: call_id.clone(),
+        session_id,
+        header,
+        multi_select,
+        options,
+        allow_custom_input,
+        status: QuestionStatus::Pending,
+    };
+
+    let mut pending = state.pending_questions.lock()
+        .map_err(|e| AppError::Unknown(e.to_string()))?;
+    pending.insert(call_id, question);
+
+    Ok(())
+}
+
+/// 回答问题
+///
+/// 用户提交答案后调用此函数
+#[tauri::command]
+pub async fn answer_question(
+    session_id: String,
+    call_id: String,
+    answer: QuestionAnswer,
+    window: Window,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<()> {
+    tracing::info!(
+        "[answer_question] 回答问题: session={}, call={}, selected={:?}, custom={:?}",
+        session_id, call_id, answer.selected, answer.custom_input
+    );
+
+    // 更新问题状态
+    {
+        let mut pending = state.pending_questions.lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
+
+        if let Some(question) = pending.get_mut(&call_id) {
+            question.status = QuestionStatus::Answered;
+        } else {
+            tracing::warn!("[answer_question] 问题不存在: {}", call_id);
+        }
+    }
+
+    // 发送事件通知前端问题已回答
+    let event = serde_json::json!({
+        "type": "question_answered",
+        "sessionId": session_id,
+        "callId": call_id,
+        "answer": answer,
+    });
+
+    window.emit("chat-event", &event)
+        .map_err(|e| AppError::ProcessError(format!("发送事件失败: {}", e)))?;
+
+    tracing::info!("[answer_question] 答案已提交，事件已发送");
+
+    Ok(())
+}
+
+/// 获取待回答问题列表
+#[tauri::command]
+pub fn get_pending_questions(
+    session_id: Option<String>,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<Vec<PendingQuestion>> {
+    let pending = state.pending_questions.lock()
+        .map_err(|e| AppError::Unknown(e.to_string()))?;
+
+    let questions: Vec<PendingQuestion> = pending
+        .values()
+        .filter(|q| {
+            if let Some(ref sid) = session_id {
+                &q.session_id == sid
+            } else {
+                true
+            }
+        })
+        .filter(|q| matches!(q.status, QuestionStatus::Pending))
+        .cloned()
+        .collect();
+
+    Ok(questions)
+}
+
+/// 清除已回答的问题
+#[tauri::command]
+pub fn clear_answered_questions(
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<usize> {
+    let mut pending = state.pending_questions.lock()
+        .map_err(|e| AppError::Unknown(e.to_string()))?;
+
+    let initial_count = pending.len();
+    pending.retain(|_, q| matches!(q.status, QuestionStatus::Pending));
+    let removed = initial_count - pending.len();
+
+    tracing::info!("[clear_answered_questions] 清除了 {} 个已回答问题", removed);
+
+    Ok(removed)
+}

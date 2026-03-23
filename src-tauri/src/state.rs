@@ -16,6 +16,52 @@ use crate::services::config_store::ConfigStore;
 use crate::services::scheduler::{TaskStoreService, LogStoreService, SchedulerDispatcher};
 use crate::utils::SchedulerLock;
 
+/// 待回答问题信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingQuestion {
+    /// 问题 ID（tool_call 的 callId）
+    pub call_id: String,
+    /// 会话 ID
+    pub session_id: String,
+    /// 问题标题
+    pub header: String,
+    /// 是否多选
+    pub multi_select: bool,
+    /// 选项列表
+    pub options: Vec<QuestionOption>,
+    /// 是否允许自定义输入
+    pub allow_custom_input: bool,
+    /// 问题状态
+    pub status: QuestionStatus,
+}
+
+/// 问题选项
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionOption {
+    pub value: String,
+    pub label: Option<String>,
+}
+
+/// 问题状态
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum QuestionStatus {
+    Pending,
+    Answered,
+}
+
+/// 问题答案
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionAnswer {
+    /// 选中的选项值
+    pub selected: Vec<String>,
+    /// 自定义输入
+    pub custom_input: Option<String>,
+}
+
 /// 全局配置状态
 pub struct AppState {
     /// 配置存储
@@ -41,6 +87,8 @@ pub struct AppState {
     pub scheduler_lock: AsyncMutex<Option<SchedulerLock>>,
     /// 终端管理器
     pub terminal_manager: Mutex<TerminalManager>,
+    /// 待回答问题映射：callId -> PendingQuestion
+    pub pending_questions: Arc<Mutex<HashMap<String, PendingQuestion>>>,
 }
 
 /// 创建应用状态
@@ -77,5 +125,6 @@ pub fn create_app_state(
         scheduler_dispatcher: Arc::new(AsyncMutex::new(dispatcher)),
         scheduler_lock: AsyncMutex::new(None),
         terminal_manager: Mutex::new(TerminalManager::new()),
+        pending_questions: Arc::new(Mutex::new(HashMap::new())),
     }
 }
