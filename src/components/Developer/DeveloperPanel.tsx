@@ -153,13 +153,13 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
     )
   }
 
-  // 填充模式：使用 flex-1 自动扩展
+  // 填充模式：嵌入左侧面板容器，继承外层尺寸
   if (fillRemaining) {
     return (
-      <aside
+      <div
         ref={containerRef}
         className={clsx(
-          'flex flex-col border-l border-border bg-background-elevated min-w-[200px] flex-1',
+          'flex min-h-0 flex-1 flex-col overflow-hidden bg-background-elevated',
           className
         )}
       >
@@ -175,7 +175,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
         </div>
 
         {/* 内容区 */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* 过滤器栏 */}
           <div className="flex flex-col gap-2 px-4 py-3 border-b border-border-subtle bg-background-surface">
             {/* 第一行：过滤类型 */}
@@ -258,7 +258,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
           </div>
 
           {/* 事件列表 */}
-          <div className="flex-1 overflow-y-auto px-2 py-2">
+          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
             {filteredEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
                 <svg className="w-12 h-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -316,7 +316,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
             <span>已过滤: {filteredEvents.length}</span>
           </div>
         </div>
-      </aside>
+      </div>
     )
   }
 
@@ -369,7 +369,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
 
       {/* 内容区 */}
       {isOpen && (
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* 过滤器栏 */}
           <div className="flex flex-col gap-2 px-4 py-3 border-b border-border-subtle bg-background-surface">
             {/* 第一行：过滤类型 */}
@@ -452,7 +452,7 @@ export function DeveloperPanel({ className = '', width, fillRemaining = false }:
           </div>
 
           {/* 事件列表 */}
-          <div className="flex-1 overflow-y-auto px-2 py-2">
+          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
             {filteredEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
                 <svg className="w-12 h-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
