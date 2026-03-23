@@ -46,6 +46,11 @@ function createMockStoreSet() {
     error: null,
     currentMessage: null,
     toolBlockMap: new Map(),
+    questionBlockMap: new Map(),
+    planBlockMap: new Map(),
+    agentRunBlockMap: new Map(),
+    activePlanId: null,
+    activeTaskId: null,
     messages: [],
   }
 
@@ -473,6 +478,613 @@ describe('handleAIEvent', () => {
 
       // 不应该抛出错误
       expect(() => handleAIEvent(event, mockStore.set, mockStore.get)).not.toThrow()
+    })
+  })
+
+  // ========================================
+  // QuestionBlock 事件测试
+  // ========================================
+  describe('tool_call_start (ask_user_question)', () => {
+    beforeEach(() => {
+      mockStore.state.appendQuestionBlock = vi.fn()
+      mockStore.state.conversationId = 'session-123'
+    })
+
+    it('应检测 ask_user_question 工具并添加问题块', () => {
+      const event: AIEvent = {
+        type: 'tool_call_start',
+        callId: 'q-1',
+        tool: 'ask_user_question',
+        args: {
+          header: '选择一个选项',
+          options: [
+            { value: 'a', label: 'Option A' },
+            { value: 'b', label: 'Option B' },
+          ],
+          multiSelect: false,
+          allowCustomInput: true,
+        },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendQuestionBlock).toHaveBeenCalledWith(
+        'q-1',
+        '选择一个选项',
+        [
+          { value: 'a', label: 'Option A' },
+          { value: 'b', label: 'Option B' },
+        ],
+        false,
+        true
+      )
+    })
+
+    it('应支持 AskUserQuestion 大写格式', () => {
+      const event: AIEvent = {
+        type: 'tool_call_start',
+        callId: 'q-1',
+        tool: 'AskUserQuestion',
+        args: {
+          question: '确认操作？',
+          options: ['yes', 'no'],
+        },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendQuestionBlock).toHaveBeenCalledWith(
+        'q-1',
+        '确认操作？',
+        [{ value: 'yes', label: 'yes' }, { value: 'no', label: 'no' }],
+        false,
+        false
+      )
+    })
+
+    it('应支持 alternative 参数名称', () => {
+      const event: AIEvent = {
+        type: 'tool_call_start',
+        callId: 'q-1',
+        tool: 'ask_user_question',
+        args: {
+          message: '提示信息',
+          multi_select: true,
+          allowInput: true, // 注意：allow_input 不在支持的参数名列表中，使用 allowInput
+        },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendQuestionBlock).toHaveBeenCalledWith(
+        'q-1',
+        '提示信息',
+        [],
+        true,
+        true
+      )
+    })
+
+    it('应调用 register_pending_question 注册到后端', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined)
+
+      const event: AIEvent = {
+        type: 'tool_call_start',
+        callId: 'q-1',
+        tool: 'ask_user_question',
+        args: {
+          header: 'Test',
+          options: [{ value: 'a', label: 'A' }],
+        },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      // 等待异步调用
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      expect(mockInvoke).toHaveBeenCalledWith('register_pending_question', {
+        sessionId: 'session-123',
+        callId: 'q-1',
+        header: 'Test',
+        multiSelect: false,
+        options: [{ value: 'a', label: 'A' }],
+        allowCustomInput: false,
+      })
+    })
+  })
+
+  describe('question_answered', () => {
+    beforeEach(() => {
+      mockStore.state.updateQuestionBlock = vi.fn()
+    })
+
+    it('应更新问题块的答案', () => {
+      const event: AIEvent = {
+        type: 'question_answered',
+        callId: 'q-1',
+        answer: {
+          selected: ['a', 'b'],
+          customInput: undefined,
+        },
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateQuestionBlock).toHaveBeenCalledWith('q-1', {
+        selected: ['a', 'b'],
+        customInput: undefined,
+      })
+    })
+
+    it('应支持自定义输入答案', () => {
+      const event: AIEvent = {
+        type: 'question_answered',
+        callId: 'q-1',
+        answer: {
+          selected: [],
+          customInput: 'My custom answer',
+        },
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateQuestionBlock).toHaveBeenCalledWith('q-1', {
+        selected: [],
+        customInput: 'My custom answer',
+      })
+    })
+  })
+
+  describe('tool_call_end (ask_user_question)', () => {
+    beforeEach(() => {
+      mockStore.state.updateQuestionBlock = vi.fn()
+      mockStore.state.questionBlockMap = new Map([['q-1', 0]])
+      mockStore.state.currentMessage = {
+        id: 'msg-1',
+        blocks: [{ type: 'question', id: 'q-1', status: 'pending', options: [] }],
+        isStreaming: true,
+      }
+    })
+
+    it('应从 result 提取答案', () => {
+      const event: AIEvent = {
+        type: 'tool_call_end',
+        callId: 'q-1',
+        tool: 'ask_user_question',
+        success: true,
+        result: {
+          selected: ['a'],
+          customInput: undefined,
+        },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateQuestionBlock).toHaveBeenCalledWith('q-1', {
+        selected: ['a'],
+        customInput: undefined,
+      })
+    })
+
+    it('问题块已有答案时不重复更新', () => {
+      mockStore.state.currentMessage = {
+        id: 'msg-1',
+        blocks: [{
+          type: 'question',
+          id: 'q-1',
+          status: 'answered',
+          options: [],
+          answer: { selected: ['existing'] },
+        }],
+        isStreaming: true,
+      }
+
+      const event: AIEvent = {
+        type: 'tool_call_end',
+        callId: 'q-1',
+        tool: 'ask_user_question',
+        success: true,
+        result: { selected: ['new'] },
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateQuestionBlock).not.toHaveBeenCalled()
+    })
+  })
+
+  // ========================================
+  // PlanMode 事件测试
+  // ========================================
+  describe('plan_start', () => {
+    beforeEach(() => {
+      mockStore.state.appendPlanModeBlock = vi.fn()
+    })
+
+    it('应创建新的 PlanModeBlock', () => {
+      const event: AIEvent = {
+        type: 'plan_start',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendPlanModeBlock).toHaveBeenCalledWith(
+        'plan-1',
+        'session-123'
+      )
+    })
+  })
+
+  describe('plan_content', () => {
+    beforeEach(() => {
+      mockStore.state.updatePlanModeBlock = vi.fn()
+    })
+
+    it('应更新计划内容', () => {
+      const event: AIEvent = {
+        type: 'plan_content',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        title: '计划标题',
+        description: '计划描述',
+        stages: [
+          {
+            stageId: 'stage-1',
+            name: '阶段1',
+            status: 'pending',
+            tasks: [],
+          },
+        ],
+        status: 'drafting',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanModeBlock).toHaveBeenCalledWith('plan-1', {
+        title: '计划标题',
+        description: '计划描述',
+        stages: [
+          {
+            stageId: 'stage-1',
+            name: '阶段1',
+            status: 'pending',
+            tasks: [],
+          },
+        ],
+        status: 'drafting',
+      })
+    })
+  })
+
+  describe('plan_stage_update', () => {
+    beforeEach(() => {
+      mockStore.state.updatePlanStageStatus = vi.fn()
+    })
+
+    it('应更新阶段状态', () => {
+      const event: AIEvent = {
+        type: 'plan_stage_update',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        stageId: 'stage-1',
+        status: 'in_progress',
+        tasks: [
+          { taskId: 'task-1', description: '任务1', status: 'pending' },
+        ],
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanStageStatus).toHaveBeenCalledWith(
+        'plan-1',
+        'stage-1',
+        'in_progress',
+        [
+          { taskId: 'task-1', description: '任务1', status: 'pending' },
+        ]
+      )
+    })
+  })
+
+  describe('plan_approval_request', () => {
+    beforeEach(() => {
+      mockStore.state.updatePlanModeBlock = vi.fn()
+      mockStore.state.planBlockMap = new Map([['plan-1', 0]])
+      mockStore.state.currentMessage = {
+        id: 'msg-1',
+        blocks: [{
+          type: 'plan_mode',
+          id: 'plan-1',
+          status: 'drafting',
+          title: '测试计划',
+          description: '描述',
+        }],
+        isStreaming: true,
+      }
+    })
+
+    it('应更新计划状态为 pending_approval', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined)
+
+      const event: AIEvent = {
+        type: 'plan_approval_request',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        message: '请审批',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanModeBlock).toHaveBeenCalledWith('plan-1', {
+        status: 'pending_approval',
+        isActive: true,
+      })
+
+      // 等待异步调用
+      await new Promise(resolve => setTimeout(resolve, 10))
+    })
+  })
+
+  describe('plan_approval_result', () => {
+    beforeEach(() => {
+      mockStore.state.updatePlanModeBlock = vi.fn()
+    })
+
+    it('审批通过应更新状态为 approved', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_result',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        approved: true,
+        feedback: 'Good plan',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanModeBlock).toHaveBeenCalledWith('plan-1', {
+        status: 'approved',
+        feedback: 'Good plan',
+        isActive: false,
+      })
+    })
+
+    it('审批拒绝应更新状态为 rejected', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_result',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        approved: false,
+        feedback: '需要修改',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanModeBlock).toHaveBeenCalledWith('plan-1', {
+        status: 'rejected',
+        feedback: '需要修改',
+        isActive: true,
+      })
+    })
+  })
+
+  describe('plan_end', () => {
+    beforeEach(() => {
+      mockStore.state.updatePlanModeBlock = vi.fn()
+      mockStore.state.activePlanId = 'plan-1'
+    })
+
+    it('应更新计划状态并清除 activePlanId', () => {
+      const event: AIEvent = {
+        type: 'plan_end',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        status: 'completed',
+        reason: 'Plan executed successfully',
+      } as any
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updatePlanModeBlock).toHaveBeenCalledWith('plan-1', {
+        status: 'completed',
+        isActive: false,
+      })
+      expect(mockStore.set).toHaveBeenCalledWith({ activePlanId: null })
+    })
+  })
+
+  // ========================================
+  // AgentRun (Task) 事件测试
+  // ========================================
+  describe('task_metadata', () => {
+    beforeEach(() => {
+      mockStore.state.appendAgentRunBlock = vi.fn()
+    })
+
+    it('任务开始时应创建 AgentRunBlock', () => {
+      const event: AIEvent = {
+        type: 'task_metadata',
+        taskId: 'task-1',
+        status: 'running',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendAgentRunBlock).toHaveBeenCalledWith(
+        'task-1',
+        'Agent',
+        undefined
+      )
+    })
+
+    it('任务 pending 状态时也应创建 AgentRunBlock', () => {
+      const event: AIEvent = {
+        type: 'task_metadata',
+        taskId: 'task-1',
+        status: 'pending',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendAgentRunBlock).toHaveBeenCalledWith(
+        'task-1',
+        'Agent',
+        undefined
+      )
+    })
+
+    it('任务完成时不应创建 AgentRunBlock', () => {
+      const event: AIEvent = {
+        type: 'task_metadata',
+        taskId: 'task-1',
+        status: 'success',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.appendAgentRunBlock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('task_progress', () => {
+    beforeEach(() => {
+      mockStore.state.updateAgentRunBlock = vi.fn()
+    })
+
+    it('应更新 AgentRunBlock 进度', () => {
+      const event: AIEvent = {
+        type: 'task_progress',
+        taskId: 'task-1',
+        message: 'Processing...',
+        percent: 50,
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateAgentRunBlock).toHaveBeenCalledWith('task-1', {
+        progressMessage: 'Processing...',
+        progressPercent: 50,
+      })
+    })
+
+    it('应支持只有消息没有百分比', () => {
+      const event: AIEvent = {
+        type: 'task_progress',
+        taskId: 'task-1',
+        message: 'Starting...',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateAgentRunBlock).toHaveBeenCalledWith('task-1', {
+        progressMessage: 'Starting...',
+        progressPercent: undefined,
+      })
+    })
+  })
+
+  describe('task_completed', () => {
+    beforeEach(() => {
+      mockStore.state.updateAgentRunBlock = vi.fn()
+      mockStore.state.activeTaskId = 'task-1'
+    })
+
+    it('应更新 AgentRunBlock 状态为 success', () => {
+      const event: AIEvent = {
+        type: 'task_completed',
+        taskId: 'task-1',
+        status: 'success',
+        duration: 1000,
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateAgentRunBlock).toHaveBeenCalledWith('task-1', {
+        status: 'success',
+        duration: 1000,
+        error: undefined,
+        completedAt: expect.any(String),
+      })
+    })
+
+    it('应更新 AgentRunBlock 状态为 error', () => {
+      const event: AIEvent = {
+        type: 'task_completed',
+        taskId: 'task-1',
+        status: 'error',
+        error: 'Task failed',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateAgentRunBlock).toHaveBeenCalledWith('task-1', {
+        status: 'error',
+        duration: undefined,
+        error: 'Task failed',
+        completedAt: expect.any(String),
+      })
+    })
+
+    it('应清除 activeTaskId', () => {
+      const event: AIEvent = {
+        type: 'task_completed',
+        taskId: 'task-1',
+        status: 'success',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.set).toHaveBeenCalledWith({ activeTaskId: null })
+    })
+
+    it('不同 taskId 不应清除 activeTaskId', () => {
+      mockStore.state.activeTaskId = 'task-2'
+
+      const event: AIEvent = {
+        type: 'task_completed',
+        taskId: 'task-1',
+        status: 'success',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.set).not.toHaveBeenCalledWith({ activeTaskId: null })
+    })
+  })
+
+  describe('task_canceled', () => {
+    beforeEach(() => {
+      mockStore.state.updateAgentRunBlock = vi.fn()
+      mockStore.state.activeTaskId = 'task-1'
+    })
+
+    it('应更新 AgentRunBlock 状态为 canceled', () => {
+      const event: AIEvent = {
+        type: 'task_canceled',
+        taskId: 'task-1',
+        reason: 'User cancelled',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.state.updateAgentRunBlock).toHaveBeenCalledWith('task-1', {
+        status: 'canceled',
+        error: 'User cancelled',
+        completedAt: expect.any(String),
+      })
+    })
+
+    it('应清除 activeTaskId', () => {
+      const event: AIEvent = {
+        type: 'task_canceled',
+        taskId: 'task-1',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockStore.set).toHaveBeenCalledWith({ activeTaskId: null })
     })
   })
 })

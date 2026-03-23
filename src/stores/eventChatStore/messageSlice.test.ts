@@ -304,4 +304,472 @@ describe('messageSlice', () => {
       expect(block.status).toBe('pending') // 状态不变
     })
   })
+
+  // ========================================
+  // QuestionBlock 测试
+  // ========================================
+  describe('appendQuestionBlock', () => {
+    it('无 currentMessage 时应创建新消息', () => {
+      const store = createTestStore()
+
+      const options = [
+        { value: 'option1', label: 'Option 1' },
+        { value: 'option2', label: 'Option 2' },
+      ]
+
+      store.getState().appendQuestionBlock('question-1', '选择一个选项', options, false, true)
+
+      const { currentMessage, questionBlockMap } = store.getState()
+      expect(currentMessage).not.toBeNull()
+      expect(currentMessage?.blocks).toHaveLength(1)
+      expect(currentMessage?.blocks[0]).toMatchObject({
+        type: 'question',
+        id: 'question-1',
+        header: '选择一个选项',
+        options,
+        multiSelect: false,
+        allowCustomInput: true,
+        status: 'pending',
+      })
+      expect(questionBlockMap.get('question-1')).toBe(0)
+    })
+
+    it('应追加到现有消息', () => {
+      const store = createTestStore()
+
+      // 先添加文本块
+      store.getState().appendTextBlock('Hello')
+
+      const options = [{ value: 'yes', label: 'Yes' }]
+      store.getState().appendQuestionBlock('question-1', '确认操作?', options, false)
+
+      const { currentMessage, questionBlockMap } = store.getState()
+      expect(currentMessage?.blocks).toHaveLength(2)
+      expect(currentMessage?.blocks[1]).toMatchObject({
+        type: 'question',
+        id: 'question-1',
+      })
+      expect(questionBlockMap.get('question-1')).toBe(1)
+    })
+
+    it('应正确更新 questionBlockMap', () => {
+      const store = createTestStore()
+
+      store.getState().appendQuestionBlock('q-1', 'Q1', [])
+      store.getState().appendQuestionBlock('q-2', 'Q2', [])
+
+      const { questionBlockMap } = store.getState()
+      expect(questionBlockMap.get('q-1')).toBe(0)
+      expect(questionBlockMap.get('q-2')).toBe(1)
+    })
+  })
+
+  describe('updateQuestionBlock', () => {
+    it('应更新问题块的答案', () => {
+      const store = createTestStore()
+
+      const options = [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ]
+      store.getState().appendQuestionBlock('q-1', 'Select', options, false)
+
+      // 更新答案
+      const answer = { selected: ['a'], customInput: undefined }
+      store.getState().updateQuestionBlock('q-1', answer)
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('answered')
+      expect(block.answer).toEqual(answer)
+    })
+
+    it('应支持多选答案', () => {
+      const store = createTestStore()
+
+      const options = [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ]
+      store.getState().appendQuestionBlock('q-1', 'Select', options, true)
+
+      // 多选答案
+      const answer = { selected: ['a', 'b'] }
+      store.getState().updateQuestionBlock('q-1', answer)
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.answer.selected).toEqual(['a', 'b'])
+    })
+
+    it('应支持自定义输入', () => {
+      const store = createTestStore()
+
+      store.getState().appendQuestionBlock('q-1', 'Input', [], false, true)
+
+      // 自定义输入答案
+      const answer = { selected: [], customInput: 'My custom answer' }
+      store.getState().updateQuestionBlock('q-1', answer)
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.answer.customInput).toBe('My custom answer')
+    })
+
+    it('不存在的问题 ID 应不影响状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendQuestionBlock('q-1', 'Q1', [])
+      store.getState().updateQuestionBlock('nonexistent', { selected: ['a'] })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('pending')
+    })
+  })
+
+  // ========================================
+  // PlanMode 测试
+  // ========================================
+  describe('appendPlanModeBlock', () => {
+    it('无 currentMessage 时应创建新消息', () => {
+      const store = createTestStore()
+
+      const stages = [
+        {
+          stageId: 'stage-1',
+          name: '阶段1',
+          status: 'pending' as const,
+          tasks: [],
+        },
+      ]
+
+      store.getState().appendPlanModeBlock('plan-1', 'session-123', '计划标题', '计划描述', stages)
+
+      const { currentMessage, planBlockMap, activePlanId } = store.getState()
+      expect(currentMessage).not.toBeNull()
+      expect(currentMessage?.blocks).toHaveLength(1)
+      expect(currentMessage?.blocks[0]).toMatchObject({
+        type: 'plan_mode',
+        id: 'plan-1',
+        sessionId: 'session-123',
+        title: '计划标题',
+        description: '计划描述',
+        stages,
+        status: 'drafting',
+        isActive: true,
+      })
+      expect(planBlockMap.get('plan-1')).toBe(0)
+      expect(activePlanId).toBe('plan-1')
+    })
+
+    it('应追加到现有消息', () => {
+      const store = createTestStore()
+
+      store.getState().appendTextBlock('Planning...')
+      store.getState().appendPlanModeBlock('plan-1', 'session-123')
+
+      const { currentMessage, planBlockMap, activePlanId } = store.getState()
+      expect(currentMessage?.blocks).toHaveLength(2)
+      expect(currentMessage?.blocks[1]).toMatchObject({
+        type: 'plan_mode',
+        id: 'plan-1',
+      })
+      expect(planBlockMap.get('plan-1')).toBe(1)
+      expect(activePlanId).toBe('plan-1')
+    })
+  })
+
+  describe('updatePlanModeBlock', () => {
+    it('应更新计划块状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendPlanModeBlock('plan-1', 'session-123')
+      store.getState().updatePlanModeBlock('plan-1', { status: 'pending_approval' })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('pending_approval')
+    })
+
+    it('应更新计划块内容', () => {
+      const store = createTestStore()
+
+      store.getState().appendPlanModeBlock('plan-1', 'session-123')
+      store.getState().updatePlanModeBlock('plan-1', {
+        title: '更新后的标题',
+        description: '更新后的描述',
+      })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.title).toBe('更新后的标题')
+      expect(block.description).toBe('更新后的描述')
+    })
+
+    it('应更新 isActive 状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendPlanModeBlock('plan-1', 'session-123')
+      store.getState().updatePlanModeBlock('plan-1', { isActive: false })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.isActive).toBe(false)
+    })
+  })
+
+  describe('updatePlanStageStatus', () => {
+    it('应更新阶段状态', () => {
+      const store = createTestStore()
+
+      const stages = [
+        {
+          stageId: 'stage-1',
+          name: '阶段1',
+          status: 'pending' as const,
+          tasks: [],
+        },
+      ]
+      store.getState().appendPlanModeBlock('plan-1', 'session-123', undefined, undefined, stages)
+      store.getState().updatePlanStageStatus('plan-1', 'stage-1', 'in_progress')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.stages[0].status).toBe('in_progress')
+    })
+
+    it('应更新阶段任务列表', () => {
+      const store = createTestStore()
+
+      const stages = [
+        {
+          stageId: 'stage-1',
+          name: '阶段1',
+          status: 'pending' as const,
+          tasks: [],
+        },
+      ]
+      store.getState().appendPlanModeBlock('plan-1', 'session-123', undefined, undefined, stages)
+
+      const newTasks = [
+        { taskId: 'task-1', content: '任务1', status: 'pending' as const },
+      ]
+      store.getState().updatePlanStageStatus('plan-1', 'stage-1', 'in_progress', newTasks)
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.stages[0].tasks).toHaveLength(1)
+      expect(block.stages[0].tasks[0].taskId).toBe('task-1')
+    })
+
+    it('不存在的问题 ID 应不影响状态', () => {
+      const store = createTestStore()
+
+      const stages = [
+        {
+          stageId: 'stage-1',
+          name: '阶段1',
+          status: 'pending' as const,
+          tasks: [],
+        },
+      ]
+      store.getState().appendPlanModeBlock('plan-1', 'session-123', undefined, undefined, stages)
+      store.getState().updatePlanStageStatus('plan-1', 'nonexistent', 'completed')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.stages[0].status).toBe('pending') // 状态不变
+    })
+  })
+
+  describe('setActivePlan', () => {
+    it('应设置活跃计划 ID', () => {
+      const store = createTestStore()
+
+      store.getState().setActivePlan('plan-123')
+      expect(store.getState().activePlanId).toBe('plan-123')
+    })
+
+    it('应支持设置为 null', () => {
+      const store = createTestStore()
+
+      store.getState().setActivePlan('plan-123')
+      store.getState().setActivePlan(null)
+      expect(store.getState().activePlanId).toBeNull()
+    })
+  })
+
+  // ========================================
+  // AgentRun 测试
+  // ========================================
+  describe('appendAgentRunBlock', () => {
+    it('无 currentMessage 时应创建新消息', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude', ['read', 'write', 'edit'])
+
+      const { currentMessage, agentRunBlockMap, activeTaskId } = store.getState()
+      expect(currentMessage).not.toBeNull()
+      expect(currentMessage?.blocks).toHaveLength(1)
+      expect(currentMessage?.blocks[0]).toMatchObject({
+        type: 'agent_run',
+        id: 'task-1',
+        agentType: 'claude',
+        capabilities: ['read', 'write', 'edit'],
+        status: 'running',
+        toolCalls: [],
+      })
+      expect(agentRunBlockMap.get('task-1')).toBe(0)
+      expect(activeTaskId).toBe('task-1')
+    })
+
+    it('应追加到现有消息', () => {
+      const store = createTestStore()
+
+      store.getState().appendTextBlock('Starting agent...')
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+
+      const { currentMessage, agentRunBlockMap, activeTaskId } = store.getState()
+      expect(currentMessage?.blocks).toHaveLength(2)
+      expect(currentMessage?.blocks[1]).toMatchObject({
+        type: 'agent_run',
+        id: 'task-1',
+      })
+      expect(agentRunBlockMap.get('task-1')).toBe(1)
+      expect(activeTaskId).toBe('task-1')
+    })
+
+    it('应支持无 capabilities 参数', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.capabilities).toBeUndefined()
+    })
+  })
+
+  describe('updateAgentRunBlock', () => {
+    it('应更新 Agent 运行块状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().updateAgentRunBlock('task-1', { status: 'success' })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('success')
+    })
+
+    it('应更新进度信息', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().updateAgentRunBlock('task-1', {
+        progressMessage: 'Processing...',
+        progressPercent: 50,
+      })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.progressMessage).toBe('Processing...')
+      expect(block.progressPercent).toBe(50)
+    })
+
+    it('应更新错误信息', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().updateAgentRunBlock('task-1', {
+        status: 'error',
+        error: 'Task failed',
+      })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('error')
+      expect(block.error).toBe('Task failed')
+    })
+
+    it('不存在的任务 ID 应不影响状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().updateAgentRunBlock('nonexistent', { status: 'success' })
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.status).toBe('running') // 状态不变
+    })
+  })
+
+  describe('appendAgentToolCall', () => {
+    it('应添加嵌套工具调用', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().appendAgentToolCall('task-1', 'tool-1', 'read_file')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.toolCalls).toHaveLength(1)
+      expect(block.toolCalls[0]).toMatchObject({
+        id: 'tool-1',
+        name: 'read_file',
+        status: 'pending',
+      })
+    })
+
+    it('应支持添加多个嵌套工具调用', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().appendAgentToolCall('task-1', 'tool-1', 'read_file')
+      store.getState().appendAgentToolCall('task-1', 'tool-2', 'write_file')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.toolCalls).toHaveLength(2)
+    })
+
+    it('不存在的任务 ID 应不影响状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().appendAgentToolCall('nonexistent', 'tool-1', 'read_file')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.toolCalls).toHaveLength(0)
+    })
+  })
+
+  describe('updateAgentToolCallStatus', () => {
+    it('应更新嵌套工具调用状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().appendAgentToolCall('task-1', 'tool-1', 'read_file')
+      store.getState().updateAgentToolCallStatus('task-1', 'tool-1', 'completed', 'Done')
+
+      const block = store.getState().currentMessage?.blocks[0] as any
+      expect(block.toolCalls[0].status).toBe('completed')
+      expect(block.toolCalls[0].summary).toBe('Done')
+    })
+
+    it('应支持多种状态', () => {
+      const store = createTestStore()
+
+      store.getState().appendAgentRunBlock('task-1', 'claude')
+      store.getState().appendAgentToolCall('task-1', 'tool-1', 'read_file')
+
+      const statuses: Array<'pending' | 'running' | 'completed' | 'failed'> = ['running', 'completed', 'failed']
+      for (const status of statuses) {
+        store.getState().updateAgentToolCallStatus('task-1', 'tool-1', status)
+        const block = store.getState().currentMessage?.blocks[0] as any
+        expect(block.toolCalls[0].status).toBe(status)
+      }
+    })
+  })
+
+  describe('setActiveTask', () => {
+    it('应设置活跃任务 ID', () => {
+      const store = createTestStore()
+
+      store.getState().setActiveTask('task-123')
+      expect(store.getState().activeTaskId).toBe('task-123')
+    })
+
+    it('应支持设置为 null', () => {
+      const store = createTestStore()
+
+      store.getState().setActiveTask('task-123')
+      store.getState().setActiveTask(null)
+      expect(store.getState().activeTaskId).toBeNull()
+    })
+  })
 })

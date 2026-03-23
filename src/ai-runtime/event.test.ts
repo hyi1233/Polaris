@@ -50,6 +50,16 @@ import {
   isTodoExecutionProgressEvent,
   isTodoExecutionCompletedEvent,
   isAIEvent,
+  // Question 事件类型守卫
+  isQuestionAnsweredEvent,
+  // PlanMode 事件类型守卫
+  isPlanStartEvent,
+  isPlanContentEvent,
+  isPlanStageUpdateEvent,
+  isPlanApprovalRequestEvent,
+  isPlanApprovalResultEvent,
+  isPlanEndEvent,
+  isPlanEvent,
   // 类型
   type AIEvent,
 } from './event'
@@ -705,5 +715,245 @@ describe('isAIEvent', () => {
   it('should return false for invalid type strings', () => {
     expect(isAIEvent({ type: 'invalid_type' })).toBe(false)
     expect(isAIEvent({ type: '' })).toBe(false)
+  })
+
+  it('should return true for question_answered and plan events', () => {
+    const questionEvent: AIEvent = {
+      type: 'question_answered',
+      sessionId: 'session-123',
+      callId: 'q-1',
+      answer: { selected: ['a'] },
+    }
+    expect(isAIEvent(questionEvent)).toBe(true)
+
+    const planStartEvent: AIEvent = {
+      type: 'plan_start',
+      sessionId: 'session-123',
+      planId: 'plan-1',
+    }
+    expect(isAIEvent(planStartEvent)).toBe(true)
+  })
+})
+
+// ========================================
+// Question 事件类型守卫测试
+// ========================================
+describe('Question Event Type Guards', () => {
+  describe('isQuestionAnsweredEvent', () => {
+    it('should return true for question_answered events', () => {
+      const event: AIEvent = {
+        type: 'question_answered',
+        sessionId: 'session-123',
+        callId: 'q-1',
+        answer: { selected: ['a', 'b'] },
+      }
+      expect(isQuestionAnsweredEvent(event)).toBe(true)
+    })
+
+    it('should return true for question_answered events with customInput', () => {
+      const event: AIEvent = {
+        type: 'question_answered',
+        sessionId: 'session-123',
+        callId: 'q-1',
+        answer: { selected: [], customInput: 'My answer' },
+      }
+      expect(isQuestionAnsweredEvent(event)).toBe(true)
+    })
+
+    it('should return false for non question_answered events', () => {
+      expect(isQuestionAnsweredEvent(createTokenEvent('test'))).toBe(false)
+      expect(isQuestionAnsweredEvent(createErrorEvent('test'))).toBe(false)
+    })
+  })
+})
+
+// ========================================
+// PlanMode 事件类型守卫测试
+// ========================================
+describe('PlanMode Event Type Guards', () => {
+  describe('isPlanStartEvent', () => {
+    it('should return true for plan_start events', () => {
+      const event: AIEvent = {
+        type: 'plan_start',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+      }
+      expect(isPlanStartEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_start events', () => {
+      expect(isPlanStartEvent(createTokenEvent('test'))).toBe(false)
+      expect(isPlanStartEvent({ type: 'plan_end', sessionId: 's', planId: 'p', status: 'completed' } as AIEvent)).toBe(false)
+    })
+  })
+
+  describe('isPlanContentEvent', () => {
+    it('should return true for plan_content events', () => {
+      const event: AIEvent = {
+        type: 'plan_content',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        stages: [],
+        status: 'drafting',
+      }
+      expect(isPlanContentEvent(event)).toBe(true)
+    })
+
+    it('should return true for plan_content events with full data', () => {
+      const event: AIEvent = {
+        type: 'plan_content',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        title: 'Plan Title',
+        description: 'Plan Description',
+        stages: [
+          {
+            stageId: 'stage-1',
+            name: 'Stage 1',
+            status: 'pending',
+            tasks: [],
+          },
+        ],
+        status: 'pending_approval',
+      }
+      expect(isPlanContentEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_content events', () => {
+      expect(isPlanContentEvent(createTokenEvent('test'))).toBe(false)
+    })
+  })
+
+  describe('isPlanStageUpdateEvent', () => {
+    it('should return true for plan_stage_update events', () => {
+      const event: AIEvent = {
+        type: 'plan_stage_update',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        stageId: 'stage-1',
+        status: 'in_progress',
+      }
+      expect(isPlanStageUpdateEvent(event)).toBe(true)
+    })
+
+    it('should return true for plan_stage_update events with tasks', () => {
+      const event: AIEvent = {
+        type: 'plan_stage_update',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        stageId: 'stage-1',
+        status: 'completed',
+        tasks: [
+          { taskId: 'task-1', description: 'Task 1', status: 'completed' },
+        ],
+      }
+      expect(isPlanStageUpdateEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_stage_update events', () => {
+      expect(isPlanStageUpdateEvent(createTokenEvent('test'))).toBe(false)
+    })
+  })
+
+  describe('isPlanApprovalRequestEvent', () => {
+    it('should return true for plan_approval_request events', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_request',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+      }
+      expect(isPlanApprovalRequestEvent(event)).toBe(true)
+    })
+
+    it('should return true for plan_approval_request events with message', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_request',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        message: 'Please approve',
+      }
+      expect(isPlanApprovalRequestEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_approval_request events', () => {
+      expect(isPlanApprovalRequestEvent(createTokenEvent('test'))).toBe(false)
+    })
+  })
+
+  describe('isPlanApprovalResultEvent', () => {
+    it('should return true for plan_approval_result events (approved)', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_result',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        approved: true,
+      }
+      expect(isPlanApprovalResultEvent(event)).toBe(true)
+    })
+
+    it('should return true for plan_approval_result events (rejected)', () => {
+      const event: AIEvent = {
+        type: 'plan_approval_result',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        approved: false,
+        feedback: 'Needs improvement',
+      }
+      expect(isPlanApprovalResultEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_approval_result events', () => {
+      expect(isPlanApprovalResultEvent(createTokenEvent('test'))).toBe(false)
+    })
+  })
+
+  describe('isPlanEndEvent', () => {
+    it('should return true for plan_end events', () => {
+      const event: AIEvent = {
+        type: 'plan_end',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        status: 'completed',
+      }
+      expect(isPlanEndEvent(event)).toBe(true)
+    })
+
+    it('should return true for plan_end events with reason', () => {
+      const event: AIEvent = {
+        type: 'plan_end',
+        sessionId: 'session-123',
+        planId: 'plan-1',
+        status: 'canceled',
+        reason: 'User cancelled',
+      }
+      expect(isPlanEndEvent(event)).toBe(true)
+    })
+
+    it('should return false for non plan_end events', () => {
+      expect(isPlanEndEvent(createTokenEvent('test'))).toBe(false)
+    })
+  })
+
+  describe('isPlanEvent', () => {
+    it('should return true for any plan event type', () => {
+      const planEvents: AIEvent[] = [
+        { type: 'plan_start', sessionId: 's', planId: 'p' },
+        { type: 'plan_content', sessionId: 's', planId: 'p', stages: [], status: 'drafting' },
+        { type: 'plan_stage_update', sessionId: 's', planId: 'p', stageId: 'st', status: 'pending' },
+        { type: 'plan_approval_request', sessionId: 's', planId: 'p' },
+        { type: 'plan_approval_result', sessionId: 's', planId: 'p', approved: true },
+        { type: 'plan_end', sessionId: 's', planId: 'p', status: 'completed' },
+      ]
+
+      planEvents.forEach((event) => {
+        expect(isPlanEvent(event)).toBe(true)
+      })
+    })
+
+    it('should return false for non plan events', () => {
+      expect(isPlanEvent(createTokenEvent('test'))).toBe(false)
+      expect(isPlanEvent(createErrorEvent('test'))).toBe(false)
+      expect(isPlanEvent(createTaskMetadataEvent('task-1', 'running'))).toBe(false)
+    })
   })
 })
