@@ -1201,6 +1201,7 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const conversationId = useEventChatStore(state => state.conversationId);
+  const continueChat = useEventChatStore(state => state.continueChat);
 
   // 是否已回答
   const isAnswered = block.status === 'answered';
@@ -1221,6 +1222,25 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
     }
   }, [block.multiSelect, isAnswered, isSubmitting]);
 
+  // 构建答案 prompt 格式
+  const buildAnswerPrompt = useCallback((answerData: { selected: string[]; customInput?: string }): string => {
+    const parts: string[] = [`[交互回答] 问题: "${block.header}"`];
+
+    if (answerData.selected.length > 0) {
+      const selectedLabels = answerData.selected.map(value => {
+        const option = block.options.find(o => o.value === value);
+        return option?.label || value;
+      });
+      parts.push(`选择的选项: ${selectedLabels.join(', ')}`);
+    }
+
+    if (answerData.customInput) {
+      parts.push(`自定义输入: ${answerData.customInput}`);
+    }
+
+    return parts.join('\n');
+  }, [block.header, block.options]);
+
   // 提交答案
   const handleSubmit = useCallback(async () => {
     if (isAnswered || isSubmitting) return;
@@ -1233,20 +1253,26 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
         customInput: customInput.trim() || undefined,
       };
 
-      // 调用后端命令提交答案
+      // 1. 调用后端命令提交答案，更新状态
       await invoke('answer_question', {
         sessionId: conversationId,
         callId: block.id,
         answer,
       });
 
-      // 更新本地状态（由事件处理更新）
+      // 2. 构建答案 prompt 并发送给 CLI
+      const answerPrompt = buildAnswerPrompt(answer);
+
+      // 3. 调用 continueChat 将答案发送给 CLI
+      if (conversationId) {
+        await continueChat(answerPrompt);
+      }
     } catch (error) {
       console.error('[QuestionBlock] 提交答案失败:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [isAnswered, isSubmitting, selectedOptions, customInput, conversationId, block.id]);
+  }, [isAnswered, isSubmitting, selectedOptions, customInput, conversationId, block.id, buildAnswerPrompt, continueChat]);
 
   // 最多显示 5 个选项，超出折叠
   const displayOptions = block.options.slice(0, 5);
@@ -1509,8 +1535,11 @@ const PlanModeBlockRenderer = memo(function PlanModeBlockRenderer({ block }: { b
   const { t } = useTranslation('chat');
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectFeedback, setRejectFeedback] = useState('');
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
 
   const conversationId = useEventChatStore(state => state.conversationId);
+  const continueChat = useEventChatStore(state => state.continueChat);
 
   const statusConfig = PLAN_STATUS_CONFIG[block.status];
   const StatusIcon = statusConfig.icon;
@@ -1531,22 +1560,44 @@ const PlanModeBlockRenderer = memo(function PlanModeBlockRenderer({ block }: { b
     });
   }, []);
 
+  // 构建审批结果 prompt 格式
+  const buildApprovalPrompt = useCallback((approved: boolean, feedback?: string): string => {
+    const planTitle = block.title || t('plan.defaultTitle');
+    const action = approved ? '批准' : '拒绝';
+    const parts: string[] = [`[计划审批] 用户${action}了计划: "${planTitle}"`];
+
+    if (!approved && feedback) {
+      parts.push(`反馈意见: ${feedback}`);
+    }
+
+    return parts.join('\n');
+  }, [block.title, t]);
+
   // 批准计划
   const handleApprove = useCallback(async () => {
     if (!isInteractive || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
+      // 1. 调用后端命令批准计划，更新状态
       await invoke('approve_plan', {
         sessionId: conversationId,
         planId: block.id,
       });
+
+      // 2. 构建审批结果 prompt 并发送给 CLI
+      const approvalPrompt = buildApprovalPrompt(true);
+
+      // 3. 调用 continueChat 将结果发送给 CLI
+      if (conversationId) {
+        await continueChat(approvalPrompt);
+      }
     } catch (error) {
       console.error('[PlanModeBlock] 批准计划失败:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [isInteractive, isSubmitting, conversationId, block.id]);
+  }, [isInteractive, isSubmitting, conversationId, block.id, buildApprovalPrompt, continueChat]);
 
   // 拒绝计划
   const handleReject = useCallback(async () => {
@@ -1554,16 +1605,30 @@ const PlanModeBlockRenderer = memo(function PlanModeBlockRenderer({ block }: { b
 
     setIsSubmitting(true);
     try {
+      // 1. 调用后端命令拒绝计划，更新状态
       await invoke('reject_plan', {
         sessionId: conversationId,
         planId: block.id,
+        feedback: rejectFeedback || undefined,
       });
+
+      // 2. 构建审批结果 prompt 并发送给 CLI
+      const rejectionPrompt = buildApprovalPrompt(false, rejectFeedback || undefined);
+
+      // 3. 调用 continueChat 将结果发送给 CLI
+      if (conversationId) {
+        await continueChat(rejectionPrompt);
+      }
+
+      // 4. 重置反馈输入
+      setRejectFeedback('');
+      setShowFeedbackInput(false);
     } catch (error) {
       console.error('[PlanModeBlock] 拒绝计划失败:', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [isInteractive, isSubmitting, conversationId, block.id]);
+  }, [isInteractive, isSubmitting, conversationId, block.id, rejectFeedback, buildApprovalPrompt, continueChat]);
 
   // 计算整体进度
   const totalTasks = block.stages.reduce((sum, s) => sum + s.tasks.length, 0);
@@ -1625,8 +1690,49 @@ const PlanModeBlockRenderer = memo(function PlanModeBlockRenderer({ block }: { b
         ))}
       </div>
 
+      {/* 反馈输入框 */}
+      {isInteractive && showFeedbackInput && (
+        <div className="px-3 py-2 border-t border-inherit bg-inherit/30">
+          <input
+            type="text"
+            value={rejectFeedback}
+            onChange={(e) => setRejectFeedback(e.target.value)}
+            placeholder={t('plan.feedbackPlaceholder')}
+            disabled={isSubmitting}
+            className="w-full px-3 py-2 rounded-md text-sm bg-bg-secondary border border-border
+                       focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none
+                       placeholder:text-text-tertiary disabled:opacity-50"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFeedbackInput(false)}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              {t('plan.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleReject}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              ) : (
+                <ThumbsDown className="w-3 h-3 mr-1" />
+              )}
+              {t('plan.confirmReject')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 审批按钮 */}
-      {isInteractive && (
+      {isInteractive && !showFeedbackInput && (
         <div className="flex items-center gap-2 px-3 py-2 border-t border-inherit bg-inherit/30">
           <Button
             variant="primary"
@@ -1645,15 +1751,11 @@ const PlanModeBlockRenderer = memo(function PlanModeBlockRenderer({ block }: { b
           <Button
             variant="danger"
             size="sm"
-            onClick={handleReject}
+            onClick={() => setShowFeedbackInput(true)}
             disabled={isSubmitting}
             className="flex-1"
           >
-            {isSubmitting ? (
-              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-            ) : (
-              <ThumbsDown className="w-3 h-3 mr-1" />
-            )}
+            <ThumbsDown className="w-3 h-3 mr-1" />
             {t('plan.reject')}
           </Button>
         </div>
