@@ -95,6 +95,8 @@
     "submitting": "提交中...",
     "showMore": "显示更多 ({{count}})",
     "customInputPlaceholder": "输入自定义答案...",
+    "customInputLabel": "自定义答案",
+    "multiSelectHint": "可多选",
     "pendingAnswer": "有待回答的问题"
   },
   "plan": {

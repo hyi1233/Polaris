@@ -95,6 +95,8 @@
     "submitting": "Submitting...",
     "showMore": "Show more ({{count}})",
     "customInputPlaceholder": "Enter custom answer...",
+    "customInputLabel": "Custom answer",
+    "multiSelectHint": "Multi-select",
     "pendingAnswer": "Pending question to answer"
   },
   "plan": {

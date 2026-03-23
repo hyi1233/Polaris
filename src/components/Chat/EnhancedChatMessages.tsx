@@ -11,7 +11,7 @@
  * - Edit 工具优化显示
  */
 
-import { useMemo, memo, useState, useCallback, useRef, useDeferredValue } from 'react';
+import { useMemo, memo, useState, useCallback, useRef, useDeferredValue, useEffect } from 'react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
@@ -1200,12 +1200,24 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
   const [customInput, setCustomInput] = useState(block.answer?.customInput || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 键盘导航状态
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const conversationId = useEventChatStore(state => state.conversationId);
   const continueChat = useEventChatStore(state => state.continueChat);
 
   // 是否已回答
   const isAnswered = block.status === 'answered';
   const answer = block.answer;
+
+  // 当前显示的选项
+  const allOptions = block.options;
+  const displayOptions = block.options.slice(0, 5);
+  const hasMoreOptions = block.options.length > 5;
+  const [showAllOptions, setShowAllOptions] = useState(false);
+  const visibleOptions = showAllOptions ? allOptions : displayOptions;
 
   // 处理选项选择
   const handleOptionSelect = useCallback((value: string) => {
@@ -1274,24 +1286,74 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
     }
   }, [isAnswered, isSubmitting, selectedOptions, customInput, conversationId, block.id, buildAnswerPrompt, continueChat]);
 
-  // 最多显示 5 个选项，超出折叠
-  const displayOptions = block.options.slice(0, 5);
-  const hasMoreOptions = block.options.length > 5;
-  const [showAllOptions, setShowAllOptions] = useState(false);
+  // 键盘导航处理
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (isAnswered || isSubmitting) return;
+
+    const totalInteractiveItems = visibleOptions.length + (block.allowCustomInput ? 1 : 0);
+
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'Tab':
+        if (!event.shiftKey) {
+          event.preventDefault();
+          setFocusedIndex(prev => (prev + 1) % totalInteractiveItems);
+        }
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        setFocusedIndex(prev => (prev - 1 + totalInteractiveItems) % totalInteractiveItems);
+        break;
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < visibleOptions.length) {
+          handleOptionSelect(visibleOptions[focusedIndex].value);
+        } else if (focusedIndex === visibleOptions.length && block.allowCustomInput) {
+          // 焦点在输入框，不做特殊处理
+        }
+        break;
+      case 'Escape':
+        event.preventDefault();
+        setFocusedIndex(-1);
+        setCustomInput('');
+        break;
+    }
+  }, [isAnswered, isSubmitting, visibleOptions, block.allowCustomInput, focusedIndex, handleOptionSelect]);
+
+  // 焦点管理
+  useEffect(() => {
+    if (focusedIndex >= 0 && focusedIndex < visibleOptions.length) {
+      const optionElement = containerRef.current?.querySelector(`[data-option-index="${focusedIndex}"]`) as HTMLElement;
+      optionElement?.focus();
+    } else if (focusedIndex === visibleOptions.length && block.allowCustomInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [focusedIndex, visibleOptions.length, block.allowCustomInput]);
 
   return (
-    <div className={clsx(
-      'my-2 rounded-lg border max-h-[300px] overflow-hidden flex flex-col',
-      isAnswered
-        ? 'bg-success-faint border-success/30'
-        : 'bg-accent-faint border-accent/30'
-    )}>
+    <div
+      ref={containerRef}
+      role="group"
+      aria-labelledby={`question-header-${block.id}`}
+      aria-describedby={block.multiSelect ? 'multi-select-hint' : undefined}
+      onKeyDown={handleKeyDown}
+      className={clsx(
+        'my-2 rounded-lg border max-h-[300px] overflow-hidden flex flex-col',
+        isAnswered
+          ? 'bg-success-faint border-success/30'
+          : 'bg-accent-faint border-accent/30'
+      )}
+    >
       {/* 头部 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-inherit/50 shrink-0">
+      <div
+        id={`question-header-${block.id}`}
+        className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-inherit/50 shrink-0"
+      >
         {isAnswered ? (
-          <CheckCircle className="w-4 h-4 text-success" />
+          <CheckCircle className="w-4 h-4 text-success" aria-hidden="true" />
         ) : (
-          <HelpCircle className="w-4 h-4 text-accent" />
+          <HelpCircle className="w-4 h-4 text-accent" aria-hidden="true" />
         )}
         <span className="text-sm font-medium text-text-primary">
           {block.header}
@@ -1301,23 +1363,35 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
             {t('question.answered')}
           </span>
         )}
+        {block.multiSelect && !isAnswered && (
+          <span id="multi-select-hint" className="ml-auto text-xs text-text-tertiary">
+            {t('question.multiSelectHint')}
+          </span>
+        )}
       </div>
 
       {/* 内容区 - 可滚动 */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {/* 选项列表 */}
         {displayOptions.length > 0 && (
-          <div className="space-y-1.5">
-            {(showAllOptions ? block.options : displayOptions).map((option, index) => {
+          <div role="listbox" aria-multiselectable={block.multiSelect} className="space-y-1.5">
+            {visibleOptions.map((option, index) => {
               const isSelected = (answer?.selected || selectedOptions).includes(option.value);
+              const isFocused = focusedIndex === index;
               return (
                 <button
                   key={index}
+                  role="option"
+                  data-option-index={index}
+                  tabIndex={isFocused ? 0 : -1}
+                  aria-selected={isSelected}
+                  aria-checked={isSelected}
                   onClick={() => handleOptionSelect(option.value)}
                   disabled={isAnswered || isSubmitting}
                   className={clsx(
                     'w-full text-left px-3 py-2 rounded-md text-sm transition-colors',
                     'flex items-center gap-2',
+                    'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1',
                     isAnswered
                       ? isSelected
                         ? 'bg-success/20 text-success border border-success/30'
@@ -1325,10 +1399,14 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
                       : isSelected
                         ? 'bg-accent/20 text-accent border border-accent/30'
                         : 'bg-bg-secondary hover:bg-bg-tertiary border border-transparent',
+                    isFocused && !isAnswered && 'ring-2 ring-accent ring-offset-1',
                     !isAnswered && !isSubmitting && 'cursor-pointer'
                   )}
                 >
-                  <div className={clsx(
+                  <div
+                    role="presentation"
+                    aria-hidden="true"
+                    className={clsx(
                     'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
                     isSelected
                       ? isAnswered
@@ -1360,15 +1438,25 @@ const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block }: { b
         {/* 自定义输入 */}
         {block.allowCustomInput && !isAnswered && (
           <div className="mt-2">
+            <label htmlFor={`custom-input-${block.id}`} className="sr-only">
+              {t('question.customInputLabel')}
+            </label>
             <input
+              ref={inputRef}
+              id={`custom-input-${block.id}`}
               type="text"
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               placeholder={t('question.customInputPlaceholder')}
               disabled={isSubmitting}
-              className="w-full px-3 py-2 rounded-md text-sm bg-bg-secondary border border-border
-                         focus:border-accent focus:ring-1 focus:ring-accent outline-none
-                         placeholder:text-text-tertiary disabled:opacity-50"
+              aria-label={t('question.customInputLabel')}
+              onFocus={() => setFocusedIndex(visibleOptions.length)}
+              className={clsx(
+                'w-full px-3 py-2 rounded-md text-sm bg-bg-secondary border border-border',
+                'focus:border-accent focus:ring-1 focus:ring-accent outline-none',
+                'placeholder:text-text-tertiary disabled:opacity-50',
+                focusedIndex === visibleOptions.length && 'ring-2 ring-accent'
+              )}
             />
           </div>
         )}
