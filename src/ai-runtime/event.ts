@@ -285,6 +285,33 @@ export interface TodoExecutionCompletedEvent {
   error?: string
 }
 
+// ========================================
+// Question 相关事件
+// ========================================
+
+/**
+ * 问题答案
+ */
+export interface QuestionAnswerData {
+  /** 选中的选项值 */
+  selected: string[]
+  /** 自定义输入 */
+  customInput?: string
+}
+
+/**
+ * 问题已回答事件
+ */
+export interface QuestionAnsweredEvent {
+  type: 'question_answered'
+  /** 会话 ID */
+  sessionId: string
+  /** 问题 ID（tool_call 的 callId） */
+  callId: string
+  /** 用户答案 */
+  answer: QuestionAnswerData
+}
+
 /**
  * AI Event - 所有事件的联合类型
  *
@@ -313,6 +340,7 @@ export type AIEvent =
   | TodoExecutionStartedEvent
   | TodoExecutionProgressEvent
   | TodoExecutionCompletedEvent
+  | QuestionAnsweredEvent
 
 /**
  * 事件监听器类型
@@ -656,6 +684,7 @@ const AI_EVENT_TYPES = new Set([
   'todo_execution_started',
   'todo_execution_progress',
   'todo_execution_completed',
+  'question_answered',
 ])
 
 /**
@@ -668,4 +697,12 @@ export function isAIEvent(value: unknown): value is AIEvent {
   }
   const event = value as Record<string, unknown>
   return typeof event.type === 'string' && AI_EVENT_TYPES.has(event.type)
+}
+
+// ========================================
+// Question 事件类型守卫
+// ========================================
+
+export function isQuestionAnsweredEvent(event: AIEvent): event is QuestionAnsweredEvent {
+  return event.type === 'question_answered'
 }

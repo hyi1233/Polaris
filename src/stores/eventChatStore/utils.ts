@@ -144,6 +144,21 @@ export function handleAIEvent(
           multiSelect,
           allowCustomInput
         )
+
+        // 同步注册到后端（用于 CLI stdin 输入等场景）
+        const conversationId = storeGet().conversationId
+        if (conversationId) {
+          invoke('register_pending_question', {
+            sessionId: conversationId,
+            callId,
+            header,
+            multiSelect,
+            options,
+            allowCustomInput,
+          }).catch(err => {
+            console.warn('[EventChatStore] 注册待回答问题失败:', err)
+          })
+        }
         break
       }
 
@@ -279,6 +294,14 @@ export function handleAIEvent(
     case 'user_message':
       // 用户消息由 sendMessage 直接添加，这里不需要处理
       break
+
+    case 'question_answered': {
+      // 处理问题已回答事件（来自后端）
+      const questionEvent = event as { callId: string; answer: { selected: string[]; customInput?: string } }
+      state.updateQuestionBlock(questionEvent.callId, questionEvent.answer)
+      console.log('[EventChatStore] Question answered:', questionEvent.callId)
+      break
+    }
 
     default:
       console.log('[EventChatStore] 未处理的 AIEvent 类型:', (event as { type: string }).type)
