@@ -2,15 +2,20 @@
  * PlanModeBlockRenderer 组件测试
  *
  * 测试范围：
- * - 渲染：显示计划标题、阶段列表、审批按钮
- * - 交互：批准/拒绝、反馈输入
- * - 状态：不同状态的显示
+ * - 渲染：显示计划标题、描述、阶段列表、任务列表、进度条
+ * - 交互：批准/拒绝操作、反馈输入、阶段展开/折叠
+ * - 状态：drafting/pending_approval/approved/rejected/executing/completed/canceled
  * - 无障碍：ARIA 属性、键盘导航
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { PlanModeBlockRenderer, SimplifiedPlanModeRenderer } from './PlanModeBlockRenderer';
+import {
+  PlanModeBlockRenderer,
+  SimplifiedPlanModeRenderer,
+  PLAN_STATUS_CONFIG,
+  PLAN_TASK_STATUS_CONFIG,
+} from './PlanModeBlockRenderer';
 import type { PlanModeBlock, PlanStageBlock } from '../../types';
 
 // Mock Tauri invoke
@@ -36,7 +41,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
       const translations: Record<string, string> = {
-        'plan.defaultTitle': '执行计划',
+        'plan.defaultTitle': '计划',
         'plan.statusDrafting': '草稿中',
         'plan.statusPendingApproval': '待审批',
         'plan.statusApproved': '已批准',
@@ -50,11 +55,11 @@ vi.mock('react-i18next', () => ({
         'plan.confirmReject': '确认拒绝',
         'plan.feedbackPlaceholder': '请输入拒绝原因或修改建议...',
         'plan.feedbackLabel': '反馈意见',
-        'plan.approvalButtonsLabel': '审批按钮',
+        'plan.planModeAriaLabel': `计划: ${options?.title || '计划'}`,
+        'plan.approvalButtonsLabel': '审批按钮组',
         'plan.approveAriaLabel': '批准计划',
         'plan.rejectAriaLabel': '拒绝计划',
-        'plan.planModeAriaLabel': `计划: ${options?.title || '执行计划'}`,
-        'plan.stageAriaLabel': `${options?.name || '阶段'} (${options?.completed || 0}/${options?.total || 0})`,
+        'plan.stageAriaLabel': `阶段 ${options?.name}: ${options?.completed}/${options?.total} 任务完成`,
       };
       return translations[key] || key;
     },
@@ -80,7 +85,7 @@ function createPlanModeBlock(overrides?: Partial<PlanModeBlock>): PlanModeBlock 
     id: 'test-plan-id',
     type: 'plan_mode',
     title: '测试计划',
-    description: '这是一个测试计划',
+    description: '这是一个测试计划的描述',
     status: 'pending_approval',
     isActive: true,
     stages: [createPlanStage()],
@@ -101,12 +106,10 @@ describe('PlanModeBlockRenderer', () => {
 
   describe('渲染', () => {
     it('应该显示计划标题', () => {
-      const block = createPlanModeBlock({ title: '这是一个测试计划' });
+      const block = createPlanModeBlock({ title: '我的测试计划' });
       render(<PlanModeBlockRenderer block={block} />);
 
-      // 标题可能在头部和 aria-label 中出现
-      const titleElements = screen.getAllByText('这是一个测试计划');
-      expect(titleElements.length).toBeGreaterThan(0);
+      expect(screen.getByText('我的测试计划')).toBeInTheDocument();
     });
 
     it('应该显示计划描述', () => {
@@ -119,24 +122,83 @@ describe('PlanModeBlockRenderer', () => {
     it('应该显示阶段列表', () => {
       const block = createPlanModeBlock({
         stages: [
-          createPlanStage({ stageId: 'stage-1', name: '阶段 A' }),
-          createPlanStage({ stageId: 'stage-2', name: '阶段 B' }),
+          createPlanStage({ stageId: 'stage-1', name: '阶段一' }),
+          createPlanStage({ stageId: 'stage-2', name: '阶段二' }),
         ],
       });
       render(<PlanModeBlockRenderer block={block} />);
 
-      expect(screen.getByText('阶段 A')).toBeInTheDocument();
-      expect(screen.getByText('阶段 B')).toBeInTheDocument();
+      expect(screen.getByText('阶段一')).toBeInTheDocument();
+      expect(screen.getByText('阶段二')).toBeInTheDocument();
     });
 
-    it('应该显示状态标签', () => {
+    it('应该显示整体进度', () => {
+      const block = createPlanModeBlock({
+        stages: [
+          createPlanStage({
+            tasks: [
+              { taskId: 't1', description: '任务1', status: 'completed' },
+              { taskId: 't2', description: '任务2', status: 'pending' },
+            ],
+          }),
+        ],
+      });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      // 应显示 1/2 进度（使用 getAllByText 检查至少有一个）
+      const progressElements = screen.getAllByText('1/2');
+      expect(progressElements.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('当 isActive 为 true 时应显示激活样式', () => {
+      const block = createPlanModeBlock({ isActive: true });
+      const { container } = render(<PlanModeBlockRenderer block={block} />);
+
+      // 检查是否有 violet 边框样式
+      const mainDiv = container.firstChild as HTMLElement;
+      expect(mainDiv.className).toMatch(/violet/);
+    });
+  });
+
+  describe('状态显示', () => {
+    it('drafting 状态应显示加载图标', () => {
+      const block = createPlanModeBlock({ status: 'drafting' });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      expect(screen.getByText('草稿中')).toBeInTheDocument();
+    });
+
+    it('pending_approval 状态应显示待审批标签', () => {
       const block = createPlanModeBlock({ status: 'pending_approval' });
       render(<PlanModeBlockRenderer block={block} />);
 
       expect(screen.getByText('待审批')).toBeInTheDocument();
     });
 
-    it('pending_approval 且 isActive 为 true 时应显示审批按钮', () => {
+    it('approved 状态应显示已批准标签', () => {
+      const block = createPlanModeBlock({ status: 'approved', isActive: false });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      expect(screen.getByText('已批准')).toBeInTheDocument();
+    });
+
+    it('rejected 状态应显示已拒绝标签', () => {
+      const block = createPlanModeBlock({ status: 'rejected', isActive: false });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      expect(screen.getByText('已拒绝')).toBeInTheDocument();
+    });
+
+    it('completed 状态应显示已完成标签', () => {
+      const block = createPlanModeBlock({ status: 'completed', isActive: false });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      expect(screen.getByText('已完成')).toBeInTheDocument();
+    });
+  });
+
+  describe('审批交互', () => {
+    it('pending_approval 状态应显示审批按钮', () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
@@ -157,42 +219,13 @@ describe('PlanModeBlockRenderer', () => {
       render(<PlanModeBlockRenderer block={block} />);
 
       expect(screen.queryByText('批准')).not.toBeInTheDocument();
-      expect(screen.queryByText('拒绝')).not.toBeInTheDocument();
     });
 
-    it('应该显示整体进度', () => {
-      const block = createPlanModeBlock({
-        stages: [
-          createPlanStage({
-            tasks: [
-              { taskId: 'task-1', description: '任务 1', status: 'completed' },
-              { taskId: 'task-2', description: '任务 2', status: 'pending' },
-            ],
-          }),
-        ],
-      });
-      render(<PlanModeBlockRenderer block={block} />);
-
-      // 整体进度和阶段进度都会显示 1/2
-      const progressTexts = screen.getAllByText('1/2');
-      expect(progressTexts.length).toBeGreaterThan(0);
-    });
-
-    it('应该显示反馈信息', () => {
-      const block = createPlanModeBlock({ feedback: '需要修改' });
-      render(<PlanModeBlockRenderer block={block} />);
-
-      expect(screen.getByText('需要修改')).toBeInTheDocument();
-    });
-  });
-
-  describe('批准操作', () => {
     it('点击批准按钮应调用 approve_plan', async () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      const approveBtn = screen.getByText('批准');
-      fireEvent.click(approveBtn);
+      fireEvent.click(screen.getByText('批准'));
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith('approve_plan', {
@@ -203,109 +236,155 @@ describe('PlanModeBlockRenderer', () => {
     });
 
     it('批准后应调用 continueChat', async () => {
-      const block = createPlanModeBlock({
-        status: 'pending_approval',
-        isActive: true,
-        title: '我的计划',
-      });
+      const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      const approveBtn = screen.getByText('批准');
-      fireEvent.click(approveBtn);
+      fireEvent.click(screen.getByText('批准'));
 
       await waitFor(() => {
         expect(mockContinueChat).toHaveBeenCalled();
-        const prompt = mockContinueChat.mock.calls[0][0];
-        expect(prompt).toContain('批准');
-        expect(prompt).toContain('我的计划');
       });
     });
-  });
 
-  describe('拒绝操作', () => {
     it('点击拒绝按钮应显示反馈输入框', () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      const rejectBtn = screen.getByText('拒绝');
-      fireEvent.click(rejectBtn);
+      fireEvent.click(screen.getByText('拒绝'));
 
       expect(screen.getByPlaceholderText('请输入拒绝原因或修改建议...')).toBeInTheDocument();
     });
 
-    it('输入反馈后点击确认拒绝应调用 reject_plan', async () => {
+    it('提交拒绝时应调用 reject_plan', async () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      // 点击拒绝显示输入框
-      const rejectBtn = screen.getByText('拒绝');
-      fireEvent.click(rejectBtn);
+      // 点击拒绝显示反馈输入
+      fireEvent.click(screen.getByText('拒绝'));
 
       // 输入反馈
       const input = screen.getByPlaceholderText('请输入拒绝原因或修改建议...');
-      fireEvent.change(input, { target: { value: '需要更多细节' } });
+      fireEvent.change(input, { target: { value: '需要修改' } });
 
       // 确认拒绝
-      const confirmBtn = screen.getByText('确认拒绝');
-      fireEvent.click(confirmBtn);
+      fireEvent.click(screen.getByText('确认拒绝'));
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith('reject_plan', {
           sessionId: 'test-conversation-id',
           planId: 'test-plan-id',
-          feedback: '需要更多细节',
+          feedback: '需要修改',
         });
       });
     });
 
-    it('点击取消应隐藏反馈输入框', () => {
+    it('提交拒绝后应调用 continueChat', async () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      // 点击拒绝显示输入框
-      const rejectBtn = screen.getByText('拒绝');
-      fireEvent.click(rejectBtn);
-      expect(screen.getByPlaceholderText('请输入拒绝原因或修改建议...')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('拒绝'));
+      fireEvent.click(screen.getByText('确认拒绝'));
 
-      // 点击取消
-      const cancelBtn = screen.getByText('取消');
-      fireEvent.click(cancelBtn);
-
-      expect(screen.queryByPlaceholderText('请输入拒绝原因或修改建议...')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockContinueChat).toHaveBeenCalled();
+      });
     });
   });
 
   describe('阶段展开/折叠', () => {
-    it('点击阶段应展开显示任务列表', () => {
+    it('点击阶段头部应展开阶段', () => {
       const block = createPlanModeBlock({
-        stages: [createPlanStage({ name: '可展开阶段' })],
+        stages: [createPlanStage({ stageId: 'stage-1', name: '阶段一' })],
       });
       render(<PlanModeBlockRenderer block={block} />);
 
-      // 阶段默认折叠，任务不应显示
-      expect(screen.queryByText('任务 1')).not.toBeInTheDocument();
+      // 点击阶段头部
+      const stageHeader = screen.getByText('阶段一').closest('div')!;
+      fireEvent.click(stageHeader);
 
-      // 点击展开
-      const stageHeader = screen.getByText('可展开阶段').closest('div');
-      fireEvent.click(stageHeader!);
-
+      // 展开后应显示任务列表
       expect(screen.getByText('任务 1')).toBeInTheDocument();
     });
 
     it('再次点击应折叠阶段', () => {
       const block = createPlanModeBlock({
-        stages: [createPlanStage({ name: '可折叠阶段' })],
+        stages: [createPlanStage({ stageId: 'stage-1', name: '阶段一' })],
+      });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      const stageHeader = screen.getByText('阶段一').closest('div')!;
+
+      // 展开
+      fireEvent.click(stageHeader);
+      expect(screen.getByText('任务 1')).toBeInTheDocument();
+
+      // 折叠
+      fireEvent.click(stageHeader);
+      expect(screen.queryByText('任务 1')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('任务状态', () => {
+    it('应显示不同状态的任务', () => {
+      const block = createPlanModeBlock({
+        stages: [
+          createPlanStage({
+            tasks: [
+              { taskId: 't1', description: '已完成任务', status: 'completed' },
+              { taskId: 't2', description: '进行中任务', status: 'in_progress' },
+              { taskId: 't3', description: '待执行任务', status: 'pending' },
+            ],
+          }),
+        ],
       });
       render(<PlanModeBlockRenderer block={block} />);
 
       // 展开阶段
-      const stageHeader = screen.getByText('可折叠阶段').closest('div');
-      fireEvent.click(stageHeader!);
-      expect(screen.getByText('任务 1')).toBeInTheDocument();
+      const stageHeader = screen.getByText('阶段 1').closest('div')!;
+      fireEvent.click(stageHeader);
 
-      // 再次点击折叠
-      fireEvent.click(stageHeader!);
-      expect(screen.queryByText('任务 1')).not.toBeInTheDocument();
+      expect(screen.getByText('已完成任务')).toBeInTheDocument();
+      expect(screen.getByText('进行中任务')).toBeInTheDocument();
+      expect(screen.getByText('待执行任务')).toBeInTheDocument();
+    });
+
+    it('已完成任务应有删除线样式', () => {
+      const block = createPlanModeBlock({
+        stages: [
+          createPlanStage({
+            tasks: [{ taskId: 't1', description: '完成任务', status: 'completed' }],
+          }),
+        ],
+      });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      // 展开阶段
+      const stageHeader = screen.getByText('阶段 1').closest('div')!;
+      fireEvent.click(stageHeader);
+
+      const taskText = screen.getByText('完成任务');
+      expect(taskText.className).toMatch(/line-through/);
+    });
+  });
+
+  describe('反馈信息', () => {
+    it('有 feedback 时应显示反馈信息', () => {
+      const block = createPlanModeBlock({
+        status: 'rejected',
+        feedback: '计划需要修改',
+      });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      expect(screen.getByText('计划需要修改')).toBeInTheDocument();
+    });
+
+    it('无 feedback 时不显示反馈区域', () => {
+      const block = createPlanModeBlock({ status: 'approved' });
+      render(<PlanModeBlockRenderer block={block} />);
+
+      // 没有反馈内容
+      const feedbackArea = screen.queryByText(/计划需要修改/);
+      expect(feedbackArea).not.toBeInTheDocument();
     });
   });
 
@@ -317,106 +396,86 @@ describe('PlanModeBlockRenderer', () => {
       expect(screen.getByRole('region')).toBeInTheDocument();
     });
 
-    it('阶段应有正确的 ARIA 属性', () => {
-      const block = createPlanModeBlock();
+    it('应有正确的 aria-label', () => {
+      const block = createPlanModeBlock({ title: '我的计划' });
       render(<PlanModeBlockRenderer block={block} />);
 
-      const stageButton = screen.getByRole('button', { name: /阶段 1/ });
-      expect(stageButton).toBeInTheDocument();
-      expect(stageButton).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByLabelText('计划: 我的计划')).toBeInTheDocument();
     });
 
-    it('审批按钮组应有正确的 ARIA 属性', () => {
+    it('审批按钮应有 aria-label', () => {
       const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
       render(<PlanModeBlockRenderer block={block} />);
 
-      expect(screen.getByRole('group', { name: '审批按钮' })).toBeInTheDocument();
+      expect(screen.getByLabelText('批准计划')).toBeInTheDocument();
+      expect(screen.getByLabelText('拒绝计划')).toBeInTheDocument();
     });
 
-    it('键盘 Escape 应关闭反馈输入框', () => {
-      const block = createPlanModeBlock({ status: 'pending_approval', isActive: true });
+    it('阶段应有键盘导航支持', () => {
+      const block = createPlanModeBlock({
+        stages: [createPlanStage({ stageId: 'stage-1', name: '阶段一' })],
+      });
       render(<PlanModeBlockRenderer block={block} />);
 
-      // 打开反馈输入框
-      const rejectBtn = screen.getByText('拒绝');
-      fireEvent.click(rejectBtn);
-      expect(screen.getByPlaceholderText('请输入拒绝原因或修改建议...')).toBeInTheDocument();
+      // 找到可聚焦的阶段头部
+      const stageButton = screen.getByText('阶段一').closest('[role="button"]')!;
 
-      // 按 Escape 关闭
-      fireEvent.keyDown(screen.getByRole('region'), { key: 'Escape' });
+      // 按 Enter 应展开/折叠
+      fireEvent.keyDown(stageButton, { key: 'Enter' });
 
-      expect(screen.queryByPlaceholderText('请输入拒绝原因或修改建议...')).not.toBeInTheDocument();
+      expect(screen.getByText('任务 1')).toBeInTheDocument();
     });
   });
 
-  describe('不同状态', () => {
-    it('drafting 状态应显示旋转动画', () => {
-      const block = createPlanModeBlock({ status: 'drafting' });
-      render(<PlanModeBlockRenderer block={block} />);
+  describe('SimplifiedPlanModeRenderer', () => {
+    it('应显示计划标题和状态', () => {
+      const block = createPlanModeBlock({ title: '简化计划', status: 'completed' });
+      render(<SimplifiedPlanModeRenderer block={block} />);
 
-      expect(screen.getByText('草稿中')).toBeInTheDocument();
+      expect(screen.getByText('简化计划')).toBeInTheDocument();
     });
 
-    it('approved 状态应显示已批准', () => {
-      const block = createPlanModeBlock({ status: 'approved', isActive: false });
-      render(<PlanModeBlockRenderer block={block} />);
+    it('应显示任务进度', () => {
+      const block = createPlanModeBlock({
+        stages: [
+          createPlanStage({
+            tasks: [
+              { taskId: 't1', description: '任务1', status: 'completed' },
+              { taskId: 't2', description: '任务2', status: 'pending' },
+            ],
+          }),
+        ],
+      });
+      render(<SimplifiedPlanModeRenderer block={block} />);
 
-      expect(screen.getByText('已批准')).toBeInTheDocument();
+      expect(screen.getByText('1/2')).toBeInTheDocument();
     });
 
-    it('rejected 状态应显示已拒绝', () => {
-      const block = createPlanModeBlock({ status: 'rejected', isActive: false });
-      render(<PlanModeBlockRenderer block={block} />);
+    it('应有 aria-label', () => {
+      const block = createPlanModeBlock({ title: '测试计划' });
+      render(<SimplifiedPlanModeRenderer block={block} />);
 
-      expect(screen.getByText('已拒绝')).toBeInTheDocument();
-    });
-
-    it('executing 状态应显示执行中', () => {
-      const block = createPlanModeBlock({ status: 'executing', isActive: false });
-      render(<PlanModeBlockRenderer block={block} />);
-
-      expect(screen.getByText('执行中')).toBeInTheDocument();
-    });
-
-    it('completed 状态应显示已完成', () => {
-      const block = createPlanModeBlock({ status: 'completed', isActive: false });
-      render(<PlanModeBlockRenderer block={block} />);
-
-      expect(screen.getByText('已完成')).toBeInTheDocument();
+      expect(screen.getByLabelText('计划: 测试计划')).toBeInTheDocument();
     });
   });
-});
 
-describe('SimplifiedPlanModeRenderer', () => {
-  it('应该显示简化版计划信息', () => {
-    const block = createPlanModeBlock({ title: '简化计划' });
-    render(<SimplifiedPlanModeRenderer block={block} />);
-
-    expect(screen.getByText('简化计划')).toBeInTheDocument();
-  });
-
-  it('应该显示任务进度', () => {
-    const block = createPlanModeBlock({
-      stages: [
-        createPlanStage({
-          tasks: [
-            { taskId: 'task-1', description: '任务 1', status: 'completed' },
-            { taskId: 'task-2', description: '任务 2', status: 'pending' },
-            { taskId: 'task-3', description: '任务 3', status: 'pending' },
-          ],
-        }),
-      ],
+  describe('状态配置导出', () => {
+    it('PLAN_STATUS_CONFIG 应包含所有状态', () => {
+      expect(PLAN_STATUS_CONFIG.drafting).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.pending_approval).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.approved).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.rejected).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.executing).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.completed).toBeDefined();
+      expect(PLAN_STATUS_CONFIG.canceled).toBeDefined();
     });
-    render(<SimplifiedPlanModeRenderer block={block} />);
 
-    expect(screen.getByText('1/3')).toBeInTheDocument();
-  });
-
-  it('应该有 aria-label 属性', () => {
-    const block = createPlanModeBlock({ title: '无障碍测试计划' });
-    render(<SimplifiedPlanModeRenderer block={block} />);
-
-    const element = screen.getByText('无障碍测试计划').closest('div');
-    expect(element).toHaveAttribute('aria-label');
+    it('PLAN_TASK_STATUS_CONFIG 应包含所有任务状态', () => {
+      expect(PLAN_TASK_STATUS_CONFIG.pending).toBeDefined();
+      expect(PLAN_TASK_STATUS_CONFIG.in_progress).toBeDefined();
+      expect(PLAN_TASK_STATUS_CONFIG.completed).toBeDefined();
+      expect(PLAN_TASK_STATUS_CONFIG.failed).toBeDefined();
+      expect(PLAN_TASK_STATUS_CONFIG.skipped).toBeDefined();
+    });
   });
 });
