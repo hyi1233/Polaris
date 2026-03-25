@@ -604,7 +604,7 @@ function App() {
 
       {showEngineSwitchConfirm && (
         <ConfirmDialog
-          message="切换引擎会清空当前对话并重新开始，是否继续？"
+          message={t('messages.engineSwitchConfirm', { ns: 'common' })}
           onCancel={() => {
             setShowEngineSwitchConfirm(false);
             setPendingEngineId(null);

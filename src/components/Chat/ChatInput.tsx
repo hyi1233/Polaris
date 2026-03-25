@@ -722,8 +722,8 @@ export function ChatInput({
             ) : attachments.length > 0 ? (
               <span className="flex items-center gap-1">
                 <IconPaperclip size={10} />
-                {attachments.length} 个附件
-                {hasReadyAttachments && ' · 可直接发送'}
+                {t('input.attachmentCount', { count: attachments.length })}
+                {hasReadyAttachments && ` · ${t('input.readyToSend')}`}
               </span>
             ) : value.length === 0 ? (
               <span>{t('input.hint')}</span>

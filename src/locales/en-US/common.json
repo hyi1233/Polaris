@@ -61,7 +61,8 @@
     "notGitRepo": "Not a Git repository",
     "workspacePath": "Workspace path",
     "exportSuccess": "Chat exported to: {{path}}",
-    "exportFailed": "Failed to export chat"
+    "exportFailed": "Failed to export chat",
+    "engineSwitchConfirm": "Switching engine will clear the current chat and start over. Continue?"
   },
   "menu": {
     "view": "View",

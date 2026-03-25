@@ -15,7 +15,9 @@
     "selectFile": "Select file",
     "gitContext": "Git context",
     "hint": "Enter to send · Shift+Enter for new line",
-    "diffChip": "Diff: {{status}}"
+    "diffChip": "Diff: {{status}}",
+    "attachmentCount": "{{count}} attachments",
+    "readyToSend": "ready to send"
   },
   "message": {
     "user": "User",
@@ -42,6 +44,9 @@
     "fileTooLarge": "File too large, content omitted",
     "binaryFile": "Binary file",
     "imageFile": "Image file"
+  },
+  "attachment": {
+    "loadFailed": "Load failed"
   },
   "todo": {
     "createPrompt": "Please help me create a todo item",

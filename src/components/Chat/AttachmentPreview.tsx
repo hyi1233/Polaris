@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, FileText, Image, File, Loader2, AlertCircle } from 'lucide-react'
 import type { Attachment } from '../../types/attachment'
 import { formatFileSize, getFileIcon, isPreviewableImage } from '../../types/attachment'
@@ -36,6 +37,7 @@ interface AttachmentItemProps {
 }
 
 function AttachmentItem({ attachment, onRemove }: AttachmentItemProps) {
+  const { t } = useTranslation('chat')
   const [imageError, setImageError] = useState(false)
   const { type, fileName, fileSize, status, error, preview, mimeType } = attachment
 
@@ -56,7 +58,7 @@ function AttachmentItem({ attachment, onRemove }: AttachmentItemProps) {
         <AlertCircle size={16} className="text-danger" />
         <div className="flex flex-col">
           <span className="text-sm text-text-primary truncate max-w-[120px]">{fileName}</span>
-          <span className="text-xs text-danger">{error || '加载失败'}</span>
+          <span className="text-xs text-danger">{error || t('attachment.loadFailed')}</span>
         </div>
         <button
           onClick={onRemove}

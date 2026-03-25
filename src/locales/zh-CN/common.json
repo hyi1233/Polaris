@@ -61,7 +61,8 @@
     "notGitRepo": "不是 Git 仓库",
     "workspacePath": "工作区路径",
     "exportSuccess": "对话已导出到: {{path}}",
-    "exportFailed": "导出对话失败"
+    "exportFailed": "导出对话失败",
+    "engineSwitchConfirm": "切换引擎会清空当前对话并重新开始，是否继续？"
   },
   "menu": {
     "view": "View",

@@ -15,7 +15,9 @@
     "selectFile": "选择文件",
     "gitContext": "Git 上下文",
     "hint": "Enter 发送 · Shift+Enter 换行",
-    "diffChip": "差异: {{status}}"
+    "diffChip": "差异: {{status}}",
+    "attachmentCount": "{{count}} 个附件",
+    "readyToSend": "可直接发送"
   },
   "message": {
     "user": "用户",
@@ -42,6 +44,9 @@
     "fileTooLarge": "文件过大，已省略部分内容",
     "binaryFile": "二进制文件",
     "imageFile": "图片文件"
+  },
+  "attachment": {
+    "loadFailed": "加载失败"
   },
   "todo": {
     "createPrompt": "请帮我创建一个待办事项",
