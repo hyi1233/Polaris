@@ -344,36 +344,62 @@ export const CodeBlock = memo(function CodeBlock({ children, className }: CodeBl
 
       {/* 代码区域 */}
       <div className="overflow-x-auto">
-        <pre
-          className={`p-4 !bg-background-base !m-0 !rounded-none ${className || ''}`}
-          style={{
-            margin: 0,
-          }}
-        >
-          {showLineNumbers ? (
-            <code className="hljs text-sm">
-              {codeWithLineNumbers?.split('\n').map((line, index) => (
-                <div key={index} className="table-row">
-                  <span className="table-cell pr-4 text-text-muted select-none text-right border-r border-border-subtle mr-4">
-                    {line.split(' | ')[0]}
-                  </span>
-                  <span className="table-cell pl-4" dangerouslySetInnerHTML={{
-                    __html: useHighlight
-                      ? (highlightedCode?.split('\n')[index] || line.split(' | ')[1] || '')
-                      : (line.split(' | ')[1] || '')
-                  }} />
-                </div>
-              ))}
-            </code>
-          ) : useHighlight ? (
-            <code
-              className="hljs text-sm"
-              dangerouslySetInnerHTML={{ __html: displayCode }}
-            />
-          ) : (
-            <code className="text-sm text-text-secondary">{codeString}</code>
-          )}
-        </pre>
+        {isCollapsed ? (
+          /* 折叠状态：显示预览提示 */
+          <div
+            className="p-4 bg-background-base cursor-pointer hover:bg-background-hover/30 transition-colors relative"
+            onClick={toggleCollapse}
+            title="点击展开代码"
+          >
+            <div className="text-xs text-text-muted mb-2">
+              {displayName && <span className="font-mono mr-2">{displayName}</span>}
+              <span>{lineCount} 行代码已折叠</span>
+            </div>
+            {/* 显示前 3 行预览 */}
+            <pre className="text-sm text-text-tertiary opacity-60 overflow-hidden" style={{ maxHeight: '4.5em' }}>
+              <code>{codeString.split('\n').slice(0, 3).join('\n')}</code>
+            </pre>
+            {/* 渐变遮罩 */}
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background-base to-transparent pointer-events-none" />
+            {/* 展开提示 */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-text-muted flex items-center gap-1">
+              <ChevronDown className="w-3.5 h-3.5" />
+              点击展开
+            </div>
+          </div>
+        ) : (
+          /* 展开状态：显示完整代码 */
+          <pre
+            className={`p-4 !bg-background-base !m-0 !rounded-none ${className || ''}`}
+            style={{
+              margin: 0,
+            }}
+          >
+            {showLineNumbers ? (
+              <code className="hljs text-sm">
+                {codeWithLineNumbers?.split('\n').map((line, index) => (
+                  <div key={index} className="table-row">
+                    <span className="table-cell pr-4 text-text-muted select-none text-right border-r border-border-subtle mr-4">
+                      {line.split(' | ')[0]}
+                    </span>
+                    <span className="table-cell pl-4" dangerouslySetInnerHTML={{
+                      __html: useHighlight
+                        ? (highlightedCode?.split('\n')[index] || line.split(' | ')[1] || '')
+                        : (line.split(' | ')[1] || '')
+                    }} />
+                  </div>
+                ))}
+              </code>
+            ) : useHighlight ? (
+              <code
+                className="hljs text-sm"
+                dangerouslySetInnerHTML={{ __html: displayCode }}
+              />
+            ) : (
+              <code className="text-sm text-text-secondary">{codeString}</code>
+            )}
+          </pre>
+        )}
       </div>
     </div>
   );
