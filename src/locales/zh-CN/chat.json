@@ -200,5 +200,12 @@
     "noHistory": "暂无历史会话",
     "claudeCodeHint": "• Claude Code 会话来自原生历史记录",
     "localSessionHint": "• 本地会话可删除，CLI 会话只读"
+  },
+  "statusBar": {
+    "conversations": "对话",
+    "tools": "工具",
+    "minutes": "{{count}}分钟",
+    "hoursMinutes": "{{hours}}小时{{minutes}}分钟",
+    "responding": "响应中..."
   }
 }

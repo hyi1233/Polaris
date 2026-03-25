@@ -200,5 +200,12 @@
     "noHistory": "No history sessions",
     "claudeCodeHint": "• Claude Code sessions from native history",
     "localSessionHint": "• Local sessions can be deleted, CLI sessions are read-only"
+  },
+  "statusBar": {
+    "conversations": "conversations",
+    "tools": "tools",
+    "minutes": "{{count}} min",
+    "hoursMinutes": "{{hours}}h {{minutes}}m",
+    "responding": "Responding..."
   }
 }

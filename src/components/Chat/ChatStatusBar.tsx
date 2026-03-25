@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useEventChatStore } from '../../stores';
 import { MessageSquare, Wrench, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -20,8 +21,8 @@ interface ChatStatusBarProps {
 /**
  * 计算会话时长
  */
-function formatDuration(startTime: string | null): string {
-  if (!startTime) return '0分钟';
+function formatDuration(startTime: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
+  if (!startTime) return t('statusBar.minutes', { count: 0 });
 
   const start = new Date(startTime).getTime();
   const now = Date.now();
@@ -32,15 +33,16 @@ function formatDuration(startTime: string | null): string {
   const remainingMinutes = minutes % 60;
 
   if (hours > 0) {
-    return `${hours}小时${remainingMinutes}分钟`;
+    return t('statusBar.hoursMinutes', { hours, minutes: remainingMinutes });
   }
-  return `${minutes}分钟`;
+  return t('statusBar.minutes', { count: minutes });
 }
 
 /**
  * 聊天状态栏组件
  */
 export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
+  const { t } = useTranslation('chat');
   const messages = useEventChatStore(state => state.messages);
   const currentMessage = useEventChatStore(state => state.currentMessage);
   const isStreaming = useEventChatStore(state => state.isStreaming);
@@ -85,7 +87,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
     return null;
   }
 
-  const duration = formatDuration(stats.startTime);
+  const duration = formatDuration(stats.startTime, t);
 
   if (compact) {
     // 紧凑模式：只显示数字
@@ -121,7 +123,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
           <span className="text-text-secondary">{stats.userMessages}</span>
           <span className="mx-0.5">/</span>
           <span className="text-primary">{stats.assistantMessages}</span>
-          <span className="ml-1 text-text-tertiary">对话</span>
+          <span className="ml-1 text-text-tertiary">{t('statusBar.conversations')}</span>
         </span>
       </div>
 
@@ -131,7 +133,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
           <Wrench className="w-3.5 h-3.5 text-warning" />
           <span>
             <span className="text-text-secondary">{stats.toolCalls}</span>
-            <span className="ml-1 text-text-tertiary">工具</span>
+            <span className="ml-1 text-text-tertiary">{t('statusBar.tools')}</span>
           </span>
         </div>
       )}
@@ -146,7 +148,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
       {isStreaming && (
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-          <span className="text-primary">响应中...</span>
+          <span className="text-primary">{t('statusBar.responding')}</span>
         </div>
       )}
     </div>
