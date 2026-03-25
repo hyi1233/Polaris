@@ -5,12 +5,13 @@
  * - 语法高亮（基于 highlight.js）
  * - 一键复制代码
  * - 显示编程语言标签
+ * - 行号切换
  * - 暗色主题适配
  * - 异步高亮避免阻塞主线程
  */
 
-import { memo, useState, useCallback, useEffect } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { memo, useState, useCallback, useEffect, useMemo } from 'react';
+import { Copy, Check, List, ListX } from 'lucide-react';
 import hljs from 'highlight.js';
 
 // 导入常用语言
@@ -180,6 +181,7 @@ function scheduleHighlight(
  */
 export const CodeBlock = memo(function CodeBlock({ children, className }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [showLineNumbers, setShowLineNumbers] = useState(false);
   const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
   const codeString = String(children).trimEnd();
 
@@ -187,6 +189,9 @@ export const CodeBlock = memo(function CodeBlock({ children, className }: CodeBl
   const language = extractLanguage(className);
   const normalizedLanguage = languageAliases[language] || language;
   const displayName = getDisplayName(normalizedLanguage);
+
+  // 计算行数
+  const lineCount = useMemo(() => codeString.split('\n').length, [codeString]);
 
   // 异步语法高亮
   useEffect(() => {
@@ -219,41 +224,88 @@ export const CodeBlock = memo(function CodeBlock({ children, className }: CodeBl
     }
   }, [codeString]);
 
+  // 切换行号显示
+  const toggleLineNumbers = useCallback(() => {
+    setShowLineNumbers(prev => !prev);
+  }, []);
+
   // 显示原始代码或高亮后的代码
   const displayCode = highlightedCode ?? codeString;
   const useHighlight = highlightedCode !== null;
+
+  // 生成带行号的代码
+  const codeWithLineNumbers = useMemo(() => {
+    if (!showLineNumbers) return null;
+    const lines = codeString.split('\n');
+    const maxLineDigits = String(lines.length).length;
+    return lines.map((line, index) => {
+      const lineNum = String(index + 1).padStart(maxLineDigits, ' ');
+      return `${lineNum} | ${line}`;
+    }).join('\n');
+  }, [showLineNumbers, codeString]);
 
   return (
     <div className="relative group my-4 rounded-lg overflow-hidden bg-background-base border border-border-subtle">
       {/* 顶部工具栏 */}
       <div className="flex items-center justify-between px-3 py-2 bg-background-elevated border-b border-border-subtle">
         {/* 语言标签 */}
-        {displayName && (
-          <span className="text-xs text-text-tertiary font-mono">{displayName}</span>
-        )}
-
-        {/* 复制按钮 */}
-        <button
-          className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
-            copied
-              ? 'bg-success text-white'
-              : 'text-text-tertiary hover:bg-background-hover'
-          }`}
-          onClick={handleCopy}
-          title={copied ? '已复制' : '复制代码'}
-        >
-          {copied ? (
-            <>
-              <Check className="w-3.5 h-3.5" />
-              已复制
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              复制
-            </>
+        <div className="flex items-center gap-3">
+          {displayName && (
+            <span className="text-xs text-text-tertiary font-mono">{displayName}</span>
           )}
-        </button>
+          {lineCount > 1 && (
+            <span className="text-xs text-text-muted">{lineCount} 行</span>
+          )}
+        </div>
+
+        {/* 操作按钮 */}
+        <div className="flex items-center gap-1">
+          {/* 行号切换按钮 */}
+          <button
+            className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+              showLineNumbers
+                ? 'bg-primary/20 text-primary'
+                : 'text-text-tertiary hover:bg-background-hover'
+            }`}
+            onClick={toggleLineNumbers}
+            title={showLineNumbers ? '隐藏行号' : '显示行号'}
+          >
+            {showLineNumbers ? (
+              <>
+                <ListX className="w-3.5 h-3.5" />
+                行号
+              </>
+            ) : (
+              <>
+                <List className="w-3.5 h-3.5" />
+                行号
+              </>
+            )}
+          </button>
+
+          {/* 复制按钮 */}
+          <button
+            className={`px-2.5 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${
+              copied
+                ? 'bg-success text-white'
+                : 'text-text-tertiary hover:bg-background-hover'
+            }`}
+            onClick={handleCopy}
+            title={copied ? '已复制' : '复制代码'}
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                已复制
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                复制
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 代码区域 */}
@@ -264,7 +316,22 @@ export const CodeBlock = memo(function CodeBlock({ children, className }: CodeBl
             margin: 0,
           }}
         >
-          {useHighlight ? (
+          {showLineNumbers ? (
+            <code className="hljs text-sm">
+              {codeWithLineNumbers?.split('\n').map((line, index) => (
+                <div key={index} className="table-row">
+                  <span className="table-cell pr-4 text-text-muted select-none text-right border-r border-border-subtle mr-4">
+                    {line.split(' | ')[0]}
+                  </span>
+                  <span className="table-cell pl-4" dangerouslySetInnerHTML={{
+                    __html: useHighlight
+                      ? (highlightedCode?.split('\n')[index] || line.split(' | ')[1] || '')
+                      : (line.split(' | ')[1] || '')
+                  }} />
+                </div>
+              ))}
+            </code>
+          ) : useHighlight ? (
             <code
               className="hljs text-sm"
               dangerouslySetInnerHTML={{ __html: displayCode }}
