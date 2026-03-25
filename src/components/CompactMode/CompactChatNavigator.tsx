@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BookOpen, ChevronDown, User, Bot, ArrowDown } from 'lucide-react'
 import { useEventChatStore } from '../../stores'
 import { groupConversationRounds, type ConversationRound } from '../../utils/conversationRounds'
@@ -21,6 +22,7 @@ interface CompactChatNavigatorProps {
 }
 
 export function CompactChatNavigator({ onScrollToMessage, onScrollToBottom }: CompactChatNavigatorProps) {
+  const { t } = useTranslation('chat')
   const messages = useEventChatStore(state => state.messages)
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -80,8 +82,8 @@ export function CompactChatNavigator({ onScrollToMessage, onScrollToBottom }: Co
         <div className="absolute right-0 top-full mt-1 w-48 max-h-64 overflow-y-auto bg-background-elevated border border-border rounded-lg shadow-lg z-50">
           {/* 标题 */}
           <div className="sticky top-0 flex items-center justify-between px-2 py-1.5 border-b border-border bg-background-surface">
-            <span className="text-xs font-medium text-text-secondary">对话导航</span>
-            <span className="text-xs text-text-tertiary">{rounds.length} 轮</span>
+            <span className="text-xs font-medium text-text-secondary">{t('compact.chatNavigation')}</span>
+            <span className="text-xs text-text-tertiary">{rounds.length} {t('compact.rounds')}</span>
           </div>
 
           {/* 轮次列表 */}
@@ -130,7 +132,7 @@ export function CompactChatNavigator({ onScrollToMessage, onScrollToBottom }: Co
               className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
             >
               <ArrowDown className="w-3.5 h-3.5" />
-              回到底部
+              {t('compact.backToBottom')}
             </button>
           </div>
         </div>

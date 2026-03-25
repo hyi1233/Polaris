@@ -3,6 +3,7 @@
  */
 
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type Message } from '../../types';
 import { useToolPanelStore } from '../../stores';
 import DOMPurify from 'dompurify';
@@ -48,6 +49,7 @@ function formatContent(content: string): string {
 
 /** 工具摘要标签 - 独立组件，隔离工具面板订阅 */
 const ToolSummary = memo(function ToolSummary({ summary }: { summary: NonNullable<Message['toolSummary']> }) {
+  const { t } = useTranslation('chat');
   // 只在这个组件内订阅工具面板状态，避免影响父组件
   const { setOpen, isOpen } = useToolPanelStore();
 
@@ -78,7 +80,7 @@ const ToolSummary = memo(function ToolSummary({ summary }: { summary: NonNullabl
         onClick={handleClick}
         className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors"
       >
-        查看
+        {t('toolSummary.view')}
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
@@ -123,6 +125,7 @@ const ClaudeMessage = memo(function ClaudeMessage({
   isStreaming?: boolean;
   toolSummary?: Message['toolSummary'];
 }) {
+  const { t } = useTranslation('chat');
   // 分离 Mermaid 代码块和普通 Markdown
   const { cleanedMarkdown, mermaidBlocks } = useMemo(() => extractMermaidBlocks(content), [content]);
 
@@ -181,7 +184,7 @@ const ClaudeMessage = memo(function ClaudeMessage({
                   <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
-                <p className="text-xs text-text-tertiary">正在生成图表...</p>
+                <p className="text-xs text-text-tertiary">{t('mermaidStream.generating')}</p>
               </div>
             </div>
           )}

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEventChatStore } from '../../stores'
 import { CompactUserMessage } from './CompactUserMessage'
 import { CompactAssistantMessage } from './CompactAssistantMessage'
@@ -30,6 +31,7 @@ interface CompactMessageListProps {
 
 export const CompactMessageList = forwardRef<CompactMessageListRef, CompactMessageListProps>(
   function CompactMessageList(_props, ref) {
+    const { t } = useTranslation('chat')
     const messages = useEventChatStore(state => state.messages)
     const currentMessage = useEventChatStore(state => state.currentMessage)
     const isStreaming = useEventChatStore(state => state.isStreaming)
@@ -92,7 +94,7 @@ export const CompactMessageList = forwardRef<CompactMessageListRef, CompactMessa
     if (displayMessages.length === 0) {
       return (
         <div className="flex-1 min-h-0 flex items-center justify-center text-text-tertiary text-sm">
-          <p>开始新对话...</p>
+          <p>{t('compact.startNewChat')}</p>
         </div>
       )
     }
@@ -121,7 +123,7 @@ export const CompactMessageList = forwardRef<CompactMessageListRef, CompactMessa
         {isStreaming && (
           <div className="flex items-center gap-1.5 px-2 py-1.5 text-text-tertiary text-xs">
             <span className="animate-pulse">●</span>
-            <span>AI 正在回复...</span>
+            <span>{t('compact.aiResponding')}</span>
           </div>
         )}
       </div>

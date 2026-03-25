@@ -270,5 +270,21 @@
   },
   "contextChip": {
     "remove": "移除 {{label}}"
+  },
+  "toolSummary": {
+    "view": "查看"
+  },
+  "mermaidStream": {
+    "generating": "正在生成图表..."
+  },
+  "compact": {
+    "typing": "正在输入...",
+    "output": "输出:",
+    "thinking": "思考过程",
+    "startNewChat": "开始新对话...",
+    "aiResponding": "AI 正在回复...",
+    "chatNavigation": "对话导航",
+    "rounds": "轮",
+    "backToBottom": "回到底部"
   }
 }

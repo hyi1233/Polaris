@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { AssistantChatMessage, ThinkingBlock, ToolCallBlock } from '../../types/chat'
 import { isTextBlock, isThinkingBlock, isToolCallBlock } from '../../types/chat'
 import { ChevronDown, ChevronRight, Check, X, Loader2 } from 'lucide-react'
@@ -19,6 +20,7 @@ interface CompactAssistantMessageProps {
 }
 
 export function CompactAssistantMessage({ message }: CompactAssistantMessageProps) {
+  const { t } = useTranslation('chat')
   // 按原始顺序渲染所有内容块
   const blocks = message.blocks || []
 
@@ -47,7 +49,7 @@ export function CompactAssistantMessage({ message }: CompactAssistantMessageProp
         {/* 流式输出指示 */}
         {message.isStreaming && (
           <div className="text-xs text-text-tertiary animate-pulse">
-            正在输入...
+            {t('compact.typing')}
           </div>
         )}
       </div>
@@ -59,6 +61,7 @@ export function CompactAssistantMessage({ message }: CompactAssistantMessageProp
  * 单个工具调用（可折叠显示）
  */
 function CompactToolCall({ block }: { block: ToolCallBlock }) {
+  const { t } = useTranslation('chat')
   const [expanded, setExpanded] = useState(false)
 
   const StatusIcon = {
@@ -105,7 +108,7 @@ function CompactToolCall({ block }: { block: ToolCallBlock }) {
           </pre>
           {block.output && (
             <div className="mt-1 pt-1 border-t border-border/30">
-              <div className="text-xs text-text-tertiary">输出:</div>
+              <div className="text-xs text-text-tertiary">{t('compact.output')}</div>
               <pre className="text-xs text-text-tertiary whitespace-pre-wrap overflow-x-auto max-h-32">
                 {typeof block.output === 'string' ? block.output : JSON.stringify(block.output, null, 2)}
               </pre>
@@ -121,6 +124,7 @@ function CompactToolCall({ block }: { block: ToolCallBlock }) {
  * 思考过程（折叠显示）
  */
 function CompactThinking({ block }: { block: ThinkingBlock }) {
+  const { t } = useTranslation('chat')
   const [expanded, setExpanded] = useState(false)
 
   // 截取思考内容的前 50 个字符作为摘要
@@ -140,7 +144,7 @@ function CompactThinking({ block }: { block: ThinkingBlock }) {
           <ChevronRight size={12} className="text-text-tertiary" />
         )}
         <span className="text-xs text-text-tertiary italic">
-          💭 {expanded ? '思考过程' : summary}
+          💭 {expanded ? t('compact.thinking') : summary}
         </span>
       </button>
 

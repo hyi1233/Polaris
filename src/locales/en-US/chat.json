@@ -270,5 +270,21 @@
   },
   "contextChip": {
     "remove": "Remove {{label}}"
+  },
+  "toolSummary": {
+    "view": "View"
+  },
+  "mermaidStream": {
+    "generating": "Generating chart..."
+  },
+  "compact": {
+    "typing": "Typing...",
+    "output": "Output:",
+    "thinking": "Thinking",
+    "startNewChat": "Start a new chat...",
+    "aiResponding": "AI is responding...",
+    "chatNavigation": "Chat Navigation",
+    "rounds": "rounds",
+    "backToBottom": "Back to bottom"
   }
 }
