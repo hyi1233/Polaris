@@ -31,16 +31,16 @@ interface SettingsModalProps {
   initialTab?: SettingsTabId;
 }
 
-// Tab 标题映射
-const TAB_TITLES: Record<SettingsTabId, string> = {
-  'general': '通用',
-  'window': '窗口',
-  'ai-engine': 'AI 引擎',
-  'openai-providers': 'OpenAI Providers',
-  'translate': '翻译',
-  'qqbot': 'QQ Bot',
-  'scheduler': '定时任务',
-  'advanced': '高级',
+// Tab 标题映射 - 使用 i18n key
+const TAB_TITLE_KEYS: Record<SettingsTabId, string> = {
+  'general': 'nav.general',
+  'window': 'nav.window',
+  'ai-engine': 'nav.aiEngine',
+  'openai-providers': 'nav.openaiProviders',
+  'translate': 'nav.translate',
+  'qqbot': 'nav.qqbot',
+  'scheduler': 'nav.scheduler',
+  'advanced': 'nav.advanced',
 };
 
 export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
@@ -151,7 +151,7 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
             {/* Tab 内容 */}
             <div className="flex-1 overflow-y-auto p-6">
               <h3 className="text-base font-medium text-text-primary mb-4">
-                {TAB_TITLES[activeTab]}
+                {t(TAB_TITLE_KEYS[activeTab])}
               </h3>
 
               {activeTab === 'ai-engine' && (
@@ -217,14 +217,14 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
             <div className="px-6 py-4 border-t border-border-subtle bg-background-elevated">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-tertiary">
-                  当前分组：{TAB_TITLES[activeTab]}
+                  {t('currentGroup', '当前分组：{{name}}', { name: t(TAB_TITLE_KEYS[activeTab]) })}
                 </span>
                 <Button
                   variant="secondary"
                   onClick={handleSaveCurrentTab}
                   disabled={saving || loading}
                 >
-                  {saving ? tCommon('status.saving') : `保存${TAB_TITLES[activeTab]}`}
+                  {saving ? tCommon('status.saving') : t('saveTab', '保存{{name}}', { name: t(TAB_TITLE_KEYS[activeTab]) })}
                 </Button>
               </div>
             </div>

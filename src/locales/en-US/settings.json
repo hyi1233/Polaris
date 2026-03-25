@@ -2,6 +2,8 @@
   "title": "Settings",
   "search": "Search settings...",
   "aiEngine": "AI Engine",
+  "currentGroup": "Current group: {{name}}",
+  "saveTab": "Save {{name}}",
   "nav": {
     "general": "General",
     "window": "Window",
