@@ -311,6 +311,131 @@ impl ConfigStore {
         }
     }
 
+    /// 检测 Codex CLI 是否可用
+    pub fn detect_codex(&self) -> Option<String> {
+        // 如果配置中指定了 codex 路径，优先使用
+        let codex_cmd = if let Some(ref cli_path) = self.config.codex.cli_path {
+            cli_path.clone()
+        } else {
+            // 否则尝试查找
+            Self::find_codex_path()?
+        };
+
+        eprintln!("[detect_codex] 尝试执行: {} --version", codex_cmd);
+
+        #[cfg(windows)]
+        let output = Command::new(&codex_cmd)
+            .arg("--version")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        #[cfg(not(windows))]
+        let output = Command::new(&codex_cmd)
+            .arg("--version")
+            .output();
+
+        match output {
+            Ok(output) => {
+                eprintln!("[detect_codex] 进程退出码: {:?}", output.status.code());
+                eprintln!("[detect_codex] stdout: {}", String::from_utf8_lossy(&output.stdout));
+                eprintln!("[detect_codex] stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+                if output.status.success() {
+                    let version = String::from_utf8_lossy(&output.stdout)
+                        .lines()
+                        .next()
+                        .map(|s| s.to_string());
+                    eprintln!("[detect_codex] 解析成功: {:?}", version);
+                    version
+                } else {
+                    eprintln!("[detect_codex] 命令执行失败");
+                    None
+                }
+            }
+            Err(e) => {
+                eprintln!("[detect_codex] 启动进程失败: {:?}", e);
+                None
+            }
+        }
+    }
+
+    /// 查找 Codex CLI 路径
+    pub fn find_codex_path() -> Option<String> {
+        // 1. 尝试 which/where 命令
+        #[cfg(windows)]
+        if let Ok(output) = Command::new("where")
+            .arg("codex")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            if output.status.success() {
+                if let Some(path) = String::from_utf8_lossy(&output.stdout).lines().next() {
+                    eprintln!("[find_codex_path] 找到: {}", path);
+                    return Some(path.to_string());
+                }
+            }
+        }
+
+        #[cfg(not(windows))]
+        if let Ok(output) = Command::new("which").arg("codex").output() {
+            if output.status.success() {
+                if let Some(path) = String::from_utf8_lossy(&output.stdout).lines().next() {
+                    eprintln!("[find_codex_path] 找到: {}", path);
+                    return Some(path.to_string());
+                }
+            }
+        }
+
+        // 2. 检查常见安装路径
+        #[cfg(windows)]
+        {
+            if let Ok(username) = env::var("USERNAME") {
+                let common_paths = vec![
+                    // npm 全局安装路径
+                    format!(r"{}\AppData\Roaming\npm\codex.cmd", username),
+                    // Scoop 安装路径
+                    format!(r"{}\scoop\shims\codex.cmd", env::var("USERPROFILE").unwrap_or_default()),
+                    // 直接尝试 codex (可能在 PATH 中)
+                    "codex.cmd".to_string(),
+                    "codex".to_string(),
+                ];
+
+                for path in common_paths {
+                    eprintln!("[find_codex_path] 检查: {}", path);
+                    if Path::new(&path).exists() {
+                        eprintln!("[find_codex_path] 找到: {}", path);
+                        return Some(path);
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(windows))]
+        {
+            let home = env::var("HOME").unwrap_or_default();
+            let common_paths = vec![
+                // macOS Homebrew
+                "/opt/homebrew/bin/codex".to_string(),
+                "/usr/local/bin/codex".to_string(),
+                // Linux 系统路径
+                "/usr/bin/codex".to_string(),
+                // npm 全局路径
+                format!("{}/.npm-global/bin/codex", home),
+                format!("{}/.local/bin/codex", home),
+            ];
+
+            for path in common_paths {
+                if Path::new(&path).exists() && Self::validate_path(&path) {
+                    eprintln!("[find_codex_path] 找到: {}", path);
+                    return Some(path);
+                }
+            }
+        }
+
+        eprintln!("[find_codex_path] 未找到 codex");
+        None
+    }
+
     /// 查找 IFlow CLI 路径
     pub fn find_iflow_path() -> Option<String> {
         // 1. 尝试 which/where 命令
@@ -394,9 +519,9 @@ impl ConfigStore {
         let iflow_version = self.detect_iflow();
         let iflow_available = iflow_version.is_some();
 
-        // 检查 Codex 配置
-        let codex_available = self.config.codex.cli_path.is_some();
-        let codex_version = None; // TODO: 实际检查 Codex 版本
+        // 检查 Codex 版本
+        let codex_version = self.detect_codex();
+        let codex_available = codex_version.is_some();
 
         // 检查 OpenAI Providers
         let openai_providers_count = self.config.openai_providers.len();
