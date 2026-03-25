@@ -5,6 +5,7 @@
  */
 
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type ToolChatMessage } from '../../types';
 import { formatDuration } from '../../utils/toolSummary';
 import { getToolStatusIcon, getToolStatusColor } from '../../utils/toolStatusHelpers';
@@ -47,6 +48,7 @@ function formatValue(value: unknown): string {
 }
 
 export const ToolBubble = memo(function ToolBubble({ message }: ToolBubbleProps) {
+  const { t } = useTranslation('chat');
   const [isExpanded, setIsExpanded] = useState(false);
   const StatusIcon = getToolStatusIcon(message.status);
 
@@ -104,7 +106,7 @@ export const ToolBubble = memo(function ToolBubble({ message }: ToolBubbleProps)
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="shrink-0 p-1 text-text-subtle hover:text-text transition-colors rounded hover:bg-background-hover"
-            title={isExpanded ? "收起详情" : "展开详情"}
+            title={isExpanded ? t('toolBubble.collapseDetails') : t('toolBubble.expandDetails')}
           >
             <IconChevronRight
               size={14}
@@ -124,13 +126,13 @@ export const ToolBubble = memo(function ToolBubble({ message }: ToolBubbleProps)
           {message.input && Object.keys(message.input).length > 0 && (
             <div className="bg-background-secondary rounded-lg border border-border-subtle overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-background-tertiary">
-                <span className="text-xs text-text-subtle">输入参数</span>
+                <span className="text-xs text-text-subtle">{t('toolBubble.inputParams')}</span>
                 <button
                   onClick={() => copyToClipboard(formatValue(message.input))}
                   className="flex items-center gap-1 text-xs text-text-muted hover:text-text transition-colors"
                 >
                   <IconCopy size={12} />
-                  复制
+                  {t('toolBubble.copy')}
                 </button>
               </div>
               <pre className="p-3 text-xs text-text-muted overflow-x-auto max-h-32 overflow-y-auto">
@@ -143,13 +145,13 @@ export const ToolBubble = memo(function ToolBubble({ message }: ToolBubbleProps)
           {message.status === 'completed' && !message.output && (
             <div className="bg-success-faint border border-success/30 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 border-b border-success/20 bg-success/10">
-                <span className="text-xs text-text-subtle">执行结果</span>
+                <span className="text-xs text-text-subtle">{t('toolBubble.outputResult')}</span>
               </div>
               <div className="p-3 text-xs text-success flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>命令执行成功（无输出）</span>
+                <span>{t('toolBubble.noOutput')}</span>
               </div>
             </div>
           )}
@@ -162,13 +164,13 @@ export const ToolBubble = memo(function ToolBubble({ message }: ToolBubbleProps)
                 : "bg-background-secondary border-border-subtle"
             )}>
               <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-background-tertiary">
-                <span className="text-xs text-text-subtle">执行结果</span>
+                <span className="text-xs text-text-subtle">{t('toolBubble.outputResult')}</span>
                 <button
                   onClick={() => copyToClipboard(message.output || '')}
                   className="flex items-center gap-1 text-xs text-text-muted hover:text-text transition-colors"
                 >
                   <IconCopy size={12} />
-                  复制
+                  {t('toolBubble.copy')}
                 </button>
               </div>
               <pre className={clsx(

@@ -220,5 +220,13 @@
     "input": "Input",
     "output": "Output",
     "copy": "Copy"
+  },
+  "toolBubble": {
+    "collapseDetails": "Collapse details",
+    "expandDetails": "Expand details",
+    "inputParams": "Input Parameters",
+    "outputResult": "Output Result",
+    "noOutput": "Command executed successfully (no output)",
+    "copy": "Copy"
   }
 }

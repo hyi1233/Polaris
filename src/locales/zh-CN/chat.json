@@ -220,5 +220,13 @@
     "input": "输入",
     "output": "输出",
     "copy": "复制"
+  },
+  "toolBubble": {
+    "collapseDetails": "收起详情",
+    "expandDetails": "展开详情",
+    "inputParams": "输入参数",
+    "outputResult": "执行结果",
+    "noOutput": "命令执行成功（无输出）",
+    "copy": "复制"
   }
 }
