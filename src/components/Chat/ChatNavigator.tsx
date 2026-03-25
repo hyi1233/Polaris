@@ -107,9 +107,9 @@ export function ChatNavigator({
     return () => clearTimers();
   }, [clearTimers]);
 
-  // 面板定位 - 固定在右侧，垂直居中
+  // 面板定位 - 固定在右侧边缘，垂直居中
   const panelStyle = useMemo(() => ({
-    right: '80px',
+    right: '24px',
     top: '50%',
     transform: 'translateY(-50%)',
     maxHeight: '70vh',
@@ -143,23 +143,45 @@ export function ChatNavigator({
 
   return (
     <>
-      {/* 悬浮球 - 固定在右中位置 */}
+      {/* 贴边半圆悬浮球 - 固定在右边缘垂直居中 */}
       <div
         className={clsx(
-          'absolute right-6 top-1/2 -translate-y-1/2',
-          'w-12 h-12 rounded-full',
-          'bg-primary/90 backdrop-blur-sm',
-          'shadow-lg shadow-primary/20',
-          'flex items-center justify-center',
+          'fixed right-0 top-1/2 -translate-y-1/2',
+          /* 贴边半圆：右半圆在屏幕外，左半圆在屏幕内 */
+          'w-8 h-14 -mr-4',
+          'rounded-l-full',
+          'flex items-center justify-start pl-1',
+          'shadow-lg',
+          'transition-all duration-200 ease-out',
           'cursor-pointer',
-          'transition-all duration-200',
-          'hover:scale-110 hover:bg-primary',
-          'z-50'
+          'group',
+          isPanelVisible
+            ? 'bg-primary-hover shadow-xl'
+            : 'bg-primary hover:bg-primary-hover hover:shadow-xl'
         )}
         onMouseEnter={handleFloatingBallMouseEnter}
         onMouseLeave={handleFloatingBallMouseLeave}
+        title={t('navigator.title')}
       >
-        <BookOpen className="w-6 h-6 text-white" />
+        {/* 三横线图标 */}
+        <div className={clsx(
+          'w-4 h-4 flex flex-col items-center justify-center gap-0.5',
+          'transition-transform duration-200',
+          isPanelVisible ? 'rotate-45' : 'group-hover:scale-110'
+        )}>
+          <div className={clsx(
+            'w-3 h-0.5 bg-white rounded-full transition-all duration-200',
+            isPanelVisible ? 'rotate-90 absolute' : ''
+          )} />
+          <div className={clsx(
+            'w-3 h-0.5 bg-white rounded-full transition-all duration-200',
+            isPanelVisible ? 'opacity-0' : ''
+          )} />
+          <div className={clsx(
+            'w-3 h-0.5 bg-white rounded-full transition-all duration-200',
+            isPanelVisible ? '-rotate-90 absolute' : ''
+          )} />
+        </div>
       </div>
 
       {/* 悬浮面板 */}
