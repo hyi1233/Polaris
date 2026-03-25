@@ -51,7 +51,8 @@
     "showAIPanel": "Show AI Panel",
     "hideAIPanel": "Hide AI Panel",
     "showActivityBar": "Show Activity Bar",
-    "hideActivityBar": "Hide Activity Bar"
+    "hideActivityBar": "Hide Activity Bar",
+    "close": "Close"
   },
   "messages": {
     "noWorkspace": "Please open a workspace first",

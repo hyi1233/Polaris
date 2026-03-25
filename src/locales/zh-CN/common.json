@@ -51,7 +51,8 @@
     "showAIPanel": "显示 AI 面板",
     "hideAIPanel": "隐藏 AI 面板",
     "showActivityBar": "显示侧边栏",
-    "hideActivityBar": "隐藏侧边栏"
+    "hideActivityBar": "隐藏侧边栏",
+    "close": "关闭"
   },
   "messages": {
     "noWorkspace": "请先打开一个工作区",
