@@ -57,5 +57,12 @@
   "ariaLabel": {
     "folder": "文件夹 {{name}}",
     "file": "文件 {{name}}"
+  },
+  "unsavedChanges": {
+    "title": "未保存的更改",
+    "message": "文件有未保存的更改。是否保存后再关闭？",
+    "cancel": "取消",
+    "discard": "放弃更改",
+    "saveAndClose": "保存并关闭"
   }
 }

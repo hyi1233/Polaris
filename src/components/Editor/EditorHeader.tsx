@@ -2,6 +2,8 @@
  * 编辑器顶部栏组件
  */
 
+import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFileEditorStore } from '../../stores';
 import { createLogger } from '../../utils/logger';
 
@@ -12,7 +14,17 @@ interface EditorHeaderProps {
 }
 
 export function EditorHeader({ className = '' }: EditorHeaderProps) {
+  const { t } = useTranslation('fileExplorer');
   const { currentFile, saveFile, closeFile, status } = useFileEditorStore();
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 聚焦到保存按钮
+  useEffect(() => {
+    if (showCloseConfirm && saveButtonRef.current) {
+      saveButtonRef.current.focus();
+    }
+  }, [showCloseConfirm]);
 
   if (!currentFile) return null;
 
@@ -27,11 +39,41 @@ export function EditorHeader({ className = '' }: EditorHeaderProps) {
     }
   };
 
-  const handleClose = async () => {
+  const handleCloseClick = () => {
+    if (isModified) {
+      setShowCloseConfirm(true);
+    } else {
+      closeFile();
+    }
+  };
+
+  const handleDiscardClose = async () => {
+    setShowCloseConfirm(false);
     try {
       await closeFile();
     } catch (error) {
       log.error('Failed to close file:', error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+
+  const handleCancelClose = () => {
+    setShowCloseConfirm(false);
+  };
+
+  const handleSaveAndClose = async () => {
+    setShowCloseConfirm(false);
+    try {
+      await saveFile();
+      await closeFile();
+    } catch (error) {
+      log.error('Failed to save and close:', error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+
+  const handleDialogKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelClose();
     }
   };
 
@@ -88,7 +130,7 @@ export function EditorHeader({ className = '' }: EditorHeaderProps) {
         )}
 
         <button
-          onClick={handleClose}
+          onClick={handleCloseClick}
           className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover
                    transition-colors"
           title="关闭文件"
@@ -98,6 +140,49 @@ export function EditorHeader({ className = '' }: EditorHeaderProps) {
           </svg>
         </button>
       </div>
+
+      {/* 未保存确认对话框 */}
+      {showCloseConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onKeyDown={handleDialogKeyDown}
+        >
+          <div className="bg-background-elevated rounded-xl p-6 w-full max-w-md border border-border shadow-glow">
+            <h2 className="text-lg font-semibold text-text-primary mb-2">
+              {t('unsavedChanges.title')}
+            </h2>
+
+            <p className="text-sm text-text-secondary whitespace-pre-wrap mb-6">
+              {t('unsavedChanges.message')}
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelClose}
+                className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover rounded-lg transition-colors"
+              >
+                {t('unsavedChanges.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardClose}
+                className="px-4 py-2 text-sm text-white rounded-lg bg-danger hover:bg-danger/90 transition-colors"
+              >
+                {t('unsavedChanges.discard')}
+              </button>
+              <button
+                ref={saveButtonRef}
+                type="button"
+                onClick={handleSaveAndClose}
+                className="px-4 py-2 text-sm text-white rounded-lg bg-primary hover:bg-primary/90 transition-colors"
+              >
+                {t('unsavedChanges.saveAndClose')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

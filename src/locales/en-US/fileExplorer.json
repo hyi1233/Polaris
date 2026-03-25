@@ -57,5 +57,12 @@
   "ariaLabel": {
     "folder": "Folder {{name}}",
     "file": "File {{name}}"
+  },
+  "unsavedChanges": {
+    "title": "Unsaved Changes",
+    "message": "The file has unsaved changes. Would you like to save before closing?",
+    "cancel": "Cancel",
+    "discard": "Discard Changes",
+    "saveAndClose": "Save & Close"
   }
 }
