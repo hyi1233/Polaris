@@ -4,7 +4,6 @@ pub mod events;
 pub mod git;
 pub mod iflow_events;
 pub mod scheduler;
-pub mod requirement;
 
 pub use ai_event::{
     AIEvent, ToolCallInfo, ToolCallStatus,

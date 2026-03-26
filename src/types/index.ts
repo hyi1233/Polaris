@@ -12,7 +12,6 @@ export * from './git';
 export * from './todo';
 export * from './integration';
 export * from './scheduler';
-export * from './requirement';
 export * from './terminal';
 export * from './attachment';
 export * from './errors';

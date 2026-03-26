@@ -5,5 +5,4 @@ pub mod iflow_service;
 pub mod openai_proxy;
 pub mod openai_service;
 pub mod scheduler;
-pub mod requirement;
 
