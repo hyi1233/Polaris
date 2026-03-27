@@ -15,3 +15,4 @@ export * from './scheduler';
 export * from './terminal';
 export * from './attachment';
 export * from './errors';
+export * from './requirement';
