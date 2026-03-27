@@ -61,9 +61,11 @@
   "unsavedChanges": {
     "title": "未保存的更改",
     "message": "文件有未保存的更改。是否保存后再关闭？",
+    "messageWithName": "文件 \"{{name}}\" 有未保存的更改。是否保存后再关闭？",
     "cancel": "取消",
     "discard": "放弃更改",
-    "saveAndClose": "保存并关闭"
+    "saveAndClose": "保存并关闭",
+    "saving": "保存中..."
   },
   "searchResults": {
     "noMatch": "没有找到匹配的文件",
