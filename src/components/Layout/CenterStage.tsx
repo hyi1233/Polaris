@@ -10,7 +10,7 @@ import { X, FileDiff, FileText, Image as ImageIcon } from 'lucide-react'
 import { useTabStore, Tab } from '@/stores/tabStore'
 import { useFileEditorStore } from '@/stores/fileEditorStore'
 import { DiffViewer } from '@/components/Diff/DiffViewer'
-import { EditorPanel } from '@/components/Editor'
+import { EditorPanel, BreadcrumbBar } from '@/components/Editor'
 import { TabContextMenu } from './TabContextMenu'
 import { ImagePreview } from '@/components/Preview/ImagePreview'
 import { UnsavedDialog } from '@/components/Common/UnsavedDialog'
@@ -382,6 +382,7 @@ export function CenterStage({ children, className = '' }: CenterStageProps) {
   return (
     <main className={`flex flex-col flex-1 overflow-hidden bg-background-base ${className}`}>
       <TabBar />
+      <BreadcrumbBar />
       <TabContent />
       {children}
     </main>

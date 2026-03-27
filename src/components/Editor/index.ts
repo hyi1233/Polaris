@@ -5,3 +5,4 @@
 export { EditorPanel } from './EditorPanel';
 export { CodeMirrorEditor } from './Editor';
 export { EditorHeader } from './EditorHeader';
+export { BreadcrumbBar } from './BreadcrumbBar';

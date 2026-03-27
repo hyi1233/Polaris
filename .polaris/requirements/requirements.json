@@ -340,7 +340,7 @@
       "id": "req-editor-breadcrumb-023",
       "title": "编辑器面包屑路径导航",
       "description": "当前编辑器顶部栏（EditorHeader）仅显示文件名和操作按钮，缺少完整的文件路径上下文信息。用户在编辑文件时无法快速了解文件所在目录层级，也无法通过路径快速导航到同目录的其他文件。\n\n**背景分析**：\n- `EditorHeader`（`src/components/Editor/EditorHeader.tsx`）只显示 `currentFile.name`（文件名），不显示路径\n- VS Code、IntelliJ 等主流编辑器都在编辑器上方提供面包屑导航\n- 当项目文件较多时，仅靠文件名难以区分同名文件（如多个 `index.ts`）\n- 用户需要切换到文件树才能浏览同级文件，效率较低\n\n**改进目标**：\n\n1. **面包屑路径栏**\n   - 在 TabBar 和编辑器内容之间新增面包屑导航栏（高度约 28px）\n   - 显示完整文件路径：`src › components › Editor › EditorHeader.tsx`\n   - 每段显示对应图标（文件夹/文件）\n   - 路径过长时支持水平滚动\n\n2. **路径段交互**\n   - 点击路径段（如「components」）展开下拉菜单\n   - 下拉菜单显示该目录下的所有文件和子目录\n   - 选择文件直接在编辑器中打开\n   - 选择文件夹在文件树中定位并展开\n   - 当前文件名高亮且为最后一段\n\n3. **右侧附加信息**\n   - 显示文件语言类型（TypeScript、Markdown 等）\n   - 显示文件编码（UTF-8）\n   - 显示换行符类型（LF/CRLF）\n\n4. **与现有组件协同**\n   - EditorHeader 保留保存/关闭按钮\n   - 面包屑栏独立于 EditorHeader，位于其上方或替代其路径显示部分\n   - 复用 FileExplorer 的文件图标和目录读取逻辑\n\n**影响范围**：\n- `src/components/Editor/EditorHeader.tsx` - 调整布局，移除文件名显示（由面包屑替代）\n- `src/components/Layout/CenterStage.tsx` - 在 TabBar 和 TabContent 之间插入面包屑栏\n- 新增 `src/components/Editor/BreadcrumbBar.tsx` - 面包屑导航组件\n- 新增 `src/components/Editor/BreadcrumbDropdown.tsx` - 路径段下拉菜单\n- 复用 `src/components/FileExplorer/` 的文件图标和目录读取逻辑\n\n**预期效果**：\n- 用户直观了解当前编辑文件的位置\n- 快速浏览和打开同级/上级目录文件\n- 区分不同目录下的同名文件\n- 提升文件导航效率，减少对文件树的依赖",
-      "status": "approved",
+      "status": "completed",
       "priority": "normal",
       "generatedBy": "ai",
       "tags": [
@@ -352,9 +352,11 @@
       "hasPrototype": true,
       "prototypePath": ".polaris/requirements/prototypes/editor-breadcrumb-navigation.html",
       "createdAt": 1774631388000,
-      "updatedAt": 1774631572701,
+      "updatedAt": 1774708800000,
       "generatedAt": 1774631388000,
-      "reviewedAt": 1774631572701
+      "reviewedAt": 1774631572701,
+      "completedAt": 1774708800000,
+      "executeLog": "## 执行记录\n\n### 2026-03-28 执行\n\n**实现方案**：\n\n1. 新增 `BreadcrumbBar` 组件，位于 TabBar 和 TabContent 之间\n2. 解析文件绝对路径为相对路径段，显示面包屑导航\n3. 点击文件夹路径段展开下拉菜单，显示该目录下所有文件/文件夹\n4. 右侧显示文件语言类型\n5. 简化 EditorHeader 移除文件名显示（由面包屑替代）\n\n**已实现**：\n- ✅ `src/components/Editor/BreadcrumbBar.tsx` - 面包屑导航组件（含内联下拉菜单）\n- ✅ `src/components/Layout/CenterStage.tsx` - 插入 BreadcrumbBar\n- ✅ `src/components/Editor/EditorHeader.tsx` - 移除文件名，保留保存/关闭按钮\n- ✅ `src/components/Editor/index.ts` - 导出新组件\n- ✅ i18n 文本（zh-CN/en-US）\n- ✅ TypeScript 类型检查通过"
     },
     {
       "id": "req-openai-provider-test-024",

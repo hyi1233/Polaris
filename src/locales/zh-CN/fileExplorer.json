@@ -72,5 +72,9 @@
     "openFolder": "打开文件夹",
     "openFile": "打开文件",
     "openInBrowser": "在浏览器中打开"
+  },
+  "breadcrumb": {
+    "loading": "加载中...",
+    "emptyDirectory": "空目录"
   }
 }
