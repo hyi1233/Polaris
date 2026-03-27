@@ -18,6 +18,7 @@ import type { Requirement, RequirementStatus } from '@/types/requirement'
 
 interface RequirementCardProps {
   requirement: Requirement
+  disabled?: boolean
   onEditClick?: (requirement: Requirement) => void
   onApproveClick?: (requirement: Requirement) => void
   onRejectClick?: (requirement: Requirement) => void
@@ -46,6 +47,7 @@ const priorityStyleConfig: Record<string, string> = {
 
 export function RequirementCard({
   requirement,
+  disabled,
   onEditClick,
   onApproveClick,
   onRejectClick,
@@ -142,13 +144,15 @@ export function RequirementCard({
         </div>
 
         {/* 操作按钮组 */}
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className={`flex items-center gap-0.5 flex-shrink-0 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
           {canReview && (
             <>
               <button
                 onClick={e => { e.stopPropagation(); onApproveClick?.(requirement) }}
                 className="p-1.5 rounded hover:bg-green-500/10 text-text-secondary hover:text-green-500 transition-all"
                 title={t('card.approve')}
+                aria-label={t('card.approve')}
+                disabled={disabled}
               >
                 <Check size={14} />
               </button>
@@ -156,6 +160,8 @@ export function RequirementCard({
                 onClick={e => { e.stopPropagation(); onRejectClick?.(requirement) }}
                 className="p-1.5 rounded hover:bg-red-500/10 text-text-secondary hover:text-red-500 transition-all"
                 title={t('card.reject')}
+                aria-label={t('card.reject')}
+                disabled={disabled}
               >
                 <X size={14} />
               </button>
@@ -166,6 +172,8 @@ export function RequirementCard({
             onClick={e => { e.stopPropagation(); onEditClick?.(requirement) }}
             className="p-1.5 rounded hover:bg-background-hover text-text-secondary hover:text-text-primary transition-all"
             title={t('card.edit')}
+            aria-label={t('card.edit')}
+            disabled={disabled}
           >
             <FileEdit size={14} />
           </button>
@@ -180,6 +188,8 @@ export function RequirementCard({
               }}
               className="p-1.5 rounded hover:bg-red-500/10 text-text-secondary hover:text-red-500 transition-all"
               title={t('card.delete')}
+              aria-label={t('card.delete')}
+              disabled={disabled}
             >
               <Trash2 size={14} />
             </button>

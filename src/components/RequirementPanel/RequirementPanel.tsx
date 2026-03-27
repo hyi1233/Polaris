@@ -5,7 +5,7 @@
  * 使用 useRequirementStore 驱动数据
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Plus,
   Search,
@@ -89,6 +89,17 @@ export function RequirementPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedRequirement = selectedId ? requirements.find(r => r.id === selectedId) ?? null : null
 
+  // 操作进行中追踪（防止重复点击）
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const setProcessing = useCallback((id: string, processing: boolean) => {
+    setProcessingIds(prev => {
+      const next = new Set(prev)
+      if (processing) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
+
   // 初始化：工作区驱动，工作区变化时重新加载
   useEffect(() => {
     if (currentWorkspace?.path) {
@@ -132,32 +143,41 @@ export function RequirementPanel() {
   // --- 事件处理 ---
 
   const handleApprove = async (req: Requirement) => {
+    setProcessing(req.id, true)
     try {
       await approveRequirements([req.id])
       toast.success(t('toast.approveSuccess'))
     } catch (e) {
       log.error('批准需求失败', e instanceof Error ? e : new Error(String(e)))
       toast.error(t('toast.updateFailed'))
+    } finally {
+      setProcessing(req.id, false)
     }
   }
 
   const handleReject = async (req: Requirement, reason?: string) => {
+    setProcessing(req.id, true)
     try {
       await rejectRequirements([req.id], reason || undefined)
       toast.success(t('toast.rejectSuccess'))
     } catch (e) {
       log.error('拒绝需求失败', e instanceof Error ? e : new Error(String(e)))
       toast.error(t('toast.updateFailed'))
+    } finally {
+      setProcessing(req.id, false)
     }
   }
 
   const handleDelete = async (req: Requirement) => {
+    setProcessing(req.id, true)
     try {
       await deleteRequirement(req.id)
       toast.success(t('toast.deleteSuccess'))
     } catch (e) {
       log.error('删除需求失败', e instanceof Error ? e : new Error(String(e)))
       toast.error(t('toast.deleteFailed'))
+    } finally {
+      setProcessing(req.id, false)
     }
   }
 
@@ -288,6 +308,7 @@ export function RequirementPanel() {
           <RequirementCard
             key={req.id}
             requirement={req}
+            disabled={processingIds.has(req.id)}
             onApproveClick={handleApprove}
             onRejectClick={req => setSelectedId(req.id)}
             onDeleteClick={handleDelete}
@@ -339,6 +360,7 @@ export function RequirementPanel() {
         <RequirementDetailDialog
           requirement={selectedRequirement}
           open={!!selectedRequirement}
+          disabled={processingIds.has(selectedRequirement.id)}
           onClose={() => setSelectedId(null)}
           onEditSubmit={async (data) => {
             try {

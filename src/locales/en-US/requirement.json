@@ -78,6 +78,7 @@
     "scheduledAt": "Scheduled At",
     "prototype": "Prototype Preview",
     "noPrototype": "No prototype",
+    "prototypeNewTab": "Open in new tab",
     "actions": {
       "approve": "Approve",
       "reject": "Reject",

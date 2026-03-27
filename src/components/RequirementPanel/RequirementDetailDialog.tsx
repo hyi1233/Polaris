@@ -18,6 +18,7 @@ import {
   User,
   Clock,
   Loader2,
+  ExternalLink,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Requirement, RequirementPriority, RequirementSource } from '@/types/requirement'
@@ -26,6 +27,7 @@ import { RequirementForm } from './RequirementForm'
 interface RequirementDetailDialogProps {
   requirement: Requirement
   open: boolean
+  disabled?: boolean
   onClose: () => void
   onDelete?: () => void
   onApprove?: (req: Requirement) => void
@@ -57,6 +59,7 @@ const statusStyleMap: Record<string, { text: string; bg: string }> = {
 export function RequirementDetailDialog({
   requirement,
   open,
+  disabled,
   onClose,
   onDelete,
   onApprove,
@@ -86,7 +89,7 @@ export function RequirementDetailDialog({
       const html = await onReadPrototype(requirement.prototypePath)
       setPrototypeHtml(html)
     } catch (e) {
-      setPrototypeError(e instanceof Error ? e.message : 'Failed to load prototype')
+      setPrototypeError(e instanceof Error ? e.message : t('detail.noPrototype'))
     } finally {
       setLoadingPrototype(false)
     }
@@ -147,6 +150,7 @@ export function RequirementDetailDialog({
             onClick={onClose}
             className="p-1 rounded hover:bg-background-hover text-text-secondary hover:text-text-primary transition-all"
             title={t('form.closeTooltip')}
+            aria-label={t('form.closeTooltip')}
           >
             <X size={18} />
           </button>
@@ -275,9 +279,25 @@ export function RequirementDetailDialog({
           {/* 原型预览 */}
           {requirement.hasPrototype && (
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-2">
-                {t('detail.prototype')}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-text-secondary">
+                  {t('detail.prototype')}
+                </label>
+                {prototypeHtml && (
+                  <button
+                    onClick={() => {
+                      const w = window.open('', '_blank')
+                      if (w) w.document.write(prototypeHtml)
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-text-secondary hover:text-text-primary hover:bg-background-hover rounded transition-all"
+                    title={t('detail.prototypeNewTab')}
+                    aria-label={t('detail.prototypeNewTab')}
+                  >
+                    <ExternalLink size={12} />
+                    {t('detail.prototypeNewTab')}
+                  </button>
+                )}
+              </div>
               {loadingPrototype ? (
                 <div className="flex items-center justify-center py-8 text-text-tertiary">
                   <Loader2 size={20} className="animate-spin mr-2" />
@@ -291,8 +311,8 @@ export function RequirementDetailDialog({
                 <div className="border border-border rounded-lg overflow-hidden bg-white">
                   <iframe
                     srcDoc={prototypeHtml}
-                    className="w-full h-64 border-0"
-                    title={`Prototype: ${requirement.title}`}
+                    className="w-full h-96 border-0"
+                    title={t('detail.prototype')}
                     sandbox="allow-scripts"
                   />
                 </div>
@@ -310,7 +330,8 @@ export function RequirementDetailDialog({
             {canReview && onApprove && (
               <button
                 onClick={() => onApprove(requirement)}
-                className="px-3 py-1.5 text-sm bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-all flex items-center gap-1"
+                className="px-3 py-1.5 text-sm bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-all flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+                disabled={disabled}
               >
                 <Check size={14} />
                 {t('detail.actions.approve')}
@@ -319,7 +340,8 @@ export function RequirementDetailDialog({
             {canReview && onReject && !showRejectInput && (
               <button
                 onClick={() => setShowRejectInput(true)}
-                className="px-3 py-1.5 text-sm bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all flex items-center gap-1"
+                className="px-3 py-1.5 text-sm bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+                disabled={disabled}
               >
                 <XCircle size={14} />
                 {t('detail.actions.reject')}
@@ -366,7 +388,8 @@ export function RequirementDetailDialog({
             )}
             <button
               onClick={() => setEditing(true)}
-              className="px-3 py-1.5 text-sm bg-background-surface border border-border rounded-lg hover:bg-background-hover text-text-secondary hover:text-text-primary transition-all flex items-center gap-1"
+              className="px-3 py-1.5 text-sm bg-background-surface border border-border rounded-lg hover:bg-background-hover text-text-secondary hover:text-text-primary transition-all flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+              disabled={disabled}
             >
               <FileEdit size={14} />
               {t('card.edit')}
@@ -382,7 +405,8 @@ export function RequirementDetailDialog({
                   onClose()
                 }
               }}
-              className="px-3 py-1.5 text-sm text-red-500 rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-1"
+              className="px-3 py-1.5 text-sm text-red-500 rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+              disabled={disabled}
             >
               <Trash2 size={14} />
               {t('detail.actions.delete')}
