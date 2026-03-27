@@ -68,6 +68,8 @@ interface RequirementState {
   savePrototype: (id: string, html: string) => Promise<string>
   /** 读取原型 */
   readPrototype: (prototypePath: string) => Promise<string>
+  /** 获取原型文件的绝对路径 */
+  getPrototypeAbsolutePath: (prototypePath: string) => string | null
 }
 
 const DEFAULT_FILTER: RequirementFilter = {
@@ -289,5 +291,9 @@ export const useRequirementStore = create<RequirementState>((set, get) => ({
       set({ error })
       throw new Error(error)
     }
+  },
+
+  getPrototypeAbsolutePath: (prototypePath: string) => {
+    return requirementService.getPrototypeAbsolutePath(prototypePath)
   },
 }))

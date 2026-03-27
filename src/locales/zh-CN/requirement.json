@@ -131,7 +131,9 @@
     "approveSuccess": "已批准",
     "rejectSuccess": "已拒绝",
     "batchApproveSuccess": "已批准 {{count}} 个需求",
-    "batchRejectSuccess": "已拒绝 {{count}} 个需求"
+    "batchRejectSuccess": "已拒绝 {{count}} 个需求",
+    "prototypeNotFound": "无法获取原型文件路径",
+    "prototypeOpenFailed": "打开原型文件失败"
   },
 
   "empty": {

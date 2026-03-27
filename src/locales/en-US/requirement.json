@@ -131,7 +131,9 @@
     "approveSuccess": "Approved",
     "rejectSuccess": "Rejected",
     "batchApproveSuccess": "{{count}} requirements approved",
-    "batchRejectSuccess": "{{count}} requirements rejected"
+    "batchRejectSuccess": "{{count}} requirements rejected",
+    "prototypeNotFound": "Cannot get prototype file path",
+    "prototypeOpenFailed": "Failed to open prototype file"
   },
 
   "empty": {

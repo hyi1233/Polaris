@@ -318,6 +318,16 @@ export class RequirementService {
   }
 
   /**
+   * 获取原型文件的绝对路径
+   */
+  getPrototypeAbsolutePath(prototypePath: string): string | null {
+    if (!this.workspacePath) {
+      return null
+    }
+    return `${this.workspacePath}/${prototypePath}`
+  }
+
+  /**
    * 获取统计信息
    */
   getStats(): RequirementStats {

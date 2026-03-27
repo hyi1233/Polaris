@@ -24,6 +24,9 @@ import { useTranslation } from 'react-i18next'
 import type { Requirement, RequirementPriority, RequirementSource } from '@/types/requirement'
 import { RequirementForm } from './RequirementForm'
 import { STATUS_STYLES, PRIORITY_TEXT, formatTime, TIME_FORMAT_FULL } from './constants'
+import { createLogger } from '@/utils/logger'
+
+const log = createLogger('RequirementDetailDialog')
 
 interface RequirementDetailDialogProps {
   requirement: Requirement
@@ -44,6 +47,8 @@ interface RequirementDetailDialogProps {
   }) => void
   /** 读取原型 HTML 内容 */
   onReadPrototype?: (path: string) => Promise<string>
+  /** 获取原型文件绝对路径并打开 */
+  onOpenPrototype?: (path: string) => Promise<void>
 }
 
 export function RequirementDetailDialog({
@@ -56,6 +61,7 @@ export function RequirementDetailDialog({
   onReject,
   onEditSubmit,
   onReadPrototype,
+  onOpenPrototype,
 }: RequirementDetailDialogProps) {
   const { t, i18n } = useTranslation('requirement')
   const [editing, setEditing] = useState(false)
@@ -284,20 +290,28 @@ export function RequirementDetailDialog({
                 <label className="text-xs font-medium text-text-secondary">
                   {t('detail.prototype')}
                 </label>
-                {prototypeHtml && (
-                  <button
-                    onClick={() => {
-                      const w = window.open('', '_blank')
-                      if (w) w.document.write(prototypeHtml)
-                    }}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-text-secondary hover:text-text-primary hover:bg-background-hover rounded transition-all"
-                    title={t('detail.prototypeNewTab')}
-                    aria-label={t('detail.prototypeNewTab')}
-                  >
-                    <ExternalLink size={12} />
-                    {t('detail.prototypeNewTab')}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {prototypeHtml && (
+                    <button
+                      onClick={async () => {
+                        // 优先使用 onOpenPrototype 打开原型文件
+                        if (onOpenPrototype && requirement.prototypePath) {
+                          try {
+                            await onOpenPrototype(requirement.prototypePath)
+                          } catch (e) {
+                            log.error('打开原型文件失败:', e instanceof Error ? e : new Error(String(e)))
+                          }
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-text-secondary hover:text-text-primary hover:bg-background-hover rounded transition-all"
+                      title={t('detail.prototypeNewTab')}
+                      aria-label={t('detail.prototypeNewTab')}
+                    >
+                      <ExternalLink size={12} />
+                      {t('detail.prototypeNewTab')}
+                    </button>
+                  )}
+                </div>
               </div>
               {loadingPrototype ? (
                 <div className="flex items-center justify-center py-8 text-text-tertiary">
