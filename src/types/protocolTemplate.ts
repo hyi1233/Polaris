@@ -475,6 +475,135 @@ export const BUILTIN_PROTOCOL_TEMPLATES: ProtocolTemplate[] = [
     createdAt: 0,
     updatedAt: 0,
   },
+  {
+    id: 'req-executor',
+    name: '需求执行器',
+    description: '从需求队列获取已批准的需求，按优先级执行并记录结果。支持分步执行、状态追踪、执行日志记录',
+    category: 'requirement',
+    builtin: true,
+    missionTemplate: '从需求队列获取已批准需求并执行。\n\n{executionScope}',
+    fullTemplate: `从需求队列中获取已批准（approved）的需求，执行实现并记录结果。
+
+## 执行范围
+
+{executionScope}
+
+## 每次执行需求数量
+
+{maxRequirements}
+
+---
+
+## 执行规则
+
+每次触发时按以下顺序执行：
+
+### 1. 获取待执行需求
+- 读取 \`.polaris/requirements/requirements.json\`
+- 筛选 \`status === "approved"\` 的需求
+- 按优先级排序：\`urgent > high > normal > low\`
+- 同优先级按 \`updatedAt\` 升序（先批准先执行）
+- 若无已批准需求，静默跳过本次执行
+
+### 2. 开始执行需求
+对每个获取到的需求：
+
+#### 2.1 状态更新
+- 将需求 \`status\` 更新为 \`"executing"\`
+- 写入 \`executedAt\` 为当前时间戳
+- 写回 JSON 文件
+
+#### 2.2 执行分析
+- 阅读需求描述，理解需求目标
+- 分析相关代码，了解当前实现
+- 设计实现方案
+- 编写代码实现
+- 测试验证
+
+#### 2.3 记录执行结果
+执行完成后更新需求：
+- **成功**: \`status\` 设为 \`"completed"\`，\`completedAt\` 设为当前时间戳
+- **失败**: \`status\` 设为 \`"failed"\`，\`executeError\` 记录错误信息
+- 无论成功失败，\`executeLog\` 记录执行过程和结果
+- 更新 \`updatedAt\`
+
+### 3. 分步执行支持
+如果需求复杂无法一次完成：
+- 保持 \`status === "executing"\`
+- 将当次进度写入 \`executeLog\`（追加模式）
+- 下次定时触发时继续执行
+- 直至完成或失败
+
+---
+
+## 需求文件格式
+
+文件路径：\`.polaris/requirements/requirements.json\`（相对于工作区根目录）
+
+\`\`\`json
+{
+  "version": "1.0.0",
+  "updatedAt": "<ISO 8601 时间>",
+  "requirements": [...]
+}
+\`\`\`
+
+### 关键字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | string | 需求状态：pending/approved/executing/completed/failed |
+| priority | string | 优先级：urgent/high/normal/low |
+| executeLog | string | 执行日志（Markdown 格式） |
+| executedAt | number | 开始执行时间戳 |
+| completedAt | number | 完成时间戳 |
+| executeError | string | 执行失败错误信息 |
+
+### 文件操作规则
+
+1. 读取 JSON 文件，解析需求列表
+2. 找到目标需求，更新相关字段
+3. 更新 \`updatedAt\` 为当前 ISO 时间
+4. 写回文件（保持 JSON 格式化，缩进 2 空格）
+
+---
+
+## 注意事项
+
+- 每次最多执行 {maxRequirements} 条需求
+- 执行前先检查需求状态，避免重复执行
+- 执行过程要写入 \`executeLog\`，便于追踪进度
+- 如果代码修改需要提交 Git，执行完成后自动提交
+- 遇到阻塞问题时，记录到 \`executeLog\` 并继续下一条需求`,
+    templateParams: [
+      {
+        key: 'executionScope',
+        label: '执行范围',
+        type: 'textarea',
+        required: false,
+        default: '不限模块，按优先级全局选取',
+        placeholder: '描述执行范围，如：仅执行 high 以上优先级的需求，或限定特定标签的需求',
+      },
+      {
+        key: 'maxRequirements',
+        label: '每次执行数量上限',
+        type: 'select',
+        required: true,
+        default: '1',
+        options: [
+          { value: '1', label: '1 条（推荐）' },
+          { value: '2', label: '2 条' },
+          { value: '3', label: '3 条' },
+          { value: '5', label: '5 条' },
+        ],
+      },
+    ],
+    defaultTriggerType: 'interval',
+    defaultTriggerValue: '1h',
+    defaultEngineId: 'claude',
+    createdAt: 0,
+    updatedAt: 0,
+  },
 ];
 
 /** 模板参数定义 - 用于动态生成输入框 */
