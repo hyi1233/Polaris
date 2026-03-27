@@ -66,7 +66,7 @@ export function RequirementCard({
 
   const style = statusStyleConfig[requirement.status]
   const priorityStyle = priorityStyleConfig[requirement.priority] || priorityStyleConfig.normal
-  const canReview = requirement.status === 'pending'
+  const canReview = requirement.status === 'pending' || requirement.status === 'draft'
 
   return (
     <div

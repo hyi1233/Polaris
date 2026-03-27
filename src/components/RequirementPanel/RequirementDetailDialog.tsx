@@ -73,7 +73,7 @@ export function RequirementDetailDialog({
   if (!open) return null
 
   const style = statusStyleMap[requirement.status] || statusStyleMap.draft
-  const canReview = requirement.status === 'pending'
+  const canReview = requirement.status === 'pending' || requirement.status === 'draft'
 
   // 加载原型
   const loadPrototype = async () => {
@@ -95,8 +95,8 @@ export function RequirementDetailDialog({
       setPrototypeHtml(null)
       loadPrototype()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, requirement.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, requirement.id, requirement.prototypePath])
 
   const formatTime = (ts: number) =>
     new Date(ts).toLocaleString('zh-CN', {

@@ -212,7 +212,7 @@ export class RequirementService {
 
     // 状态转换：记录审核时间
     if ((updates.status === 'approved' || updates.status === 'rejected') &&
-        original.status === 'pending') {
+        (original.status === 'pending' || original.status === 'draft')) {
       this.requirements[index].reviewedAt = Date.now()
     }
 

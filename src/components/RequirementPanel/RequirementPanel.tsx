@@ -84,7 +84,8 @@ export function RequirementPanel() {
 
   // Dialog 状态
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedRequirement = selectedId ? requirements.find(r => r.id === selectedId) ?? null : null
 
   // 初始化：工作区驱动，工作区变化时重新加载
   useEffect(() => {
@@ -289,8 +290,8 @@ export function RequirementPanel() {
             onApproveClick={handleApprove}
             onRejectClick={handleReject}
             onDeleteClick={handleDelete}
-            onEditClick={req => setSelectedRequirement(req)}
-            onClick={req => setSelectedRequirement(req)}
+            onEditClick={req => setSelectedId(req.id)}
+            onClick={req => setSelectedId(req.id)}
           />
         ))}
 
@@ -329,7 +330,7 @@ export function RequirementPanel() {
         <RequirementDetailDialog
           requirement={selectedRequirement}
           open={!!selectedRequirement}
-          onClose={() => setSelectedRequirement(null)}
+          onClose={() => setSelectedId(null)}
           onEditSubmit={async (data) => {
             try {
               await updateRequirement(selectedRequirement.id, data)
@@ -341,7 +342,7 @@ export function RequirementPanel() {
           onDelete={async () => {
             try {
               await deleteRequirement(selectedRequirement.id)
-              setSelectedRequirement(null)
+              setSelectedId(null)
             } catch (e) {
               log.error('删除需求失败', e instanceof Error ? e : new Error(String(e)))
               alert(t('toast.deleteFailed'))
