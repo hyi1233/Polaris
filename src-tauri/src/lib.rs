@@ -1,15 +1,15 @@
-mod error;
-mod models;
-mod services;
-mod commands;
+pub mod error;
+pub mod models;
+pub mod services;
+pub mod commands;
 mod integrations;
 mod ai;
 mod state;
 mod utils;
 
 pub use state::AppState;
+pub use error::{AppError, Result};
 
-use error::Result;
 use models::config::{Config, HealthStatus};
 use services::config_store::ConfigStore;
 use services::logger::Logger;
@@ -91,6 +91,7 @@ use commands::terminal::{
     terminal_create, terminal_write, terminal_resize,
     terminal_close, terminal_list, terminal_get,
 };
+use commands::diagnostics::get_todo_mcp_diagnostics;
 
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
@@ -318,6 +319,8 @@ pub fn run() {
             // 健康检查
             health_check,
             detect_claude,
+            // MCP 诊断
+            get_todo_mcp_diagnostics,
             // 聊天相关（统一接口）
             start_chat,
             continue_chat,

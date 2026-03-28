@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.polaris.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "cargo build --manifest-path src-tauri/Cargo.toml --bin polaris-todo-mcp && npm run build:mcp && npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && cargo build --manifest-path src-tauri/Cargo.toml --release --bin polaris-todo-mcp",
     "frontendDist": "../dist"
   },
   "app": {
@@ -26,14 +26,12 @@
       "csp": null
     }
   },
-  "plugins": {
-    "dialog": null,
-    "opener": null,
-    "notification": null
-  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "target/release/polaris-todo-mcp.exe"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

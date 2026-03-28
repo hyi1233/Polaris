@@ -12,7 +12,7 @@ use crate::ai::{SessionMeta, HistoryMessage, ClaudeHistoryProvider, IFlowHistory
 use crate::error::{AppError, Result};
 use crate::models::AIEvent;
 use crate::services::mcp_config_service::WorkspaceMcpConfigService;
-use tauri::{Emitter, State, Window};
+use tauri::{Emitter, Manager, State, Window};
 use tauri_plugin_notification::NotificationExt;
 
 #[cfg(windows)]
@@ -138,7 +138,7 @@ fn save_attachments(work_dir: &str, attachments: &[Attachment]) -> Result<Vec<St
     Ok(saved_image_paths)
 }
 
-fn prepare_mcp_config_path(options: &ChatRequestOptions, engine: &EngineId) -> Result<Option<String>> {
+fn prepare_mcp_config_path(options: &ChatRequestOptions, engine: &EngineId, window: &Window) -> Result<Option<String>> {
     let enable_mcp_tools = options.enable_mcp_tools.unwrap_or(false);
     if !enable_mcp_tools || !matches!(engine, EngineId::ClaudeCode) {
         return Ok(None);
@@ -153,8 +153,9 @@ fn prepare_mcp_config_path(options: &ChatRequestOptions, engine: &EngineId) -> R
         .parent()
         .ok_or_else(|| AppError::ProcessError("无法确定应用根目录".to_string()))?
         .to_path_buf();
+    let resource_dir = window.path().resource_dir().ok();
 
-    let service = WorkspaceMcpConfigService::new(app_root);
+    let service = WorkspaceMcpConfigService::from_app_paths(resource_dir, app_root)?;
     let config_path = service.prepare_todo_config(work_dir)?;
     Ok(Some(config_path.to_string_lossy().to_string()))
 }
@@ -200,7 +201,7 @@ pub async fn start_chat(
         .unwrap_or(EngineId::ClaudeCode);
 
     tracing::info!("[start_chat] 使用引擎: {:?}", engine);
-    let mcp_config_path = prepare_mcp_config_path(&options, &engine)?;
+    let mcp_config_path = prepare_mcp_config_path(&options, &engine, &window)?;
 
     let window_clone = window.clone();
     let ctx_id = options.context_id.clone();
@@ -303,7 +304,7 @@ pub async fn continue_chat(
         .ok_or_else(|| AppError::ValidationError("必须提供有效的 engine_id".to_string()))?;
 
     tracing::info!("[continue_chat] 使用引擎: {:?}", engine);
-    let mcp_config_path = prepare_mcp_config_path(&options, &engine)?;
+    let mcp_config_path = prepare_mcp_config_path(&options, &engine, &window)?;
 
     let window_clone = window.clone();
     let ctx_id = options.context_id.clone();

@@ -4,8 +4,11 @@ pub mod git;
 pub mod logger;
 pub mod iflow_service;
 pub mod mcp_config_service;
+pub mod mcp_diagnostics_service;
 pub mod openai_proxy;
 pub mod openai_service;
 pub mod prompt_store;
 pub mod scheduler;
+pub mod todo_repository;
+pub mod todo_mcp_server;
 

@@ -10,6 +10,7 @@ pub mod integration;
 pub mod scheduler;
 pub mod terminal;
 pub mod file_watcher;
+pub mod diagnostics;
 
 // 重新导出命令函数，确保它们在模块级别可见
 pub use workspace::validate_workspace_path;

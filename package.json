@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run build:mcp",
     "build:mcp": "node ./scripts/build-mcp.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
