@@ -25,6 +25,32 @@ interface MarkdownEditorProps {
 /** 视图模式 */
 type ViewMode = 'edit' | 'preview' | 'split';
 
+/** TOC 标题项 */
+interface TocHeading {
+  level: number;
+  text: string;
+  id: string;
+}
+
+/** 从 Markdown 源码提取标题列表 */
+function extractHeadings(content: string): TocHeading[] {
+  const result: TocHeading[] = [];
+  for (const line of content.split('\n')) {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      const text = match[2]
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/`(.+?)`/g, '$1')
+        .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+        .replace(/~~(.+?)~~/g, '$1')
+        .trim();
+      result.push({ level: match[1].length, text, id: `toc-h-${result.length}` });
+    }
+  }
+  return result;
+}
+
 // 配置 marked
 marked.setOptions({
   breaks: true,  // 支持 GFM 换行
@@ -57,6 +83,7 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [showToc, setShowToc] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -64,7 +91,10 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
   // 预览渲染
   const previewParts = useMemo(() => splitMarkdownWithMermaid(value), [value]);
 
-  // 代码块语法高亮
+  // TOC 目录
+  const tocHeadings = useMemo(() => extractHeadings(value), [value]);
+
+  // 代码高亮 + 为标题元素赋 ID（用于 TOC 跳转）
   useEffect(() => {
     if (viewMode === 'edit' || !previewRef.current) return;
     previewRef.current.querySelectorAll('pre code').forEach((block) => {
@@ -73,6 +103,8 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
         hljs.highlightElement(el);
       }
     });
+    const domHeadings = previewRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    domHeadings.forEach((h, i) => { h.id = `toc-h-${i}`; });
   }, [previewParts, viewMode]);
 
   // 分隔条拖拽
@@ -103,6 +135,11 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
     setIsDraggingSplit(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+  }, []);
+
+  const scrollToHeading = useCallback((id: string) => {
+    const el = previewRef.current?.querySelector(`#${id}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   const showEditor = viewMode === 'edit' || viewMode === 'split';
@@ -149,6 +186,20 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
         </div>
 
         <div className="flex-1" />
+
+        {showPreview && tocHeadings.length > 0 && (
+          <button
+            className={`px-2 py-1 text-xs rounded-md border transition-all ${
+              showToc
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-border-subtle text-text-tertiary hover:text-text-primary'
+            }`}
+            onClick={() => setShowToc(!showToc)}
+            title="目录"
+          >
+            大纲
+          </button>
+        )}
       </div>
 
       {/* 内容区域 */}
@@ -179,33 +230,56 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
           />
         )}
 
-        {/* 预览面板 */}
+        {/* 预览区域（含 TOC） */}
         {showPreview && (
           <div
-            ref={previewRef}
-            className="overflow-auto bg-background-base"
+            className="flex overflow-hidden"
             style={viewMode === 'split' ? { width: `${(1 - splitRatio) * 100}%` } : { flex: 1 }}
           >
-            <div className="max-w-none px-6 py-4 prose prose-invert prose-sm">
-              {previewParts.map((part: any, index: number) => {
-                if (part.type === 'mermaid') {
+            {/* TOC 目录侧边栏 */}
+            {showToc && tocHeadings.length > 0 && (
+              <div className="w-[160px] flex-shrink-0 border-r border-border-subtle bg-background-elevated overflow-y-auto p-3">
+                <div className="text-[10px] text-text-quaternary uppercase tracking-wider mb-2">目录</div>
+                {tocHeadings.map((h) => (
+                  <button
+                    key={h.id}
+                    className="block text-[11px] text-text-tertiary hover:text-primary transition-colors truncate w-full text-left py-0.5"
+                    style={{ paddingLeft: `${(h.level - 1) * 12}px` }}
+                    onClick={() => scrollToHeading(h.id)}
+                    title={h.text}
+                  >
+                    {h.text}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 预览内容 */}
+            <div
+              ref={previewRef}
+              className="flex-1 overflow-auto bg-background-base"
+            >
+              <div className="max-w-none px-6 py-4 prose prose-invert prose-sm">
+                {previewParts.map((part: any, index: number) => {
+                  if (part.type === 'mermaid') {
+                    return (
+                      <div key={`mermaid-${part.id || index}`}>
+                        <MermaidDiagram
+                          code={part.content}
+                          id={part.id || `mermaid-${index}`}
+                        />
+                      </div>
+                    );
+                  }
+                  const html = formatContent(part.content);
                   return (
-                    <div key={`mermaid-${part.id || index}`}>
-                      <MermaidDiagram
-                        code={part.content}
-                        id={part.id || `mermaid-${index}`}
-                      />
-                    </div>
+                    <div
+                      key={`text-${index}`}
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
                   );
-                }
-                const html = formatContent(part.content);
-                return (
-                  <div
-                    key={`text-${index}`}
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  />
-                );
-              })}
+                })}
+              </div>
             </div>
           </div>
         )}
