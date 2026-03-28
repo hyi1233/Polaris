@@ -5,5 +5,6 @@ pub mod logger;
 pub mod iflow_service;
 pub mod openai_proxy;
 pub mod openai_service;
+pub mod prompt_store;
 pub mod scheduler;
 

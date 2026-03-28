@@ -2,6 +2,7 @@
  *
  * 支持的命令：
  * - 模型切换: /claude, /iflow, /codex, /openai, /agent
+ * - 提示词预设: /preset <preset_id>, /preset list, /preset default
  * - 中断对话: /stop, /end, /停止
  * - 状态查询: /status, /状态
  * - 工作目录: /path <目录>, /路径 <目录>
@@ -33,6 +34,12 @@ pub enum BotCommand {
         custom_prompt: Option<String>,
         replace_mode: bool,
     },
+    /// 切换提示词预设
+    SwitchPreset {
+        preset_id: Option<String>,
+    },
+    /// 列出可用预设
+    ListPresets,
     /// 中断当前对话
     Interrupt,
     /// 查询状态
@@ -142,6 +149,22 @@ impl CommandParser {
 
             // 帮助
             "help" | "帮助" => Some(BotCommand::Help),
+
+            // 提示词预设
+            "preset" | "预设" => {
+                if parts.len() > 1 {
+                    let sub_cmd = parts[1].to_lowercase();
+                    match sub_cmd.as_str() {
+                        "list" | "列表" => Some(BotCommand::ListPresets),
+                        "default" | "默认" => Some(BotCommand::SwitchPreset { preset_id: None }),
+                        _ => Some(BotCommand::SwitchPreset {
+                            preset_id: Some(parts[1..].join(" ")),
+                        }),
+                    }
+                } else {
+                    Some(BotCommand::ListPresets)
+                }
+            }
 
             // 未知命令
             _ => Some(BotCommand::Unknown),
@@ -254,6 +277,9 @@ pub struct ConversationState {
     pub ai_session_id: Option<String>,
     /// 工作目录
     pub work_dir: Option<String>,
+    /// 提示词预设 ID
+    #[serde(default)]
+    pub prompt_preset_id: Option<String>,
     /// 自定义提示词
     pub custom_prompt: Option<String>,
     /// 提示词模式
@@ -285,6 +311,7 @@ impl ConversationState {
             engine_id: "claude".to_string(),
             ai_session_id: None,
             work_dir: None,
+            prompt_preset_id: None,
             custom_prompt: None,
             prompt_mode: PromptMode::default(),
             last_activity: Utc::now().timestamp_millis(),
@@ -304,6 +331,7 @@ impl ConversationState {
     /// 重置状态
     pub fn reset(&mut self) {
         self.ai_session_id = None;
+        self.prompt_preset_id = None;
         self.custom_prompt = None;
         self.prompt_mode = PromptMode::default();
         self.message_count = 0;
@@ -375,6 +403,13 @@ pub fn get_help_text() -> String {
 • 示例: `/claude 你是Python专家`
 • 示例: `/openai qwen 你是专家`
 
+**提示词预设**
+`/preset <预设名>` - 切换提示词预设
+`/preset list` - 列出可用预设
+`/preset default` - 恢复默认预设
+• 示例: `/preset minimal` 使用精简预设
+• 示例: `/preset full` 使用完整预设
+
 **会话控制**
 `/stop` - 中断当前对话
 `/restart` - 重置会话
@@ -439,6 +474,34 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_preset() {
+        // 列出预设
+        let cmd = CommandParser::parse("/preset list");
+        assert!(matches!(cmd, Some(BotCommand::ListPresets)));
+
+        let cmd = CommandParser::parse("/预设 列表");
+        assert!(matches!(cmd, Some(BotCommand::ListPresets)));
+
+        // 切换预设
+        let cmd = CommandParser::parse("/preset minimal");
+        assert!(matches!(
+            cmd,
+            Some(BotCommand::SwitchPreset { preset_id: Some(_) })
+        ));
+
+        // 恢复默认
+        let cmd = CommandParser::parse("/preset default");
+        assert!(matches!(
+            cmd,
+            Some(BotCommand::SwitchPreset { preset_id: None })
+        ));
+
+        // 无参数显示列表
+        let cmd = CommandParser::parse("/preset");
+        assert!(matches!(cmd, Some(BotCommand::ListPresets)));
+    }
+
+    #[test]
     fn test_parse_interrupt() {
         assert!(matches!(CommandParser::parse("/stop"), Some(BotCommand::Interrupt)));
         assert!(matches!(CommandParser::parse("/end"), Some(BotCommand::Interrupt)));
@@ -490,5 +553,17 @@ mod tests {
     fn test_unknown_command() {
         // 未知命令返回 None（作为普通消息处理）
         assert!(CommandParser::parse("/unknown").is_none());
+    }
+
+    #[test]
+    fn test_conversation_state_preset() {
+        let mut state = ConversationState::new("test");
+        assert!(state.prompt_preset_id.is_none());
+
+        state.prompt_preset_id = Some("preset-minimal".to_string());
+        assert_eq!(state.prompt_preset_id, Some("preset-minimal".to_string()));
+
+        state.reset();
+        assert!(state.prompt_preset_id.is_none());
     }
 }

@@ -20,6 +20,7 @@ use super::instance_registry::{InstanceRegistry, PlatformInstance, InstanceConfi
 use crate::ai::{EngineRegistry, SessionOptions};
 use crate::error::Result;
 use crate::models::config::QQBotConfig;
+use crate::services::prompt_store::PromptStore;
 
 /// 集成管理器
 pub struct IntegrationManager {
@@ -317,6 +318,12 @@ impl IntegrationManager {
                     lines.push(format!("🤖 模型: {}", state.engine_id));
                     lines.push(format!("📁 工作目录: {}", state.work_dir.as_deref().unwrap_or("默认")));
                     lines.push(format!("💬 消息数: {}", state.message_count));
+
+                    // 显示预设信息
+                    if let Some(ref preset_id) = state.prompt_preset_id {
+                        lines.push(format!("🎯 预设: {}", preset_id));
+                    }
+
                     if let Some(ref prompt) = state.custom_prompt {
                         lines.push(format!("📝 提示词: {}...", &prompt[..prompt.len().min(30)]));
                     }
@@ -397,6 +404,37 @@ impl IntegrationManager {
                 Some("✅ 会话已重置".to_string())
             }
 
+            BotCommand::SwitchPreset { preset_id } => {
+                // 切换提示词预设
+                let mut states = conversation_states.lock().await;
+                let state = states.get_or_create(conversation_id);
+
+                match preset_id {
+                    Some(id) => {
+                        state.prompt_preset_id = Some(id.clone());
+                        Some(format!("✅ 已切换到预设: {}", id))
+                    }
+                    None => {
+                        // 恢复默认预设
+                        state.prompt_preset_id = None;
+                        Some("✅ 已恢复默认提示词".to_string())
+                    }
+                }
+            }
+
+            BotCommand::ListPresets => {
+                // 列出可用预设
+                Some(
+                    "📋 **可用提示词预设**\n\n\
+                    • `default` - 默认预设（完整功能）\n\
+                    • `minimal` - 精简预设（仅工作区信息）\n\
+                    • `full` - 完整预设（所有模块）\n\n\
+                    使用 `/preset <预设名>` 切换预设\n\
+                    使用 `/preset default` 恢复默认"
+                        .to_string(),
+                )
+            }
+
             BotCommand::Help => {
                 Some(get_help_text())
             }
@@ -446,14 +484,48 @@ impl IntegrationManager {
 
             // 构建系统提示词
             let default_prompt = "你是一个友好的助手，通过 QQ 回复用户消息。回复简洁、有帮助。";
-            let system_prompt = match &state.custom_prompt {
-                Some(custom) => {
-                    match state.prompt_mode {
-                        PromptMode::Append => format!("{}\n\n{}", default_prompt, custom),
-                        PromptMode::Replace => custom.clone(),
+
+            // 优先使用预设提示词，其次使用自定义提示词
+            let system_prompt = if let Some(ref preset_id) = state.prompt_preset_id {
+                // 使用预设构建提示词
+                let work_dir_path = state.work_dir.clone().unwrap_or_else(|| ".".to_string());
+                match Self::build_prompt_from_preset(preset_id, &work_dir_path) {
+                    Some(preset_prompt) => {
+                        // 如果有自定义提示词，追加到预设后面
+                        match &state.custom_prompt {
+                            Some(custom) => {
+                                match state.prompt_mode {
+                                    PromptMode::Append => format!("{}\n\n{}", preset_prompt, custom),
+                                    PromptMode::Replace => custom.clone(),
+                                }
+                            }
+                            None => preset_prompt,
+                        }
+                    }
+                    None => {
+                        // 预设不存在，使用默认逻辑
+                        match &state.custom_prompt {
+                            Some(custom) => {
+                                match state.prompt_mode {
+                                    PromptMode::Append => format!("{}\n\n{}", default_prompt, custom),
+                                    PromptMode::Replace => custom.clone(),
+                                }
+                            }
+                            None => default_prompt.to_string(),
+                        }
                     }
                 }
-                None => default_prompt.to_string(),
+            } else {
+                // 没有预设，使用默认逻辑
+                match &state.custom_prompt {
+                    Some(custom) => {
+                        match state.prompt_mode {
+                            PromptMode::Append => format!("{}\n\n{}", default_prompt, custom),
+                            PromptMode::Replace => custom.clone(),
+                        }
+                    }
+                    None => default_prompt.to_string(),
+                }
             };
 
             let session_id = state.ai_session_id.clone();
@@ -1103,6 +1175,41 @@ impl IntegrationManager {
         }
 
         Ok(())
+    }
+
+    /// 从预设构建提示词
+    fn build_prompt_from_preset(preset_id: &str, work_dir: &str) -> Option<String> {
+        use std::path::Path;
+
+        let work_path = Path::new(work_dir);
+        match PromptStore::from_work_dir(work_path) {
+            Ok(store) => {
+                // 检查预设是否存在
+                if store.get_preset(preset_id).is_none() {
+                    tracing::warn!("[IntegrationManager] 预设不存在: {}", preset_id);
+                    return None;
+                }
+
+                // 构建变量表
+                let mut variables = std::collections::HashMap::new();
+                variables.insert("workspace_path".to_string(), work_dir.to_string());
+                variables.insert("workspace_name".to_string(),
+                    work_path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("workspace")
+                        .to_string()
+                );
+
+                // 构建提示词
+                let prompt = store.build_prompt(preset_id, &variables);
+                tracing::info!("[IntegrationManager] 📝 从预设 '{}' 构建提示词, 长度: {}", preset_id, prompt.len());
+                Some(prompt)
+            }
+            Err(e) => {
+                tracing::warn!("[IntegrationManager] 无法加载提示词配置: {:?}", e);
+                None
+            }
+        }
     }
 }
 
