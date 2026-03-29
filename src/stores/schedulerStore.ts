@@ -391,6 +391,15 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
           level: 'info',
           message,
         });
+      } else if (type === 'thinking') {
+        // 思考过程
+        const content = event?.content as string | undefined;
+        if (content) {
+          get().addExecutionLog(taskId, {
+            level: 'debug',
+            message: `[思考] ${content}`,
+          });
+        }
       } else if (type === 'assistant_message' || type === 'assistant') {
         // AI 响应内容
         const content = event?.content as string | undefined;
@@ -400,23 +409,29 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
             message: content,
           });
         }
+        // toolCalls 通过单独的 tool_call_start 事件处理，这里不重复处理
       } else if (type === 'tool_call_start') {
         // 工具调用开始
-        const toolName = (event?.toolName as string) || (event?.name as string) || 'unknown';
+        // 支持多种字段名: tool, toolName, name
+        const toolName = (event?.tool as string) || (event?.toolName as string) || (event?.name as string) || 'unknown';
+        const args = event?.args as Record<string, unknown> | undefined;
+
         get().addExecutionLog(taskId, {
           level: 'info',
-          message: `调用工具: ${toolName}`,
+          message: `🔧 调用工具: ${toolName}`,
         });
         get().addToolCall(taskId, {
           name: toolName,
-          args: event?.args as Record<string, unknown> | undefined,
+          args,
         });
       } else if (type === 'tool_call_end') {
         // 工具调用结束
-        const toolName = (event?.toolName as string) || (event?.name as string) || 'unknown';
+        const toolName = (event?.tool as string) || (event?.toolName as string) || (event?.name as string) || 'unknown';
+        const success = event?.success !== false;
+
         get().addExecutionLog(taskId, {
-          level: 'info',
-          message: `工具完成: ${toolName}`,
+          level: success ? 'info' : 'error',
+          message: success ? `✅ ${toolName}` : `❌ ${toolName}`,
         });
       } else if (type === 'session_end') {
         // 会话结束
