@@ -11,14 +11,16 @@
  * - 语音识别按钮
  */
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEventChatStore, useConfigStore, useChatInputStore } from '../../stores';
-import { MessageSquare, Wrench, Clock, Paperclip } from 'lucide-react';
+import { MessageSquare, Wrench, Clock, Paperclip, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { IconMic } from '../Common/Icons';
+import { IconMic, IconVolume, IconVolumeX } from '../Common/Icons';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
-import type { SpeechConfig, VoiceCommand } from '../../types/speech';
+import { useTTS } from '../../hooks/useTTS';
+import type { SpeechConfig, VoiceCommand, TTSConfig } from '../../types/speech';
+import { DEFAULT_TTS_CONFIG } from '../../types/speech';
 
 interface ChatStatusBarProps {
   /** 是否紧凑模式 */
@@ -54,7 +56,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
   const currentMessage = useEventChatStore(state => state.currentMessage);
   const isStreaming = useEventChatStore(state => state.isStreaming);
   const interruptChat = useEventChatStore(state => state.interruptChat);
-  const { config, healthStatus } = useConfigStore();
+  const { config, healthStatus, updateConfig } = useConfigStore();
   const {
     inputLength,
     attachmentCount,
@@ -70,6 +72,41 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
   // 语音识别配置
   const speechConfig = config?.speech as SpeechConfig | undefined;
   const speechEnabled = speechConfig?.enabled ?? true;
+
+  // TTS 配置
+  const ttsConfig = config?.tts as TTSConfig | undefined;
+  const ttsEnabled = ttsConfig?.enabled ?? false;
+
+  // TTS Hook
+  const {
+    status: ttsStatus,
+    stop: stopTTS,
+  } = useTTS();
+
+  // 处理 TTS 按钮点击
+  const handleTTSClick = useCallback(() => {
+    if (!config) return;
+
+    if (ttsStatus === 'playing') {
+      // 正在播放 → 停止
+      stopTTS();
+    } else if (ttsStatus === 'paused') {
+      // 已暂停 → 关闭 TTS 设置
+      stopTTS();
+      updateConfig({
+        ...config,
+        tts: { ...(ttsConfig || DEFAULT_TTS_CONFIG), enabled: false },
+      });
+    } else if (ttsStatus === 'idle' || ttsStatus === 'error') {
+      if (!ttsEnabled) {
+        // 空闲且未开启 → 自动开启 TTS 设置
+        updateConfig({
+          ...config,
+          tts: { ...(ttsConfig || DEFAULT_TTS_CONFIG), enabled: true },
+        });
+      }
+    }
+  }, [ttsStatus, stopTTS, ttsEnabled, ttsConfig, config, updateConfig]);
 
   // 语音识别 Hook
   const {
@@ -254,6 +291,36 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
             </button>
           </div>
         )}
+
+        {/* TTS 播放控制 */}
+        <button
+          onClick={handleTTSClick}
+          disabled={ttsStatus === 'synthesizing'}
+          className={clsx(
+            'flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors',
+            ttsStatus === 'playing' && 'bg-primary/10 text-primary',
+            ttsStatus === 'paused' && 'text-text-secondary hover:text-text-primary hover:bg-background-hover',
+            ttsStatus === 'synthesizing' && 'text-warning cursor-wait',
+            (ttsStatus === 'idle' || ttsStatus === 'error') && (ttsEnabled
+              ? 'text-text-muted cursor-not-allowed'
+              : 'text-text-tertiary hover:text-text-primary hover:bg-background-hover'
+            )
+          )}
+          title={
+            ttsStatus === 'playing' ? t('tts.stop', '停止播放') :
+            ttsStatus === 'paused' ? t('tts.disable', '关闭语音播放') :
+            ttsStatus === 'synthesizing' ? t('tts.synthesizing', '合成中...') :
+            ttsEnabled ? t('tts.idle', '语音播放') : t('tts.enable', '开启语音播放')
+          }
+        >
+          {ttsStatus === 'synthesizing' && <Loader2 size={14} className="animate-spin" />}
+          {(ttsStatus === 'playing' || ttsStatus === 'paused') && (
+            <IconVolume size={14} className={ttsStatus === 'playing' ? 'animate-pulse' : ''} />
+          )}
+          {(ttsStatus === 'idle' || ttsStatus === 'error') && (
+            <IconVolumeX size={14} />
+          )}
+        </button>
 
         {/* 输入状态提示 */}
         {inputHint && (
