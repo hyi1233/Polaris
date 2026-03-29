@@ -30,12 +30,12 @@ function formatRelativeTime(timestamp: number | undefined, t: (key: string, opti
 /** 状态徽章 */
 function StatusBadge({ status }: { status?: 'running' | 'success' | 'failed' }) {
   const { t } = useTranslation('scheduler');
-  if (!status) return <span className="text-gray-400">{t('status.notExecuted')}</span>;
+  if (!status) return <span className="text-text-muted">{t('status.notExecuted')}</span>;
 
   const styles = {
-    running: 'bg-blue-500/20 text-blue-400',
-    success: 'bg-green-500/20 text-green-400',
-    failed: 'bg-red-500/20 text-red-400',
+    running: 'bg-info-faint text-info',
+    success: 'bg-success-faint text-success',
+    failed: 'bg-danger-faint text-danger',
   };
 
   const labels = {
@@ -79,16 +79,16 @@ function TaskCard({
   // 紧凑模式
   if (isCompact) {
     return (
-      <div className={`bg-[#1a1a2e] rounded-lg p-3 border border-[#2a2a4a] ${!task.enabled ? 'opacity-70' : ''}`}>
+      <div className={`bg-background-surface rounded-lg p-3 border border-border-subtle ${!task.enabled ? 'opacity-70' : ''}`}>
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${task.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
-            <h3 className="text-white text-sm font-medium truncate">{task.name}</h3>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${task.enabled ? 'bg-success' : 'bg-text-muted'}`} />
+            <h3 className="text-text-primary text-sm font-medium truncate">{task.name}</h3>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <DropdownMenu
               trigger={
-                <button className="w-7 h-7 flex items-center justify-center bg-gray-600/20 text-gray-300 hover:bg-gray-600/30 rounded transition-colors text-xs">
+                <button className="w-7 h-7 flex items-center justify-center bg-background-hover text-text-secondary hover:bg-background-active rounded transition-colors text-xs">
                   ⋯
                 </button>
               }
@@ -97,11 +97,11 @@ function TaskCard({
             />
           </div>
         </div>
-        <div className="text-xs text-gray-500 flex items-center gap-2">
+        <div className="text-xs text-text-muted flex items-center gap-2">
           <StatusBadge status={task.lastRunStatus} />
           {task.enabled && task.nextRunAt && (
             <span>
-              {t('task.nextRun')}: <span className="text-cyan-400">{formatRelativeTime(task.nextRunAt, t)}</span>
+              {t('task.nextRun')}: <span className="text-primary">{formatRelativeTime(task.nextRunAt, t)}</span>
             </span>
           )}
         </div>
@@ -111,61 +111,61 @@ function TaskCard({
 
   // 正常模式
   return (
-    <div className={`bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a4a] ${!task.enabled ? 'opacity-70' : ''}`}>
+    <div className={`bg-background-surface rounded-lg p-4 border border-border-subtle ${!task.enabled ? 'opacity-70' : ''}`}>
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${task.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
-        <h3 className="text-white font-medium truncate">{task.name}</h3>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${task.enabled ? 'bg-success' : 'bg-text-muted'}`} />
+        <h3 className="text-text-primary font-medium truncate">{task.name}</h3>
         {task.description && (
-          <span className="text-xs text-gray-500 truncate">{task.description}</span>
+          <span className="text-xs text-text-muted truncate">{task.description}</span>
         )}
       </div>
 
       {/* Body */}
       <div className="mb-3">
         <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          <span className="text-gray-500">{t('task.trigger')}</span>
-          <span className="text-gray-300">{TriggerTypeLabels[task.triggerType]} - {task.triggerValue}</span>
-          <span className="text-gray-500">{t('task.engine')}</span>
-          <span className="text-gray-300">{task.engineId}</span>
+          <span className="text-text-muted">{t('task.trigger')}</span>
+          <span className="text-text-secondary">{TriggerTypeLabels[task.triggerType]} - {task.triggerValue}</span>
+          <span className="text-text-muted">{t('task.engine')}</span>
+          <span className="text-text-secondary">{task.engineId}</span>
           {task.enabled && task.nextRunAt && (
             <>
-              <span className="text-gray-500">{t('task.nextRun')}</span>
-              <span className="text-cyan-400">{formatRelativeTime(task.nextRunAt, t)}</span>
+              <span className="text-text-muted">{t('task.nextRun')}</span>
+              <span className="text-primary">{formatRelativeTime(task.nextRunAt, t)}</span>
             </>
           )}
-          <span className="text-gray-500">{t('log.stats', { defaultValue: '状态' })}</span>
+          <span className="text-text-muted">{t('log.stats', { defaultValue: '状态' })}</span>
           <span><StatusBadge status={task.lastRunStatus} /></span>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#2a2a4a] flex-wrap">
+      <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-subtle flex-wrap">
         <button
           onClick={onToggle}
           className={`px-3 py-1 text-sm rounded transition-colors ${
             task.enabled
-              ? 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30'
-              : 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+              ? 'bg-warning-faint text-warning hover:bg-warning/30'
+              : 'bg-success-faint text-success hover:bg-success/30'
           }`}
         >
           {task.enabled ? t('task.disabled') : t('task.enabled')}
         </button>
         <button
           onClick={onEdit}
-          className="px-3 py-1 text-sm bg-gray-600/20 text-gray-300 hover:bg-gray-600/30 rounded transition-colors"
+          className="px-3 py-1 text-sm bg-background-hover text-text-secondary hover:bg-background-active rounded transition-colors"
         >
           {t('task.edit')}
         </button>
         <button
           onClick={onCopy}
-          className="px-3 py-1 text-sm bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 rounded transition-colors"
+          className="px-3 py-1 text-sm bg-info-faint text-info hover:bg-info/30 rounded transition-colors"
         >
           {t('task.copy')}
         </button>
         <button
           onClick={onDelete}
-          className="px-3 py-1 text-sm bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded transition-colors"
+          className="px-3 py-1 text-sm bg-danger-faint text-danger hover:bg-danger/30 rounded transition-colors"
         >
           {t('task.delete')}
         </button>
@@ -296,36 +296,36 @@ export function SchedulerPanel() {
   };
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col bg-[#12122a]">
+    <div ref={containerRef} className="h-full flex flex-col bg-background-base">
       {/* 头部 */}
-      <div className="p-4 border-b border-[#2a2a4a] flex items-center justify-between">
-        <h1 className="text-xl font-medium text-white">{t('title')}</h1>
+      <div className="p-4 border-b border-border-subtle flex items-center justify-between">
+        <h1 className="text-xl font-medium text-text-primary">{t('title')}</h1>
         <button
           onClick={() => {
             setEditingTask(undefined);
             setCopyingTask(undefined);
             setShowEditor(true);
           }}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+          className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors"
         >
           + {t('newTask')}
         </button>
       </div>
 
       {/* 筛选栏 */}
-      <div className="p-3 border-b border-[#2a2a4a] bg-[#1a1a2e]">
+      <div className="p-3 border-b border-border-subtle bg-background-surface">
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             placeholder={t('filter.search')}
             value={filter.search}
             onChange={(e) => setFilter({ ...filter, search: e.target.value })}
-            className={`px-3 py-1.5 text-sm bg-[#12122a] border border-[#2a2a4a] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 ${isCompact ? 'w-24' : 'w-48'}`}
+            className={`px-3 py-1.5 text-sm bg-background-base border border-border-subtle rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 ${isCompact ? 'w-24' : 'w-48'}`}
           />
           <select
             value={filter.enabled}
             onChange={(e) => setFilter({ ...filter, enabled: e.target.value as TaskFilter['enabled'] })}
-            className="px-2 py-1.5 text-sm bg-[#12122a] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+            className="px-2 py-1.5 text-sm bg-background-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="all">{t('filter.allStatus')}</option>
             <option value="enabled">{t('filter.enabled')}</option>
@@ -334,7 +334,7 @@ export function SchedulerPanel() {
           <select
             value={filter.triggerType}
             onChange={(e) => setFilter({ ...filter, triggerType: e.target.value as TaskFilter['triggerType'] })}
-            className="px-2 py-1.5 text-sm bg-[#12122a] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+            className="px-2 py-1.5 text-sm bg-background-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="all">{t('filter.allTriggers')}</option>
             <option value="once">{t('triggerTypes.once')}</option>
@@ -344,7 +344,7 @@ export function SchedulerPanel() {
           <select
             value={filter.engineId}
             onChange={(e) => setFilter({ ...filter, engineId: e.target.value })}
-            className="px-2 py-1.5 text-sm bg-[#12122a] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+            className="px-2 py-1.5 text-sm bg-background-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="all">{t('filter.allEngines')}</option>
             {engineOptions.map((engine) => (
@@ -353,12 +353,12 @@ export function SchedulerPanel() {
           </select>
           <button
             onClick={() => setFilter(defaultFilter)}
-            className="px-3 py-1.5 text-sm bg-gray-600/20 text-gray-400 hover:bg-gray-600/30 rounded transition-colors"
+            className="px-3 py-1.5 text-sm bg-background-hover text-text-secondary hover:bg-background-active rounded-lg transition-colors"
           >
             {t('filter.clearFilter')}
           </button>
           {filteredTasks.length !== tasks.length && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-text-muted">
               {filteredTasks.length}/{tasks.length}
             </span>
           )}
@@ -368,9 +368,9 @@ export function SchedulerPanel() {
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <div className="text-center text-gray-500 py-8">{t('loading')}</div>
+          <div className="text-center text-text-muted py-8">{t('loading')}</div>
         ) : tasks.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">{t('empty.noTasks')}</div>
+          <div className="text-center text-text-muted py-8">{t('empty.noTasks')}</div>
         ) : (
           <div className="space-y-2">
             {filteredTasks.map((task) => (

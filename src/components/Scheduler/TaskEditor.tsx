@@ -161,13 +161,13 @@ export function TaskEditor({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[#16162a] rounded-lg w-[650px] max-h-[85vh] overflow-y-auto border border-[#2a2a4a]">
+      <div className="bg-background-elevated rounded-xl w-[650px] max-h-[85vh] overflow-y-auto border border-border-subtle shadow-soft">
         {/* 头部 */}
-        <div className="p-4 border-b border-[#2a2a4a] flex items-center justify-between sticky top-0 bg-[#16162a]">
-          <h2 className="text-lg font-medium text-white">
+        <div className="p-4 border-b border-border-subtle flex items-center justify-between sticky top-0 bg-background-elevated">
+          <h2 className="text-lg font-medium text-text-primary">
             {title || (task ? '编辑任务' : '新建任务')}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">
+          <button onClick={onClose} className="text-text-tertiary hover:text-text-primary text-xl transition-colors">
             ✕
           </button>
         </div>
@@ -175,56 +175,56 @@ export function TaskEditor({
         <div className="p-4 space-y-4">
           {/* 任务名称 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              任务名称 <span className="text-red-400">*</span>
+            <label className="block text-sm text-text-secondary mb-1">
+              任务名称 <span className="text-danger">*</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="例如：每日日报生成"
             />
           </div>
 
           {/* 任务描述 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              描述 <span className="text-gray-600">(可选)</span>
+            <label className="block text-sm text-text-secondary mb-1">
+              描述 <span className="text-text-muted">(可选)</span>
             </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="任务描述..."
             />
           </div>
 
           {/* 提示词 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              提示词 <span className="text-red-400">*</span>
+            <label className="block text-sm text-text-secondary mb-1">
+              提示词 <span className="text-danger">*</span>
             </label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={5}
-              className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
               placeholder="输入 AI 要执行的提示词..."
             />
           </div>
 
           {/* 触发类型 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">触发方式</label>
+            <label className="block text-sm text-text-secondary mb-1">触发方式</label>
             <div className="space-y-2">
               {/* 触发类型选择 */}
               <div className="flex gap-2">
                 <select
                   value={triggerType}
                   onChange={(e) => setTriggerType(e.target.value as TriggerType)}
-                  className="px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                  className="px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   {Object.entries(TriggerTypeLabels).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -241,12 +241,12 @@ export function TaskEditor({
                       value={intervalNum}
                       onChange={(e) => handleIntervalChange(parseInt(e.target.value) || 1, intervalUnit)}
                       min={1}
-                      className="w-24 px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                      className="w-24 px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                     <select
                       value={intervalUnit}
                       onChange={(e) => handleIntervalChange(intervalNum, e.target.value as 's' | 'm' | 'h' | 'd')}
-                      className="px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                      className="px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
                     >
                       {Object.entries(IntervalUnitLabels).map(([value, label]) => (
                         <option key={value} value={value}>
@@ -260,7 +260,7 @@ export function TaskEditor({
                     type="text"
                     value={triggerValue}
                     onChange={(e) => setTriggerValue(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 font-mono"
+                    className="flex-1 px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
                     placeholder="0 9 * * 1-5"
                   />
                 ) : (
@@ -268,7 +268,7 @@ export function TaskEditor({
                     type="datetime-local"
                     value={triggerValue}
                     onChange={(e) => setTriggerValue(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                    className="flex-1 px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 )}
               </div>
@@ -287,10 +287,10 @@ export function TaskEditor({
                           setTriggerValue(preset.value);
                         }
                       }}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`px-2 py-1 text-xs rounded-lg transition-colors ${
                         triggerValue === preset.value
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-[#2a2a4a] text-gray-400 hover:bg-[#3a3a5a]'
+                          ? 'bg-primary text-white'
+                          : 'bg-background-hover text-text-secondary hover:bg-background-active'
                       }`}
                     >
                       {preset.label}
@@ -304,22 +304,22 @@ export function TaskEditor({
                 <div className="space-y-2">
                   <button
                     onClick={() => setShowAdvancedTime(!showAdvancedTime)}
-                    className="text-xs text-blue-400 hover:text-blue-300"
+                    className="text-xs text-primary hover:text-primary-hover transition-colors"
                   >
                     {showAdvancedTime ? '隐藏高级选项' : '显示高级时间选项'}
                   </button>
 
                   {showAdvancedTime && (
-                    <div className="p-3 bg-[#1a1a2e] rounded border border-[#2a2a4a] space-y-3">
+                    <div className="p-3 bg-background-surface rounded-lg border border-border-subtle space-y-3">
                       {/* 每日多个时间点 */}
                       <div>
-                        <p className="text-xs text-gray-400 mb-2">每日多个时间点:</p>
+                        <p className="text-xs text-text-secondary mb-2">每日多个时间点:</p>
                         <div className="flex flex-wrap gap-1">
                           {DAILY_TIME_PRESETS.map((preset) => (
                             <button
                               key={preset.label}
                               onClick={() => applyDailyPreset(preset.hours)}
-                              className="px-2 py-1 text-xs bg-[#2a2a4a] text-gray-300 hover:bg-[#3a3a5a] rounded"
+                              className="px-2 py-1 text-xs bg-background-hover text-text-secondary hover:bg-background-active rounded-lg transition-colors"
                             >
                               {preset.label}
                             </button>
@@ -329,13 +329,13 @@ export function TaskEditor({
 
                       {/* 每小时指定分钟 */}
                       <div>
-                        <p className="text-xs text-gray-400 mb-2">每小时指定分钟:</p>
+                        <p className="text-xs text-text-secondary mb-2">每小时指定分钟:</p>
                         <div className="flex flex-wrap gap-1">
                           {HOURLY_MINUTE_PRESETS.map((preset) => (
                             <button
                               key={preset.label}
                               onClick={() => applyHourlyPreset(preset.minute)}
-                              className="px-2 py-1 text-xs bg-[#2a2a4a] text-gray-300 hover:bg-[#3a3a5a] rounded"
+                              className="px-2 py-1 text-xs bg-background-hover text-text-secondary hover:bg-background-active rounded-lg transition-colors"
                             >
                               {preset.label}
                             </button>
@@ -344,8 +344,8 @@ export function TaskEditor({
                       </div>
 
                       {/* 当前表达式说明 */}
-                      <div className="text-xs text-gray-500">
-                        当前表达式: <code className="text-blue-400">{triggerValue}</code>
+                      <div className="text-xs text-text-muted">
+                        当前表达式: <code className="text-primary">{triggerValue}</code>
                       </div>
                     </div>
                   )}
@@ -354,7 +354,7 @@ export function TaskEditor({
 
               {/* Cron 表达式说明 */}
               {triggerType === 'cron' && !showAdvancedTime && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-muted">
                   示例: "0 9 * * 1-5" 表示工作日早9点，格式为：分 时 日 月 周
                 </p>
               )}
@@ -363,7 +363,7 @@ export function TaskEditor({
 
           {/* AI 引擎 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">AI 引擎</label>
+            <label className="block text-sm text-text-secondary mb-1">AI 引擎</label>
             <div className="space-y-2">
               {/* 检测失效的 Provider */}
               {(() => {
@@ -372,7 +372,7 @@ export function TaskEditor({
                   const providerExists = openaiProviders.some(p => p.id === providerId && p.enabled);
                   if (!providerExists) {
                     return (
-                      <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-xs text-yellow-500 mb-2">
+                      <div className="p-2 bg-warning-faint border border-warning/30 rounded-lg text-xs text-warning mb-2">
                         ⚠️ 当前任务的 Provider 已失效或被禁用，请重新选择引擎
                       </div>
                     );
@@ -393,7 +393,7 @@ export function TaskEditor({
                     setEngineId(baseEngine);
                   }
                 }}
-                className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
               >
                 <option value="claude">Claude Code</option>
                 <option value="iflow">IFlow</option>
@@ -405,14 +405,14 @@ export function TaskEditor({
 
               {/* OpenAI Provider 二级选择 */}
               {parseEngineId(engineId).baseEngine === 'openai' && (
-                <div className="pl-2 border-l-2 border-[#2a2a4a]">
-                  <label className="block text-xs text-gray-500 mb-1">选择 Provider</label>
+                <div className="pl-2 border-l-2 border-border-subtle">
+                  <label className="block text-xs text-text-muted mb-1">选择 Provider</label>
                   {openaiProviders.filter(p => p.enabled).length > 0 ? (
                     <>
                       <select
                         value={parseEngineId(engineId).providerId || ''}
                         onChange={(e) => setEngineId(`provider-${e.target.value}`)}
-                        className="w-full px-3 py-2 bg-[#12122a] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-background-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
                       >
                         {openaiProviders.filter(p => p.enabled).map((provider) => (
                           <option key={provider.id} value={provider.id}>
@@ -426,11 +426,11 @@ export function TaskEditor({
                         );
                         if (selectedProvider) {
                           return (
-                            <div className="mt-2 p-2 bg-[#0a0a1a] rounded text-xs text-gray-400 space-y-1">
-                              <div>模型: <span className="text-blue-400">{selectedProvider.model}</span></div>
-                              <div>API: <span className="text-gray-500 truncate">{selectedProvider.apiBase}</span></div>
+                            <div className="mt-2 p-2 bg-background-base rounded-lg text-xs text-text-secondary space-y-1">
+                              <div>模型: <span className="text-primary">{selectedProvider.model}</span></div>
+                              <div>API: <span className="text-text-muted truncate">{selectedProvider.apiBase}</span></div>
                               {selectedProvider.supportsTools && (
-                                <span className="inline-block px-1 py-0.5 bg-green-500/20 text-green-400 rounded text-xs">
+                                <span className="inline-block px-1 py-0.5 bg-success-faint text-success rounded text-xs">
                                   支持工具调用
                                 </span>
                               )}
@@ -442,7 +442,7 @@ export function TaskEditor({
                     </>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-xs text-yellow-500">
+                      <p className="text-xs text-warning">
                         未配置 OpenAI Provider
                       </p>
                       <button
@@ -453,7 +453,7 @@ export function TaskEditor({
                           }));
                           onClose();
                         }}
-                        className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                        className="px-3 py-1.5 text-xs bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors"
                       >
                         去配置 →
                       </button>
@@ -466,8 +466,8 @@ export function TaskEditor({
 
           {/* 工作目录 */}
           <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              工作目录 <span className="text-gray-600">(可选)</span>
+            <label className="block text-sm text-text-secondary mb-1">
+              工作目录 <span className="text-text-muted">(可选)</span>
             </label>
             <div className="space-y-2">
               {/* 工作区快捷选择 */}
@@ -478,10 +478,10 @@ export function TaskEditor({
                       key={ws.id}
                       type="button"
                       onClick={() => setWorkDir(ws.path)}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`px-2 py-1 text-xs rounded-lg transition-colors ${
                         workDir === ws.path
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-[#2a2a4a] text-gray-400 hover:bg-[#3a3a5a]'
+                          ? 'bg-primary text-white'
+                          : 'bg-background-hover text-text-secondary hover:bg-background-active'
                       }`}
                     >
                       {ws.name}
@@ -494,7 +494,7 @@ export function TaskEditor({
                 type="text"
                 value={workDir}
                 onChange={(e) => setWorkDir(e.target.value)}
-                className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#2a2a4a] rounded text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-background-surface border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="留空使用默认目录"
               />
             </div>
@@ -502,16 +502,16 @@ export function TaskEditor({
         </div>
 
         {/* 底部按钮 */}
-        <div className="p-4 border-t border-[#2a2a4a] flex justify-end gap-2 sticky bottom-0 bg-[#16162a]">
+        <div className="p-4 border-t border-border-subtle flex justify-end gap-2 sticky bottom-0 bg-background-elevated">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-600/20 text-gray-300 hover:bg-gray-600/30 rounded transition-colors"
+            className="px-4 py-2 bg-background-hover text-text-secondary hover:bg-background-active rounded-lg transition-colors"
           >
             取消
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+            className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors"
           >
             保存
           </button>

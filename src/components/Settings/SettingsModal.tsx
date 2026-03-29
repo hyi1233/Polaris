@@ -22,7 +22,6 @@ import { createLogger } from '../../utils/logger';
 
 const log = createLogger('SettingsModal');
 import { AdvancedTab } from './tabs/AdvancedTab';
-import { SchedulerTab } from './tabs/SchedulerTab';
 import type { Config } from '../../types';
 
 interface SettingsModalProps {
@@ -39,7 +38,6 @@ const TAB_TITLE_KEYS: Record<SettingsTabId, string> = {
   'openai-providers': 'nav.openaiProviders',
   'translate': 'nav.translate',
   'qqbot': 'nav.qqbot',
-  'scheduler': 'nav.scheduler',
   'advanced': 'nav.advanced',
 };
 
@@ -201,8 +199,6 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
                   loading={loading}
                 />
               )}
-
-              {activeTab === 'scheduler' && <SchedulerTab />}
 
               {activeTab === 'advanced' && (
                 <AdvancedTab

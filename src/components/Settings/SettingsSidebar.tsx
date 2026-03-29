@@ -11,7 +11,6 @@ import {
   IconSettings,
   IconSearch,
   IconGeneral,
-  IconClock,
 } from '../Common/Icons';
 import type { ReactNode } from 'react';
 
@@ -21,7 +20,6 @@ export type SettingsTabId =
   | 'openai-providers'
   | 'translate'
   | 'qqbot'
-  | 'scheduler'
   | 'window'
   | 'advanced';
 
@@ -45,7 +43,6 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'openai-providers', icon: <IconAPI size={16} />, labelKey: 'nav.openaiProviders' },
   { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },
   { id: 'qqbot', icon: <IconBot size={16} />, labelKey: 'nav.qqbot' },
-  { id: 'scheduler', icon: <IconClock size={16} />, labelKey: 'nav.scheduler' },
   { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
 ];
 
