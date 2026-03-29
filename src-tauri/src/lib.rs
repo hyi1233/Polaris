@@ -86,11 +86,6 @@ use commands::scheduler::{
     scheduler_subscribe_task, scheduler_unsubscribe_task,
     scheduler_export_tasks, scheduler_import_tasks,
     scheduler_get_log_stats, scheduler_get_log_retention_config, scheduler_update_log_retention_config,
-    // 工作区调度器命令
-    workspace_scheduler_get_tasks, workspace_scheduler_get_task, workspace_scheduler_create_task,
-    workspace_scheduler_update_task, workspace_scheduler_delete_task,
-    workspace_scheduler_get_logs, workspace_scheduler_get_task_logs, workspace_scheduler_delete_task_logs,
-    workspace_scheduler_get_retention_config, workspace_scheduler_update_retention_config,
 };
 use commands::terminal::{
     terminal_create, terminal_write, terminal_resize,
@@ -504,17 +499,6 @@ pub fn run() {
             scheduler_get_log_stats,
             scheduler_get_log_retention_config,
             scheduler_update_log_retention_config,
-            // 工作区调度器命令
-            workspace_scheduler_get_tasks,
-            workspace_scheduler_get_task,
-            workspace_scheduler_create_task,
-            workspace_scheduler_update_task,
-            workspace_scheduler_delete_task,
-            workspace_scheduler_get_logs,
-            workspace_scheduler_get_task_logs,
-            workspace_scheduler_delete_task_logs,
-            workspace_scheduler_get_retention_config,
-            workspace_scheduler_update_retention_config,
             // 终端相关
             terminal_create,
             terminal_write,

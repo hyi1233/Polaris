@@ -419,8 +419,7 @@ impl SchedulerRepository {
 // ============================================================================
 
 /// Parameters for updating a scheduled task
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default)]
 pub struct TaskUpdateParams {
     pub name: Option<String>,
     pub enabled: Option<bool>,
