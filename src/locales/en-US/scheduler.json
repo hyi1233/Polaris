@@ -66,7 +66,9 @@
     "enable": "Enable",
     "disable": "Disable",
     "mode": "Mode",
-    "category": "Category"
+    "category": "Category",
+    "viewProtocol": "Protocol",
+    "viewProtocolHint": "View protocol documents"
   },
 
   "filter": {
@@ -271,5 +273,28 @@
     "cannotEditBuiltin": "Built-in templates cannot be edited",
     "cannotDeleteBuiltin": "Built-in templates cannot be deleted",
     "builtinReadOnly": "Built-in templates are read-only"
+  },
+
+  "protocolDoc": {
+    "title": "Protocol Documents",
+    "loading": "Loading...",
+    "protocol": "Protocol",
+    "supplement": "Supplement",
+    "memory": "Memory Index",
+    "tasks": "Task Queue",
+    "noTaskPath": "This task is not in protocol mode or has no associated document path",
+    "empty": "No content",
+    "loadFailed": "Failed to load protocol documents",
+    "edit": "Edit",
+    "editPlaceholder": "Edit document content...",
+    "saveSuccess": "Saved successfully",
+    "saveFailed": "Failed to save",
+    "saving": "Saving...",
+    "clearSupplement": "Clear Supplement",
+    "clearSuccess": "Supplement cleared",
+    "clearFailed": "Failed to clear",
+    "backup": "Backup",
+    "backupSuccess": "Backup created",
+    "backupFailed": "Failed to backup"
   }
 }

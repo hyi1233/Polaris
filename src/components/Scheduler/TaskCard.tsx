@@ -60,6 +60,8 @@ export interface TaskCardProps {
   onRun: () => void;
   /** 点击订阅日志（仅订阅正在执行的任务） */
   onSubscribe: () => void;
+  /** 点击查看协议文档 */
+  onViewProtocol?: () => void;
 }
 
 export function TaskCard({
@@ -72,6 +74,7 @@ export function TaskCard({
   onToggle,
   onRun,
   onSubscribe,
+  onViewProtocol,
 }: TaskCardProps) {
   const { t } = useTranslation('scheduler');
 
@@ -176,6 +179,17 @@ export function TaskCard({
         >
           {isSubscribed ? t('card.subscribed') : t('card.subscribe')}
         </button>
+
+        {/* 协议文档按钮 - 仅协议模式任务显示 */}
+        {task.mode === 'protocol' && onViewProtocol && (
+          <button
+            onClick={onViewProtocol}
+            className="px-3 py-1 text-sm bg-purple-faint text-purple hover:bg-purple/20 rounded transition-colors"
+            title={t('card.viewProtocolHint', '查看协议文档')}
+          >
+            {t('card.viewProtocol', '协议文档')}
+          </button>
+        )}
 
         <button
           onClick={onToggle}

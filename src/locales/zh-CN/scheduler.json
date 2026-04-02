@@ -66,7 +66,9 @@
     "enable": "启用",
     "disable": "禁用",
     "mode": "模式",
-    "category": "分类"
+    "category": "分类",
+    "viewProtocol": "协议文档",
+    "viewProtocolHint": "查看协议文档"
   },
 
   "filter": {
@@ -271,5 +273,28 @@
     "cannotEditBuiltin": "内置模板不可编辑",
     "cannotDeleteBuiltin": "内置模板不可删除",
     "builtinReadOnly": "内置模板只读"
+  },
+
+  "protocolDoc": {
+    "title": "协议文档",
+    "loading": "加载中...",
+    "protocol": "协议文档",
+    "supplement": "用户补充",
+    "memory": "记忆索引",
+    "tasks": "任务队列",
+    "noTaskPath": "此任务不是协议模式或没有关联的文档路径",
+    "empty": "暂无内容",
+    "loadFailed": "加载协议文档失败",
+    "edit": "编辑",
+    "editPlaceholder": "编辑文档内容...",
+    "saveSuccess": "保存成功",
+    "saveFailed": "保存失败",
+    "saving": "保存中...",
+    "clearSupplement": "清空补充",
+    "clearSuccess": "已清空用户补充",
+    "clearFailed": "清空失败",
+    "backup": "备份",
+    "backupSuccess": "备份成功",
+    "backupFailed": "备份失败"
   }
 }

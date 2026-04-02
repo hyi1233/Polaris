@@ -13,3 +13,5 @@ export { ProtocolTemplateSelector, TemplateParamsForm } from './ProtocolTemplate
 export type { ProtocolTemplateSelectorProps, TemplateParamsFormProps } from './ProtocolTemplateSelector';
 export { ProtocolTemplateManager } from './ProtocolTemplateManager';
 export type { ProtocolTemplateManagerProps } from './ProtocolTemplateManager';
+export { ProtocolDocumentViewer } from './ProtocolDocumentViewer';
+export type { ProtocolDocumentViewerProps } from './ProtocolDocumentViewer';

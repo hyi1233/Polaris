@@ -14,6 +14,7 @@ import { TaskEditor } from './TaskEditor';
 import { ExecutionLogDrawer } from './ExecutionLogDrawer';
 import { TemplateManager } from './TemplateManager';
 import { ProtocolTemplateManager } from './ProtocolTemplateManager';
+import { ProtocolDocumentViewer } from './ProtocolDocumentViewer';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 
 /** 筛选条件 */
@@ -76,6 +77,9 @@ export function SchedulerPanel() {
 
   // 协议模板管理状态
   const [showProtocolTemplateManager, setShowProtocolTemplateManager] = useState(false);
+
+  // 协议文档查看状态
+  const [viewingProtocolTask, setViewingProtocolTask] = useState<ScheduledTask | null>(null);
 
   // 筛选状态
   const [filter, setFilter] = useState<TaskFilter>(DEFAULT_FILTER);
@@ -380,6 +384,11 @@ export function SchedulerPanel() {
                 onToggle={() => toggleTask(task.id, !task.enabled)}
                 onRun={() => handleRun(task)}
                 onSubscribe={() => handleSubscribe(task)}
+                onViewProtocol={
+                  task.mode === 'protocol' && task.taskPath
+                    ? () => setViewingProtocolTask(task)
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -426,6 +435,14 @@ export function SchedulerPanel() {
       {/* 协议模板管理弹窗 */}
       {showProtocolTemplateManager && (
         <ProtocolTemplateManager onClose={() => setShowProtocolTemplateManager(false)} />
+      )}
+
+      {/* 协议文档查看弹窗 */}
+      {viewingProtocolTask && (
+        <ProtocolDocumentViewer
+          task={viewingProtocolTask}
+          onClose={() => setViewingProtocolTask(null)}
+        />
       )}
     </div>
   );
