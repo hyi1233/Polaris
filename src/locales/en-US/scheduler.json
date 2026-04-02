@@ -272,7 +272,10 @@
     "paramLabelRequired": "Parameter display name cannot be empty",
     "cannotEditBuiltin": "Built-in templates cannot be edited",
     "cannotDeleteBuiltin": "Built-in templates cannot be deleted",
-    "builtinReadOnly": "Built-in templates are read-only"
+    "builtinReadOnly": "Built-in templates are read-only",
+    "previewToggle": "Preview Generated Protocol Document",
+    "previewParams": "Preview Parameter Values",
+    "previewDocument": "Protocol Document Preview"
   },
 
   "protocolDoc": {

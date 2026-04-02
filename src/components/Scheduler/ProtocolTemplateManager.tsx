@@ -2,7 +2,7 @@
  * 协议模板管理组件
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSchedulerStore, useToastStore } from '../../stores';
 import type {
@@ -12,7 +12,7 @@ import type {
   TaskCategory,
   TemplateParamType,
 } from '../../types/scheduler';
-import { TASK_CATEGORY_LABELS } from '../../types/scheduler';
+import { TASK_CATEGORY_LABELS, generateProtocolDocument } from '../../types/scheduler';
 
 export interface ProtocolTemplateManagerProps {
   /** 关闭回调 */
@@ -66,6 +66,10 @@ export function ProtocolTemplateManager({ onClose }: ProtocolTemplateManagerProp
   const [formParams, setFormParams] = useState<TemplateParam[]>([]);
   const [formEnabled, setFormEnabled] = useState(true);
 
+  // 预览状态
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewParams, setPreviewParams] = useState<Record<string, string>>({});
+
   // 确认对话框
   const [deleteConfirm, setDeleteConfirm] = useState<ProtocolTemplate | null>(null);
 
@@ -73,6 +77,30 @@ export function ProtocolTemplateManager({ onClose }: ProtocolTemplateManagerProp
   useEffect(() => {
     loadProtocolTemplates();
   }, [loadProtocolTemplates]);
+
+  // 生成预览文档
+  const previewDocument = useMemo(() => {
+    // 构建临时模板对象用于预览
+    const tempTemplate: ProtocolTemplate = {
+      id: 'preview',
+      name: formName || '模板预览',
+      description: formDescription,
+      category: formCategory,
+      builtin: false,
+      protocolConfig: {
+        missionTemplate: formMissionTemplate || '任务目标模板预览',
+        executionRules: formExecutionRules || undefined,
+        memoryRules: formMemoryRules || undefined,
+      },
+      promptTemplate: formPromptTemplate || undefined,
+      params: formParams,
+      enabled: formEnabled,
+      createdAt: Math.floor(Date.now() / 1000),
+      updatedAt: Math.floor(Date.now() / 1000),
+    };
+
+    return generateProtocolDocument(tempTemplate, previewParams);
+  }, [formName, formDescription, formCategory, formMissionTemplate, formExecutionRules, formMemoryRules, formPromptTemplate, formParams, formEnabled, previewParams]);
 
   // 重置表单
   const resetForm = () => {
@@ -85,6 +113,8 @@ export function ProtocolTemplateManager({ onClose }: ProtocolTemplateManagerProp
     setFormPromptTemplate('');
     setFormParams([]);
     setFormEnabled(true);
+    setPreviewParams({});
+    setShowPreview(false);
   };
 
   // 打开新建编辑器
@@ -643,6 +673,96 @@ export function ProtocolTemplateManager({ onClose }: ProtocolTemplateManagerProp
                     {t('template.enabled')}
                   </label>
                 </div>
+
+                {/* 预览切换 */}
+                {formMissionTemplate.trim() && (
+                  <div className="border-t border-border-subtle pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(!showPreview)}
+                      className="flex items-center gap-2 text-sm text-primary hover:text-primary-hover"
+                    >
+                      <span className={`transition-transform ${showPreview ? 'rotate-90' : ''}`}>▶</span>
+                      {t('protocolTemplate.previewToggle')}
+                    </button>
+
+                    {showPreview && (
+                      <div className="mt-3 space-y-3">
+                        {/* 参数预览值 */}
+                        {formParams.length > 0 && (
+                          <div className="p-3 bg-background-base rounded-lg border border-border-subtle">
+                            <label className="block text-sm text-text-secondary mb-2">
+                              {t('protocolTemplate.previewParams')}
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {formParams.map((param) => (
+                                <div key={param.key}>
+                                  <label className="block text-xs text-text-muted mb-1">
+                                    {param.label}
+                                    {param.required && <span className="text-danger ml-1">*</span>}
+                                  </label>
+                                  {param.type === 'textarea' ? (
+                                    <textarea
+                                      value={previewParams[param.key] || param.defaultValue || ''}
+                                      onChange={(e) => setPreviewParams({ ...previewParams, [param.key]: e.target.value })}
+                                      placeholder={param.placeholder}
+                                      rows={2}
+                                      className="w-full px-2 py-1.5 text-xs bg-background-surface border border-border-subtle rounded text-text-primary resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                    />
+                                  ) : param.type === 'select' ? (
+                                    <select
+                                      value={previewParams[param.key] || param.defaultValue || ''}
+                                      onChange={(e) => setPreviewParams({ ...previewParams, [param.key]: e.target.value })}
+                                      className="w-full px-2 py-1.5 text-xs bg-background-surface border border-border-subtle rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                    >
+                                      <option value="">{t('protocolTemplate.selectPlaceholder')}</option>
+                                      {param.options?.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
+                                  ) : param.type === 'number' ? (
+                                    <input
+                                      type="number"
+                                      value={previewParams[param.key] || param.defaultValue || ''}
+                                      onChange={(e) => setPreviewParams({ ...previewParams, [param.key]: e.target.value })}
+                                      placeholder={param.placeholder}
+                                      className="w-full px-2 py-1.5 text-xs bg-background-surface border border-border-subtle rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                    />
+                                  ) : param.type === 'date' ? (
+                                    <input
+                                      type="date"
+                                      value={previewParams[param.key] || param.defaultValue || ''}
+                                      onChange={(e) => setPreviewParams({ ...previewParams, [param.key]: e.target.value })}
+                                      className="w-full px-2 py-1.5 text-xs bg-background-surface border border-border-subtle rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      value={previewParams[param.key] || param.defaultValue || ''}
+                                      onChange={(e) => setPreviewParams({ ...previewParams, [param.key]: e.target.value })}
+                                      placeholder={param.placeholder}
+                                      className="w-full px-2 py-1.5 text-xs bg-background-surface border border-border-subtle rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 文档预览 */}
+                        <div className="p-3 bg-background-base rounded-lg border border-border-subtle">
+                          <label className="block text-sm text-text-secondary mb-2">
+                            {t('protocolTemplate.previewDocument')}
+                          </label>
+                          <pre className="text-xs text-text-primary whitespace-pre-wrap font-mono max-h-80 overflow-y-auto bg-background-surface p-3 rounded border border-border-subtle">
+                            {previewDocument}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 编辑器底部 */}

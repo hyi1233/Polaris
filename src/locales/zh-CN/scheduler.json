@@ -272,7 +272,10 @@
     "paramLabelRequired": "参数显示名称不能为空",
     "cannotEditBuiltin": "内置模板不可编辑",
     "cannotDeleteBuiltin": "内置模板不可删除",
-    "builtinReadOnly": "内置模板只读"
+    "builtinReadOnly": "内置模板只读",
+    "previewToggle": "预览生成的协议文档",
+    "previewParams": "预览参数值",
+    "previewDocument": "协议文档预览"
   },
 
   "protocolDoc": {
