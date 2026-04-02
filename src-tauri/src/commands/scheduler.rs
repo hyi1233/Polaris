@@ -1,13 +1,15 @@
-//! Scheduler Tauri Commands (Simplified)
+//! Scheduler Tauri Commands
 //!
-//! Simplified commands for scheduled task management using unified repository.
+//! Commands for scheduled task management using unified repository.
+//! Supports both simple mode and protocol mode (document-driven workflow).
 
 use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager};
 
 use crate::error::Result;
-use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TriggerType};
+use crate::models::scheduler::{CreateTaskParams, ScheduledTask, TaskMode, TriggerType};
+use crate::services::scheduler::protocol_task::ProtocolTaskService;
 use crate::services::unified_scheduler_repository::{
     TaskUpdateParams, UnifiedSchedulerRepository,
 };
@@ -63,8 +65,31 @@ pub async fn scheduler_create_task(
     workspace_path: Option<String>,
     app: AppHandle,
 ) -> Result<ScheduledTask> {
-    let repository = get_repository(&app, workspace_path)?;
-    repository.create_task(params)
+    let repository = get_repository(&app, workspace_path.clone())?;
+
+    // 如果是协议模式，创建任务文档结构
+    let mut task = repository.create_task(params.clone())?;
+
+    if params.mode == TaskMode::Protocol {
+        let work_dir = params.work_dir.clone().unwrap_or_else(|| ".".to_string());
+        let mission = task.mission.clone().unwrap_or_else(|| task.name.clone());
+
+        // 创建协议任务文档结构
+        let task_path = ProtocolTaskService::create_task_structure(
+            &work_dir,
+            &task.id,
+            &mission,
+            None, // TODO: 支持模板内容
+        ).map_err(|e| crate::error::AppError::IoError(e))?;
+
+        // 更新任务的 task_path
+        task = repository.update_task(&task.id, TaskUpdateParams {
+            task_path: Some(task_path),
+            ..Default::default()
+        })?;
+    }
+
+    Ok(task)
 }
 
 /// 更新任务
@@ -112,7 +137,20 @@ pub async fn scheduler_delete_task(
     workspace_path: Option<String>,
     app: AppHandle,
 ) -> Result<ScheduledTask> {
-    let repository = get_repository(&app, workspace_path)?;
+    let repository = get_repository(&app, workspace_path.clone())?;
+
+    // 获取任务信息以检查是否是协议模式
+    let task = repository.get_task(&id)?;
+
+    // 如果是协议模式，删除任务文档结构
+    if let Some(ref t) = task {
+        if t.mode == TaskMode::Protocol {
+            if let (Some(work_dir), Some(task_path)) = (&t.work_dir, &t.task_path) {
+                let _ = ProtocolTaskService::delete_task_structure(work_dir, task_path);
+            }
+        }
+    }
+
     repository.delete_task(&id)
 }
 
@@ -459,4 +497,137 @@ pub async fn scheduler_build_prompt(
 ) -> Result<String> {
     let repository = get_repository(&app, workspace_path)?;
     repository.build_prompt_with_template(&template_id, &task_name, &user_prompt)
+}
+
+// ============================================================================
+// Protocol Task Commands
+// ============================================================================
+
+/// 协议文档内容
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtocolDocuments {
+    pub protocol: String,
+    pub supplement: String,
+    pub memory_index: String,
+    pub memory_tasks: String,
+}
+
+/// 读取协议任务文档
+#[tauri::command]
+pub async fn scheduler_read_protocol_documents(
+    task_path: String,
+    work_dir: String,
+) -> Result<ProtocolDocuments> {
+    let protocol = ProtocolTaskService::read_protocol(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+    let supplement = ProtocolTaskService::read_supplement(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+    let memory_index = ProtocolTaskService::read_memory_index(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+    let memory_tasks = ProtocolTaskService::read_memory_tasks(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+
+    Ok(ProtocolDocuments {
+        protocol,
+        supplement,
+        memory_index,
+        memory_tasks,
+    })
+}
+
+/// 更新协议文档
+#[tauri::command]
+pub async fn scheduler_update_protocol(
+    task_path: String,
+    work_dir: String,
+    content: String,
+) -> Result<()> {
+    ProtocolTaskService::update_protocol(&work_dir, &task_path, &content)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 更新用户补充
+#[tauri::command]
+pub async fn scheduler_update_supplement(
+    task_path: String,
+    work_dir: String,
+    content: String,
+) -> Result<()> {
+    ProtocolTaskService::update_supplement(&work_dir, &task_path, &content)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 更新记忆索引
+#[tauri::command]
+pub async fn scheduler_update_memory_index(
+    task_path: String,
+    work_dir: String,
+    content: String,
+) -> Result<()> {
+    ProtocolTaskService::update_memory_index(&work_dir, &task_path, &content)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 更新记忆任务
+#[tauri::command]
+pub async fn scheduler_update_memory_tasks(
+    task_path: String,
+    work_dir: String,
+    content: String,
+) -> Result<()> {
+    ProtocolTaskService::update_memory_tasks(&work_dir, &task_path, &content)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 清空用户补充（处理完成后）
+#[tauri::command]
+pub async fn scheduler_clear_supplement(
+    task_path: String,
+    work_dir: String,
+) -> Result<()> {
+    ProtocolTaskService::clear_supplement(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 备份用户补充内容
+#[tauri::command]
+pub async fn scheduler_backup_supplement(
+    task_path: String,
+    work_dir: String,
+    content: String,
+) -> Result<String> {
+    ProtocolTaskService::backup_supplement(&work_dir, &task_path, &content)
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 备份协议文档
+#[tauri::command]
+pub async fn scheduler_backup_document(
+    task_path: String,
+    work_dir: String,
+    doc_name: String,
+    content: String,
+    summary: Option<String>,
+) -> Result<String> {
+    ProtocolTaskService::backup_document(&work_dir, &task_path, &doc_name, &content, summary.as_deref())
+        .map_err(|e| crate::error::AppError::IoError(e))
+}
+
+/// 检查用户补充是否有内容
+#[tauri::command]
+pub fn scheduler_has_supplement_content(content: String) -> bool {
+    ProtocolTaskService::has_supplement_content(&content)
+}
+
+/// 检查文档是否需要备份
+#[tauri::command]
+pub fn scheduler_needs_backup(content: String) -> bool {
+    ProtocolTaskService::needs_backup(&content)
+}
+
+/// 提取用户补充内容
+#[tauri::command]
+pub fn scheduler_extract_user_content(content: String) -> String {
+    ProtocolTaskService::extract_user_content(&content)
 }

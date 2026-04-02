@@ -63,6 +63,7 @@ pub struct TaskUpdateParams {
     pub mode: Option<TaskMode>,
     pub category: Option<TaskCategory>,
     // === 协议模式属性 ===
+    pub task_path: Option<String>,
     pub mission: Option<String>,
     pub template_params: Option<std::collections::HashMap<String, String>>,
     // === 执行控制 ===
@@ -274,6 +275,10 @@ impl UnifiedSchedulerRepository {
         }
 
         // === 协议模式属性 ===
+        if updates.task_path.is_some() {
+            task.task_path = sanitize_optional_string(updates.task_path);
+        }
+
         if updates.mission.is_some() {
             task.mission = sanitize_optional_string(updates.mission);
         }

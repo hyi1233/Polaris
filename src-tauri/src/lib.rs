@@ -84,6 +84,11 @@ use commands::scheduler::{
     scheduler_list_templates, scheduler_get_template, scheduler_create_template,
     scheduler_update_template, scheduler_delete_template, scheduler_toggle_template,
     scheduler_build_prompt,
+    // Protocol task commands
+    scheduler_read_protocol_documents, scheduler_update_protocol, scheduler_update_supplement,
+    scheduler_update_memory_index, scheduler_update_memory_tasks, scheduler_clear_supplement,
+    scheduler_backup_supplement, scheduler_backup_document, scheduler_has_supplement_content,
+    scheduler_needs_backup, scheduler_extract_user_content,
 };
 use commands::terminal::{
     terminal_create, terminal_write, terminal_resize,
@@ -468,6 +473,18 @@ pub fn run() {
             scheduler_delete_template,
             scheduler_toggle_template,
             scheduler_build_prompt,
+            // Protocol Task 相关
+            scheduler_read_protocol_documents,
+            scheduler_update_protocol,
+            scheduler_update_supplement,
+            scheduler_update_memory_index,
+            scheduler_update_memory_tasks,
+            scheduler_clear_supplement,
+            scheduler_backup_supplement,
+            scheduler_backup_document,
+            scheduler_has_supplement_content,
+            scheduler_needs_backup,
+            scheduler_extract_user_content,
             // 终端相关
             terminal_create,
             terminal_write,

@@ -957,3 +957,97 @@ export async function schedulerBuildPrompt(
   return invoke<string>('scheduler_build_prompt', { templateId, taskName, userPrompt });
 }
 
+// ============================================================================
+// 协议任务命令
+// ============================================================================
+
+import type { ProtocolDocuments } from '../types/scheduler';
+
+/** 读取协议任务文档 */
+export async function schedulerReadProtocolDocuments(
+  taskPath: string,
+  workDir: string
+): Promise<ProtocolDocuments> {
+  return invoke<ProtocolDocuments>('scheduler_read_protocol_documents', { taskPath, workDir });
+}
+
+/** 更新协议文档 */
+export async function schedulerUpdateProtocol(
+  taskPath: string,
+  workDir: string,
+  content: string
+): Promise<void> {
+  return invoke('scheduler_update_protocol', { taskPath, workDir, content });
+}
+
+/** 更新用户补充 */
+export async function schedulerUpdateSupplement(
+  taskPath: string,
+  workDir: string,
+  content: string
+): Promise<void> {
+  return invoke('scheduler_update_supplement', { taskPath, workDir, content });
+}
+
+/** 更新记忆索引 */
+export async function schedulerUpdateMemoryIndex(
+  taskPath: string,
+  workDir: string,
+  content: string
+): Promise<void> {
+  return invoke('scheduler_update_memory_index', { taskPath, workDir, content });
+}
+
+/** 更新记忆任务 */
+export async function schedulerUpdateMemoryTasks(
+  taskPath: string,
+  workDir: string,
+  content: string
+): Promise<void> {
+  return invoke('scheduler_update_memory_tasks', { taskPath, workDir, content });
+}
+
+/** 清空用户补充 */
+export async function schedulerClearSupplement(
+  taskPath: string,
+  workDir: string
+): Promise<void> {
+  return invoke('scheduler_clear_supplement', { taskPath, workDir });
+}
+
+/** 备份用户补充内容 */
+export async function schedulerBackupSupplement(
+  taskPath: string,
+  workDir: string,
+  content: string
+): Promise<string> {
+  return invoke<string>('scheduler_backup_supplement', { taskPath, workDir, content });
+}
+
+/** 备份协议文档 */
+export async function schedulerBackupDocument(
+  taskPath: string,
+  workDir: string,
+  docName: string,
+  content: string,
+  summary?: string
+): Promise<string> {
+  return invoke<string>('scheduler_backup_document', { taskPath, workDir, docName, content, summary });
+}
+
+/** 检查用户补充是否有内容 */
+export function schedulerHasSupplementContent(content: string): boolean {
+  // This is a synchronous command, but we use invoke for consistency
+  return invoke<boolean>('scheduler_has_supplement_content', { content }) as unknown as boolean;
+}
+
+/** 检查文档是否需要备份 */
+export function schedulerNeedsBackup(content: string): boolean {
+  return invoke<boolean>('scheduler_needs_backup', { content }) as unknown as boolean;
+}
+
+/** 提取用户补充内容 */
+export function schedulerExtractUserContent(content: string): string {
+  return invoke<string>('scheduler_extract_user_content', { content }) as unknown as string;
+}
+

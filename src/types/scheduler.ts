@@ -362,3 +362,17 @@ export function formatDateTime(timestamp: number | undefined): string {
     minute: '2-digit',
   });
 }
+
+// ============ 协议文档 ============
+
+/** 协议文档内容 */
+export interface ProtocolDocuments {
+  /** 协议文档 */
+  protocol: string;
+  /** 用户补充 */
+  supplement: string;
+  /** 记忆索引 */
+  memoryIndex: string;
+  /** 记忆任务 */
+  memoryTasks: string;
+}

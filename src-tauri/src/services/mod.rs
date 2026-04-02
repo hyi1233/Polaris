@@ -8,6 +8,7 @@ pub mod mcp_diagnostics_service;
 pub mod openai_proxy;
 pub mod openai_service;
 pub mod prompt_store;
+pub mod scheduler;
 pub mod scheduler_daemon;
 pub mod scheduler_mcp_server;
 pub mod todo_mcp_server;
