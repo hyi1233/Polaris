@@ -41,6 +41,7 @@ vi.mock('react-i18next', () => ({
         'protocolDoc.empty': '暂无内容',
         'protocolDoc.edit': '编辑',
         'protocolDoc.editPlaceholder': '编辑文档内容...',
+        'protocolDoc.supplementPlaceholder': '输入用户补充内容，保存后生效...',
         'protocolDoc.saveSuccess': '保存成功',
         'protocolDoc.saveFailed': '保存失败',
         'protocolDoc.loadFailed': '加载失败',
@@ -173,8 +174,11 @@ describe('ProtocolDocumentViewer', () => {
     const supplementTab = screen.getByRole('button', { name: '用户补充' });
     fireEvent.click(supplementTab);
 
+    // 用户补充 Tab 现在是直接编辑模式，应该显示 textarea
     await waitFor(() => {
-      expect(screen.getByText('用户补充内容')).toBeInTheDocument();
+      const textarea = screen.getByPlaceholderText('输入用户补充内容，保存后生效...');
+      expect(textarea).toBeInTheDocument();
+      expect(textarea).toHaveValue('用户补充内容');
     });
   });
 
