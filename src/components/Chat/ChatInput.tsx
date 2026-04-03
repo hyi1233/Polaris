@@ -328,7 +328,7 @@ export function ChatInput({
       return
     }
 
-    // 2. 检测用户正在输入工作区名（无冒号，可能是工作区名或当前工作区文件）
+    // 2. 检测用户正在输入工作区名或文件路径（无冒号）
     const partialMatch = textBeforeCursor.match(/@([\w\u4e00-\u9fa5-\u4e00-\u9fa5/.\\_-]*)$/)
     if (partialMatch) {
       const query = partialMatch[1]
@@ -346,15 +346,23 @@ export function ChatInput({
         return
       }
 
-      // 否则显示工作区列表（用户可能想选择其他工作区）
+      // 输入中但不含路径分隔符，可能是：
+      // 1. 正在输入工作区名（选择其他工作区）
+      // 2. 正在输入当前工作区文件名的开头（如 @App → App.tsx）
+      // 同时显示工作区和当前工作区文件建议
       if (query.length > 0) {
         setShowWorkspaceSuggestions(true)
-        setShowFileSuggestions(false)
+        setShowFileSuggestions(true)
+        setFileWorkspace(null)
         setWorkspaceQuery(query)
         setSelectedWorkspaceIndex(0)
+        setSelectedFileIndex(0)
+        // 搜索当前工作区文件
+        searchFiles(query)
 
         const position = calculateSuggestionPosition()
         setWorkspacePosition({ top: position.top, left: position.left })
+        setFilePosition({ top: position.top, left: position.left })
         return
       }
     }
@@ -362,16 +370,19 @@ export function ChatInput({
     // 3. 检测单独的 @ 符号（显示工作区列表和当前工作区文件提示）
     const atOnlyMatch = textBeforeCursor.match(/@$/)
     if (atOnlyMatch) {
-      // 显示工作区建议，用户可以：
-      // - 选择其他工作区 → 自动添加冒号
-      // - 直接输入文件路径 → 自动切换到文件建议
+      // 同时显示工作区建议和当前工作区文件建议
       setShowWorkspaceSuggestions(true)
-      setShowFileSuggestions(false)
+      setShowFileSuggestions(true)
+      setFileWorkspace(null)
       setWorkspaceQuery('')
       setSelectedWorkspaceIndex(0)
+      setSelectedFileIndex(0)
+      // 搜索当前工作区文件（空查询显示所有）
+      searchFiles('')
 
       const position = calculateSuggestionPosition()
       setWorkspacePosition({ top: position.top, left: position.left })
+      setFilePosition({ top: position.top, left: position.left })
       return
     }
 
@@ -641,7 +652,12 @@ export function ChatInput({
           selectedIndex={selectedFileIndex}
           onSelect={selectFile}
           onHover={setSelectedFileIndex}
-          position={filePosition}
+          position={{
+            top: showWorkspaceSuggestions && filteredWorkspaces.length > 0
+              ? workspacePosition.top + Math.min(filteredWorkspaces.length, 5) * 40 + 50
+              : filePosition.top,
+            left: filePosition.left,
+          }}
         />
       )}
     </div>

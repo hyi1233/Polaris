@@ -56,6 +56,10 @@ export function FileSuggestion({
         maxWidth: '450px',
       }}
     >
+      {/* 当前工作区文件标题 */}
+      <div className="px-3 py-1.5 text-xs text-text-tertiary border-b border-border bg-background-elevated/50">
+        当前工作区文件
+      </div>
       {files.map((file, index) => {
         const { dir, name } = splitPath(file.relativePath);
 
