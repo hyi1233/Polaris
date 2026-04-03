@@ -66,10 +66,12 @@ const TOOL_COLLAPSE_CONFIG = {
   collapseThreshold: 5,
 };
 
-/** 工具调用分组 */
+/** 工具调用分组（包含完整的块索引范围） */
 interface ToolCallGroup {
   /** 在 blocks 数组中的起始索引 */
   startIndex: number;
+  /** 在 blocks 数组中的结束索引（包含，即最后一个块的索引） */
+  endIndex: number;
   /** 连续的工具调用块 */
   tools: ToolCallBlock[];
 }
@@ -1893,11 +1895,13 @@ function isEmptyTextBlock(block: ContentBlock): boolean {
 /**
  * 识别连续的工具调用分组
  * 空文本块（空内容或只有"..."）不打断分组
+ * 记录完整的块索引范围（包括中间的空白块）
  */
 function identifyToolCallGroups(blocks: ContentBlock[]): ToolCallGroup[] {
   const groups: ToolCallGroup[] = [];
   let currentGroup: ToolCallBlock[] = [];
-  let groupStartIndex = 0;
+  let groupStartIndex = -1;
+  let groupEndIndex = -1;
 
   blocks.forEach((block, index) => {
     if (block.type === 'tool_call') {
@@ -1906,23 +1910,29 @@ function identifyToolCallGroups(blocks: ContentBlock[]): ToolCallGroup[] {
         groupStartIndex = index;
       }
       currentGroup.push(block as ToolCallBlock);
+      groupEndIndex = index;
     } else if (!isEmptyTextBlock(block)) {
       // 非空白块，保存之前的组（空白块不打断分组）
       if (currentGroup.length > 0) {
         groups.push({
           startIndex: groupStartIndex,
+          endIndex: groupEndIndex,
           tools: currentGroup,
         });
         currentGroup = [];
+        groupStartIndex = -1;
+        groupEndIndex = -1;
       }
     }
-    // 空白块：不做任何处理，不打断当前组
+    // 空白块：不做任何处理，不打断当前组，但需要更新 endIndex
+    // 以便正确标记整个组的范围
   });
 
   // 处理末尾的工具组
   if (currentGroup.length > 0) {
     groups.push({
       startIndex: groupStartIndex,
+      endIndex: groupEndIndex,
       tools: currentGroup,
     });
   }
@@ -1947,9 +1957,17 @@ const ToolCollapseGroup = memo(function ToolCollapseGroup({
   renderMode: MessageRenderMode;
 }) {
   const { t } = useTranslation('chat');
-  const [isExpanded, setIsExpanded] = useState(false);
+  // 流式期间始终展开，结束后才启用折叠
+  const [isExpanded, setIsExpanded] = useState(true);
 
+  // 流式结束时自动折叠（如果有隐藏的工具）
   const hiddenCount = tools.length - maxVisible;
+  useEffect(() => {
+    if (!isStreaming && hiddenCount > 0) {
+      setIsExpanded(false);
+    }
+  }, [isStreaming, hiddenCount]);
+
   const visibleTools = isExpanded ? tools : tools.slice(0, maxVisible);
 
   return (
@@ -1961,8 +1979,8 @@ const ToolCollapseGroup = memo(function ToolCollapseGroup({
         </div>
       ))}
 
-      {/* 折叠/展开指示器 */}
-      {hiddenCount > 0 && (
+      {/* 折叠/展开指示器 - 仅在非流式时显示 */}
+      {hiddenCount > 0 && !isStreaming && (
         <div
           className={clsx(
             'flex items-center gap-1.5 px-3 py-2 my-1',
@@ -2020,12 +2038,11 @@ function renderBlocksWithGrouping(
     ));
   }
 
-  // 构建分组映射：block index -> ToolCallGroup
-  const groupMap = new Map<number, ToolCallGroup>();
+  // 构建分组映射：使用 startIndex 作为组的标识
+  // 同时记录每个组的完整索引范围 [startIndex, endIndex]
+  const groupStartMap = new Map<number, ToolCallGroup>();
   toolGroups.forEach(group => {
-    for (let i = 0; i < group.tools.length; i++) {
-      groupMap.set(group.startIndex + i, group);
-    }
+    groupStartMap.set(group.startIndex, group);
   });
 
   const result: React.ReactNode[] = [];
@@ -2034,10 +2051,11 @@ function renderBlocksWithGrouping(
   blocks.forEach((block, index) => {
     if (processedIndices.has(index)) return;
 
-    const group = groupMap.get(index);
+    // 检查当前索引是否是某个组的起始位置
+    const group = groupStartMap.get(index);
 
     if (group && group.tools.length > TOOL_COLLAPSE_CONFIG.collapseThreshold) {
-      // 需要折叠的组
+      // 需要折叠的组：渲染折叠组件
       result.push(
         <ToolCollapseGroup
           key={`tool-group-${group.startIndex}`}
@@ -2047,25 +2065,33 @@ function renderBlocksWithGrouping(
           renderMode={renderMode}
         />
       );
-      // 标记组内所有工具已处理
-      group.tools.forEach((_, i) => processedIndices.add(group.startIndex + i));
+      // 标记组内整个范围的所有块都已处理（包括中间的空白块）
+      for (let i = group.startIndex; i <= group.endIndex; i++) {
+        processedIndices.add(i);
+      }
     } else if (group) {
-      // 不需要折叠的组，逐个渲染
+      // 不需要折叠的组：逐个渲染工具
       group.tools.forEach((tool, i) => {
         result.push(
-          <div key={`block-${group.startIndex + i}`}>
+          <div key={`block-${group.startIndex}-tool-${i}`}>
             {renderContentBlock(tool, isStreaming, renderMode)}
           </div>
         );
-        processedIndices.add(group.startIndex + i);
       });
+      // 标记组内整个范围的所有块都已处理（包括中间的空白块）
+      for (let i = group.startIndex; i <= group.endIndex; i++) {
+        processedIndices.add(i);
+      }
     } else {
-      // 非工具块
-      result.push(
-        <div key={`block-${index}`}>
-          {renderContentBlock(block, isStreaming, renderMode)}
-        </div>
-      );
+      // 非工具块：检查是否是空白块，空白块不需要渲染
+      if (!isEmptyTextBlock(block)) {
+        result.push(
+          <div key={`block-${index}`}>
+            {renderContentBlock(block, isStreaming, renderMode)}
+          </div>
+        );
+      }
+      processedIndices.add(index);
     }
   });
 
