@@ -441,7 +441,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   },
 
   handleTaskDue: async (event) => {
-    const { taskId, engineId, workDir, prompt, taskName, templateId } = event;
+    const { taskId, engineId, workDir, prompt, taskName, templateId, mode, taskPath } = event;
     const store = get();
 
     if (store.runningTaskIds.has(taskId)) {
@@ -453,15 +453,38 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       // 执行任务（不订阅日志）
       await store.runTask(taskId, { subscribe: false });
 
-      // 如果有模板，先构建提示词
+      // 构建最终提示词
       let finalPrompt = prompt;
-      if (templateId) {
+
+      // 协议模式：从文档构建 prompt
+      if (mode === 'protocol' && taskPath && workDir) {
+        try {
+          finalPrompt = await tauri.schedulerBuildProtocolPrompt(taskPath, workDir);
+          console.log('[Scheduler] 协议模式，构建的 prompt 长度:', finalPrompt.length);
+        } catch (e) {
+          console.error('[Scheduler] 构建协议 prompt 失败:', e);
+          // 使用 mission 作为备用
+          finalPrompt = event.mission || prompt;
+        }
+      } else if (templateId) {
+        // 简单模式 + 模板
         try {
           finalPrompt = await store.buildPrompt(templateId, taskName, prompt);
           console.log('[Scheduler] 已应用模板，最终提示词长度:', finalPrompt.length);
         } catch (e) {
           console.error('[Scheduler] 应用模板失败，使用原始提示词:', e);
         }
+      }
+
+      // 检查 prompt 是否为空
+      if (!finalPrompt || finalPrompt.trim().length === 0) {
+        console.error('[Scheduler] 提示词为空，无法执行任务');
+        get().addLog(taskId, {
+          type: 'error',
+          content: '提示词为空，无法执行任务',
+        });
+        await get().updateRunStatus(taskId, 'failed');
+        return;
       }
 
       // 调用 AI 引擎

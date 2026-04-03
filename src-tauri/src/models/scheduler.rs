@@ -44,6 +44,15 @@ pub enum TaskMode {
     Protocol,
 }
 
+impl std::fmt::Display for TaskMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskMode::Simple => write!(f, "simple"),
+            TaskMode::Protocol => write!(f, "protocol"),
+        }
+    }
+}
+
 /// 任务分类（用于模板分组）
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]

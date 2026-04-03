@@ -755,3 +755,58 @@ pub fn scheduler_render_protocol_document(
 ) -> String {
     crate::models::scheduler::generate_protocol_document(&template, &params)
 }
+
+/// 构建协议模式任务的 prompt
+///
+/// 读取协议文档、用户补充、记忆文件，组合成完整的 prompt
+#[tauri::command]
+pub fn scheduler_build_protocol_prompt(
+    task_path: String,
+    work_dir: String,
+) -> Result<String> {
+    // 读取所有协议文档
+    let protocol = ProtocolTaskService::read_protocol(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+
+    let supplement = ProtocolTaskService::read_supplement(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+
+    let memory_index = ProtocolTaskService::read_memory_index(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+
+    let memory_tasks = ProtocolTaskService::read_memory_tasks(&work_dir, &task_path)
+        .map_err(|e| crate::error::AppError::IoError(e))?;
+
+    // 提取用户补充内容
+    let user_content = ProtocolTaskService::extract_user_content(&supplement);
+
+    // 组合成完整的 prompt
+    let prompt = format!(
+        "# 协议任务执行\n\n\
+        请按照以下协议文档执行任务。\n\n\
+        ---\n\n\
+        ## 协议文档\n\n\
+        {}\n\n\
+        ---\n\n\
+        ## 用户补充\n\n\
+        {}\n\n\
+        ---\n\n\
+        ## 记忆索引（当前进度）\n\n\
+        {}\n\n\
+        ---\n\n\
+        ## 任务队列\n\n\
+        {}\n\n\
+        ---\n\n\
+        请按照协议文档的执行规则，先检查用户补充，然后推进主任务，最后更新记忆。",
+        protocol,
+        if user_content.trim().is_empty() {
+            "（暂无用户补充）"
+        } else {
+            &user_content
+        },
+        memory_index,
+        memory_tasks
+    );
+
+    Ok(prompt)
+}

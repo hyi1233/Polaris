@@ -402,10 +402,16 @@ export interface TaskDueEvent {
   engineId: string;
   /** 工作目录 */
   workDir?: string;
-  /** 提示词 */
+  /** 提示词（简单模式使用） */
   prompt: string;
   /** 模板 ID */
   templateId?: string;
+  /** 任务模式 */
+  mode: TaskMode;
+  /** 协议任务路径（协议模式使用） */
+  taskPath?: string;
+  /** 任务目标（协议模式使用） */
+  mission?: string;
 }
 
 // ============ 常量 ============

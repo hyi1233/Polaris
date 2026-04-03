@@ -978,6 +978,17 @@ export async function schedulerBuildPrompt(
 
 import type { ProtocolDocuments } from '../types/scheduler';
 
+/** 构建协议模式任务的完整 prompt
+ *
+ * 读取协议文档、用户补充、记忆文件，组合成完整的 prompt
+ */
+export async function schedulerBuildProtocolPrompt(
+  taskPath: string,
+  workDir: string
+): Promise<string> {
+  return invoke<string>('scheduler_build_protocol_prompt', { taskPath, workDir });
+}
+
 /** 读取协议任务文档 */
 export async function schedulerReadProtocolDocuments(
   taskPath: string,

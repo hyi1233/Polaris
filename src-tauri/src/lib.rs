@@ -95,6 +95,7 @@ use commands::scheduler::{
     scheduler_get_protocol_template, scheduler_create_protocol_template,
     scheduler_update_protocol_template, scheduler_delete_protocol_template,
     scheduler_toggle_protocol_template, scheduler_render_protocol_document,
+    scheduler_build_protocol_prompt,
 };
 use commands::terminal::{
     terminal_create, terminal_write, terminal_resize,
@@ -503,6 +504,7 @@ pub fn run() {
             scheduler_delete_protocol_template,
             scheduler_toggle_protocol_template,
             scheduler_render_protocol_document,
+            scheduler_build_protocol_prompt,
             // 终端相关
             terminal_create,
             terminal_write,

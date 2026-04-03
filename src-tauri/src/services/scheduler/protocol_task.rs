@@ -533,6 +533,56 @@ impl ProtocolTaskService {
     pub fn needs_backup(content: &str) -> bool {
         Self::count_lines(content) > BACKUP_LINE_THRESHOLD
     }
+
+    // =========================================================================
+    // Prompt Building
+    // =========================================================================
+
+    /// Build complete prompt for protocol mode task
+    ///
+    /// Combines protocol document, user supplement, and memory files
+    /// into a single prompt for AI execution.
+    ///
+    /// # Arguments
+    /// * `work_dir` - Working directory root
+    /// * `task_path` - Relative task path (e.g., `.polaris/tasks/20260403011008`)
+    ///
+    /// # Returns
+    /// Complete prompt string or error
+    pub fn build_protocol_prompt(work_dir: &str, task_path: &str) -> io::Result<String> {
+        // Read all documents
+        let protocol = Self::read_protocol(work_dir, task_path)?;
+        let supplement = Self::read_supplement(work_dir, task_path)?;
+        let (memory_index, memory_tasks) = Self::read_all_memory(work_dir, task_path)?;
+
+        // Extract user content from supplement (remove template comments)
+        let user_supplement = Self::extract_user_content(&supplement);
+
+        // Build prompt with clear sections
+        let mut prompt_parts = Vec::new();
+
+        // Add protocol document (main task definition)
+        prompt_parts.push(protocol);
+
+        // Add separator
+        prompt_parts.push("\n---\n".to_string());
+
+        // Add user supplement if has content
+        if !user_supplement.trim().is_empty() {
+            prompt_parts.push(format!(
+                "# 用户补充（当前轮次）\n\n{}\n\n---\n",
+                user_supplement
+            ));
+        }
+
+        // Add memory state
+        prompt_parts.push(format!(
+            "# 当前状态\n\n## 进度索引\n\n{}\n\n## 任务队列\n\n{}",
+            memory_index, memory_tasks
+        ));
+
+        Ok(prompt_parts.join("\n"))
+    }
 }
 
 // ============================================================================
