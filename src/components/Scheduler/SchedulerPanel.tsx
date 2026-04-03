@@ -157,6 +157,7 @@ export function SchedulerPanel() {
     deleteTask,
     toggleTask,
     runTask,
+    updateRunStatus,
     isTaskRunning,
     isTaskSubscribed,
     subscribeToEvents,
@@ -320,15 +321,51 @@ export function SchedulerPanel() {
       // 执行任务（不订阅）
       await runTask(task.id, { subscribe: false });
 
-      // 如果有模板，先构建提示词
+      // 构建最终提示词
       let finalPrompt = task.prompt;
-      if (task.templateId) {
+
+      // 调试日志
+      console.log('[Scheduler] 手动执行任务:', {
+        taskId: task.id,
+        taskName: task.name,
+        mode: task.mode,
+        taskPath: task.taskPath,
+        workDir: task.workDir,
+        hasTemplateId: !!task.templateId,
+        promptLength: task.prompt?.length ?? 0,
+      });
+
+      // 协议模式：从文档构建 prompt
+      if (task.mode === 'protocol') {
+        if (task.taskPath && task.workDir) {
+          try {
+            const { schedulerBuildProtocolPrompt } = await import('../../services/tauri');
+            finalPrompt = await schedulerBuildProtocolPrompt(task.taskPath, task.workDir);
+            console.log('[Scheduler] 协议模式，构建的 prompt 长度:', finalPrompt?.length ?? 0);
+          } catch (e) {
+            console.error('[Scheduler] 构建 protocol prompt 失败:', e);
+            finalPrompt = task.mission || task.prompt || '';
+          }
+        } else {
+          console.error('[Scheduler] 协议模式缺少 taskPath 或 workDir');
+          finalPrompt = task.mission || task.prompt || '';
+        }
+      } else if (task.templateId) {
+        // 简单模式 + 模板
         try {
           finalPrompt = await buildPrompt(task.templateId, task.name, task.prompt);
-          console.log('[Scheduler] 已应用模板，最终提示词长度:', finalPrompt.length);
+          console.log('[Scheduler] 已应用模板，最终提示词长度:', finalPrompt?.length ?? 0);
         } catch (e) {
           console.error('[Scheduler] 应用模板失败，使用原始提示词:', e);
         }
+      }
+
+      // 检查 prompt 是否为空
+      if (!finalPrompt || finalPrompt.trim().length === 0) {
+        console.error('[Scheduler] 提示词为空，无法执行任务');
+        toast.error(t('toast.runFailed'), '提示词为空，无法执行任务');
+        await updateRunStatus(task.id, 'failed');
+        return;
       }
 
       // 调用 AI 引擎

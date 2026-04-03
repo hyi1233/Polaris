@@ -442,6 +442,20 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
 
   handleTaskDue: async (event) => {
     const { taskId, engineId, workDir, prompt, taskName, templateId, mode, taskPath } = event;
+
+    // 调试日志：记录事件详情
+    console.log('[Scheduler] TaskDue Event:', {
+      taskId,
+      taskName,
+      mode,
+      taskPath,
+      workDir,
+      promptLength: prompt?.length ?? 0,
+      missionLength: event.mission?.length ?? 0,
+      templateId,
+      engineId,
+    });
+
     const store = get();
 
     if (store.runningTaskIds.has(taskId)) {
@@ -457,28 +471,51 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       let finalPrompt = prompt;
 
       // 协议模式：从文档构建 prompt
-      if (mode === 'protocol' && taskPath && workDir) {
-        try {
-          finalPrompt = await tauri.schedulerBuildProtocolPrompt(taskPath, workDir);
-          console.log('[Scheduler] 协议模式，构建的 prompt 长度:', finalPrompt.length);
-        } catch (e) {
-          console.error('[Scheduler] 构建协议 prompt 失败:', e);
-          // 使用 mission 作为备用
-          finalPrompt = event.mission || prompt;
+      if (mode === 'protocol') {
+        console.log('[Scheduler] 协议模式，检查路径:', { taskPath, workDir });
+
+        if (taskPath && workDir) {
+          try {
+            finalPrompt = await tauri.schedulerBuildProtocolPrompt(taskPath, workDir);
+            console.log('[Scheduler] 协议模式，构建的 prompt 长度:', finalPrompt?.length ?? 0);
+          } catch (e) {
+            console.error('[Scheduler] 构建协议 prompt 失败:', e);
+            // 使用 mission 作为备用
+            finalPrompt = event.mission || prompt || '';
+            console.log('[Scheduler] 使用备用 prompt，长度:', finalPrompt?.length ?? 0);
+          }
+        } else {
+          console.error('[Scheduler] 协议模式缺少 taskPath 或 workDir，使用备用 prompt');
+          finalPrompt = event.mission || prompt || '';
+          console.log('[Scheduler] 备用 prompt 来源:', {
+            hasMission: !!event.mission,
+            hasPrompt: !!prompt,
+            finalLength: finalPrompt?.length ?? 0,
+          });
         }
       } else if (templateId) {
         // 简单模式 + 模板
         try {
           finalPrompt = await store.buildPrompt(templateId, taskName, prompt);
-          console.log('[Scheduler] 已应用模板，最终提示词长度:', finalPrompt.length);
+          console.log('[Scheduler] 已应用模板，最终提示词长度:', finalPrompt?.length ?? 0);
         } catch (e) {
           console.error('[Scheduler] 应用模板失败，使用原始提示词:', e);
         }
+      } else {
+        // 简单模式无模板
+        console.log('[Scheduler] 简单模式，原始 prompt 长度:', finalPrompt?.length ?? 0);
       }
 
       // 检查 prompt 是否为空
       if (!finalPrompt || finalPrompt.trim().length === 0) {
-        console.error('[Scheduler] 提示词为空，无法执行任务');
+        console.error('[Scheduler] 提示词为空，无法执行任务', {
+          mode,
+          taskPath,
+          workDir,
+          hasPrompt: !!prompt,
+          hasMission: !!event.mission,
+          hasTemplateId: !!templateId,
+        });
         get().addLog(taskId, {
           type: 'error',
           content: '提示词为空，无法执行任务',
