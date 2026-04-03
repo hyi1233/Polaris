@@ -2,6 +2,12 @@
 //!
 //! Implements TaskStorage trait using local file system.
 //! Tasks and templates are stored in JSON files within a config directory.
+//!
+//! # Caching
+//!
+//! This implementation uses in-memory caching to reduce file I/O operations.
+//! The cache is automatically invalidated on write operations and can be
+//! manually cleared using the `clear_cache` method.
 
 use crate::error::{AppError, Result};
 use crate::models::scheduler::{
@@ -13,6 +19,7 @@ use chrono::Utc;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use super::storage::StorageBackend;
@@ -22,16 +29,48 @@ const TEMPLATES_FILE_NAME: &str = "templates.json";
 const WORKSPACES_FILE_NAME: &str = "workspaces.json";
 const SCHEDULER_FILE_VERSION: &str = "1.1.0";
 
-/// Local file-based storage for scheduled tasks
+/// Cached data with timestamp for cache invalidation
+#[derive(Debug, Clone)]
+struct CachedData<T> {
+    data: T,
+    timestamp: std::time::Instant,
+}
+
+/// Local file-based storage for scheduled tasks with caching
 pub struct LocalFileStorage {
     /// Storage directory path
     storage_dir: PathBuf,
+    /// Tasks cache
+    tasks_cache: Arc<Mutex<Option<CachedData<TaskStore>>>>,
+    /// Templates cache
+    templates_cache: Arc<Mutex<Option<CachedData<TemplateStore>>>>,
+    /// Workspaces cache
+    workspaces_cache: Arc<Mutex<Option<CachedData<WorkspacesFile>>>>,
+    /// Cache TTL in seconds (default: 30 seconds)
+    cache_ttl_secs: u64,
 }
 
 impl LocalFileStorage {
     /// Create a new local file storage instance
     pub fn new(storage_dir: PathBuf) -> Self {
-        Self { storage_dir }
+        Self {
+            storage_dir,
+            tasks_cache: Arc::new(Mutex::new(None)),
+            templates_cache: Arc::new(Mutex::new(None)),
+            workspaces_cache: Arc::new(Mutex::new(None)),
+            cache_ttl_secs: 30,
+        }
+    }
+
+    /// Create a new local file storage instance with custom cache TTL
+    pub fn with_cache_ttl(storage_dir: PathBuf, ttl_secs: u64) -> Self {
+        Self {
+            storage_dir,
+            tasks_cache: Arc::new(Mutex::new(None)),
+            templates_cache: Arc::new(Mutex::new(None)),
+            workspaces_cache: Arc::new(Mutex::new(None)),
+            cache_ttl_secs: ttl_secs,
+        }
     }
 
     /// Get the storage directory path
@@ -44,23 +83,55 @@ impl LocalFileStorage {
         StorageBackend::LocalFile
     }
 
+    /// Clear all caches (useful for testing or forced reload)
+    pub fn clear_cache(&self) {
+        *self.tasks_cache.lock().unwrap() = None;
+        *self.templates_cache.lock().unwrap() = None;
+        *self.workspaces_cache.lock().unwrap() = None;
+    }
+
+    /// Check if cached data is still valid
+    fn is_cache_valid<T>(cached: &Option<CachedData<T>>, ttl_secs: u64) -> bool {
+        if let Some(cached) = cached {
+            cached.timestamp.elapsed().as_secs() < ttl_secs
+        } else {
+            false
+        }
+    }
+
     // =========================================================================
-    // File Operations
+    // File Operations with Caching
     // =========================================================================
 
     fn read_tasks_file(&self) -> Result<TaskStore> {
-        let file_path = self.storage_dir.join(TASKS_FILE_NAME);
-
-        if !file_path.exists() {
-            let empty = TaskStore::default();
-            self.write_tasks_file(&empty)?;
-            return Ok(empty);
+        // Check cache first
+        {
+            let cache = self.tasks_cache.lock().unwrap();
+            if Self::is_cache_valid(&cache, self.cache_ttl_secs) {
+                return Ok(cache.as_ref().unwrap().data.clone());
+            }
         }
 
-        let content = std::fs::read_to_string(&file_path)?;
-        let raw_json: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}));
+        // Cache miss or expired, read from file
+        let file_path = self.storage_dir.join(TASKS_FILE_NAME);
 
-        Ok(normalize_file_data(raw_json))
+        let data = if !file_path.exists() {
+            let empty = TaskStore::default();
+            self.write_tasks_file(&empty)?;
+            empty
+        } else {
+            let content = std::fs::read_to_string(&file_path)?;
+            let raw_json: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}));
+            normalize_file_data(raw_json)
+        };
+
+        // Update cache
+        *self.tasks_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
+        Ok(data)
     }
 
     fn write_tasks_file(&self, data: &TaskStore) -> Result<()> {
@@ -72,20 +143,43 @@ impl LocalFileStorage {
         let file_path = self.storage_dir.join(TASKS_FILE_NAME);
         let content = serde_json::to_string_pretty(data)?;
         std::fs::write(&file_path, format!("{}\n", content))?;
+
+        // Update cache after write
+        *self.tasks_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
         Ok(())
     }
 
     fn read_templates_file(&self) -> Result<TemplateStore> {
-        let file_path = self.storage_dir.join(TEMPLATES_FILE_NAME);
-
-        if !file_path.exists() {
-            let empty = create_empty_template_store();
-            self.write_templates_file(&empty)?;
-            return Ok(empty);
+        // Check cache first
+        {
+            let cache = self.templates_cache.lock().unwrap();
+            if Self::is_cache_valid(&cache, self.cache_ttl_secs) {
+                return Ok(cache.as_ref().unwrap().data.clone());
+            }
         }
 
-        let content = std::fs::read_to_string(&file_path)?;
-        let data: TemplateStore = serde_json::from_str(&content).unwrap_or_else(|_| create_empty_template_store());
+        // Cache miss or expired, read from file
+        let file_path = self.storage_dir.join(TEMPLATES_FILE_NAME);
+
+        let data = if !file_path.exists() {
+            let empty = create_empty_template_store();
+            self.write_templates_file(&empty)?;
+            empty
+        } else {
+            let content = std::fs::read_to_string(&file_path)?;
+            serde_json::from_str(&content).unwrap_or_else(|_| create_empty_template_store())
+        };
+
+        // Update cache
+        *self.templates_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
         Ok(data)
     }
 
@@ -98,21 +192,44 @@ impl LocalFileStorage {
         let file_path = self.storage_dir.join(TEMPLATES_FILE_NAME);
         let content = serde_json::to_string_pretty(data)?;
         std::fs::write(&file_path, format!("{}\n", content))?;
+
+        // Update cache after write
+        *self.templates_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
         Ok(())
     }
 
     fn read_workspaces_file(&self) -> Result<WorkspacesFile> {
-        let file_path = self.storage_dir.join(WORKSPACES_FILE_NAME);
-
-        if !file_path.exists() {
-            return Ok(WorkspacesFile {
-                version: SCHEDULER_FILE_VERSION.to_string(),
-                workspaces: Vec::new(),
-            });
+        // Check cache first
+        {
+            let cache = self.workspaces_cache.lock().unwrap();
+            if Self::is_cache_valid(&cache, self.cache_ttl_secs) {
+                return Ok(cache.as_ref().unwrap().data.clone());
+            }
         }
 
-        let content = std::fs::read_to_string(&file_path)?;
-        let data: WorkspacesFile = serde_json::from_str(&content).unwrap_or_default();
+        // Cache miss or expired, read from file
+        let file_path = self.storage_dir.join(WORKSPACES_FILE_NAME);
+
+        let data = if !file_path.exists() {
+            WorkspacesFile {
+                version: SCHEDULER_FILE_VERSION.to_string(),
+                workspaces: Vec::new(),
+            }
+        } else {
+            let content = std::fs::read_to_string(&file_path)?;
+            serde_json::from_str(&content).unwrap_or_default()
+        };
+
+        // Update cache
+        *self.workspaces_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
         Ok(data)
     }
 
@@ -125,6 +242,13 @@ impl LocalFileStorage {
         let file_path = self.storage_dir.join(WORKSPACES_FILE_NAME);
         let content = serde_json::to_string_pretty(data)?;
         std::fs::write(&file_path, format!("{}\n", content))?;
+
+        // Update cache after write
+        *self.workspaces_cache.lock().unwrap() = Some(CachedData {
+            data: data.clone(),
+            timestamp: std::time::Instant::now(),
+        });
+
         Ok(())
     }
 }
@@ -783,6 +907,81 @@ mod tests {
         storage.unregister_workspace("/path/to/ws1").unwrap();
         let workspaces = storage.list_workspaces().unwrap();
         assert_eq!(workspaces.len(), 1);
+
+        let _ = std::fs::remove_dir_all(&storage_dir);
+    }
+
+    #[test]
+    fn cache_reduces_file_reads() {
+        let storage_dir = temp_dir("cache");
+        std::fs::create_dir_all(&storage_dir).unwrap();
+
+        let storage = LocalFileStorage::new(storage_dir.clone());
+
+        // Create a task
+        storage
+            .create_task(
+                CreateTaskParams {
+                    name: "Cache测试".to_string(),
+                    enabled: true,
+                    trigger_type: TriggerType::Interval,
+                    trigger_value: "1h".to_string(),
+                    engine_id: "test".to_string(),
+                    prompt: "test".to_string(),
+                    ..Default::default()
+                },
+                None,
+                None,
+            )
+            .unwrap();
+
+        // First read - from file
+        let tasks1 = storage.list_tasks(None).unwrap();
+
+        // Second read - from cache
+        let tasks2 = storage.list_tasks(None).unwrap();
+
+        // Both should return same data
+        assert_eq!(tasks1.len(), tasks2.len());
+        assert_eq!(tasks1[0].name, tasks2[0].name);
+
+        let _ = std::fs::remove_dir_all(&storage_dir);
+    }
+
+    #[test]
+    fn clear_cache_forces_reload() {
+        let storage_dir = temp_dir("clear_cache");
+        std::fs::create_dir_all(&storage_dir).unwrap();
+
+        let storage = LocalFileStorage::new(storage_dir.clone());
+
+        // Create a task
+        storage
+            .create_task(
+                CreateTaskParams {
+                    name: "Clear Cache测试".to_string(),
+                    enabled: true,
+                    trigger_type: TriggerType::Interval,
+                    trigger_value: "1h".to_string(),
+                    engine_id: "test".to_string(),
+                    prompt: "test".to_string(),
+                    ..Default::default()
+                },
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Read tasks
+        let tasks = storage.list_tasks(None).unwrap();
+        assert_eq!(tasks.len(), 1);
+
+        // Clear cache
+        storage.clear_cache();
+
+        // Read again - should reload from file
+        let tasks_after_clear = storage.list_tasks(None).unwrap();
+        assert_eq!(tasks_after_clear.len(), 1);
 
         let _ = std::fs::remove_dir_all(&storage_dir);
     }
