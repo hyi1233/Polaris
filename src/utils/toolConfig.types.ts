@@ -17,6 +17,7 @@ export type ToolCategory =
   | 'manage'    // 任务管理
   | 'analyze'   // 代码分析
   | 'network'   // 网络请求
+  | 'agent'     // Agent/Skill/Task 子任务
   | 'other';    // 其他
 
 /** 工具配置 */

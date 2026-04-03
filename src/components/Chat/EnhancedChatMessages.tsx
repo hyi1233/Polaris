@@ -19,13 +19,13 @@ import { clsx } from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
 import type { ChatMessage, UserChatMessage, AssistantChatMessage, ContentBlock, TextBlock, ThinkingBlock, ToolCallBlock } from '../../types';
 import { useEventChatStore, useGitStore, useWorkspaceStore, useTabStore, useToastStore } from '../../stores';
-import { getToolConfig, extractToolKeyInfo } from '../../utils/toolConfig';
+import { getToolConfig, extractToolKeyInfo, getToolShortName } from '../../utils/toolConfig';
 import { markdownCache } from '../../utils/cache';
 import { useThrottle } from '../../hooks/useThrottle';
 import {
   formatDuration,
   calculateDuration,
-  generateOutputSummary,
+  generateCollapsedSummary,
   parseGrepMatches,
   stripAnsiCodes,
   escapeRegExp,
@@ -39,7 +39,6 @@ import { QuestionBlockRenderer, SimplifiedQuestionRenderer } from './QuestionBlo
 import { PlanModeBlockRenderer, SimplifiedPlanModeRenderer } from './PlanModeBlockRenderer';
 import { AgentRunBlockRenderer, SimplifiedAgentRunRenderer } from './AgentRunBlockRenderer';
 import { PermissionRequestRenderer, SimplifiedPermissionRequestRenderer } from './PermissionRequestRenderer';
-import { ToolGroupRenderer } from './ToolGroupRenderer';
 import { ContentBlockErrorBoundary } from './ContentBlockErrorBoundary';
 import { groupConversationRounds } from '../../utils/conversationRounds';
 import { splitMarkdownWithMermaid } from '../../utils/markdown';
@@ -818,19 +817,6 @@ const TodoWriteInputRenderer = memo(function TodoWriteInputRenderer({
   );
 });
 
-/**
- * TodoWrite 任务状态图标（用于折叠状态）
- */
-function getTodoStatusIcon(status: TodoItem['status']): React.ReactElement {
-  const config = TODO_STATUS_CONFIG[status];
-  const Icon = config.icon;
-  return (
-    <Icon className={clsx('w-3 h-3', config.color,
-      status === 'in_progress' && 'animate-spin'
-    )} />
-  );
-}
-
 // ========================================
 // 思考过程块渲染器
 // ========================================
@@ -843,12 +829,12 @@ const ThinkingBlockRenderer = memo(function ThinkingBlockRenderer({
   block: ThinkingBlock;
   isStreaming?: boolean;
 }) {
-  // 流式阶段默认展开，完成后默认折叠
+  // 始终默认折叠（流式时也不展开，避免界面跳动）
   const [isCollapsed, setIsCollapsed] = useState(() => {
     // 如果有明确的 collapsed 属性，使用它
     if (block.collapsed !== undefined) return block.collapsed;
-    // 否则：流式阶段展开，完成后折叠
-    return !isStreaming;
+    // 否则：始终默认折叠
+    return true;
   });
 
   // 计算字数统计
@@ -868,19 +854,6 @@ const ThinkingBlockRenderer = memo(function ThinkingBlockRenderer({
       ? block.content.slice(0, 80) + '...'
       : block.content;
   }, [block.content, steps]);
-
-  // 同步流式状态：当开始流式时展开，停止流式时折叠
-  const prevStreamingRef = useRef(isStreaming);
-  if (prevStreamingRef.current !== isStreaming) {
-    if (isStreaming && isCollapsed) {
-      // 开始流式时展开
-      setIsCollapsed(false);
-    } else if (!isStreaming && !isCollapsed && block.collapsed === undefined) {
-      // 停止流式时折叠（如果没有明确设置过 collapsed）
-      setIsCollapsed(true);
-    }
-    prevStreamingRef.current = isStreaming;
-  }
 
   return (
     <div className="my-2 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent overflow-hidden">
@@ -984,6 +957,7 @@ const ThinkingBlockRenderer = memo(function ThinkingBlockRenderer({
 /** 工具调用块组件 - 优化版本 */
 const ToolCallBlockRenderer = memo(function ToolCallBlockRenderer({ block }: { block: ToolCallBlock }) {
   const { t } = useTranslation('chat');
+  // 始终默认折叠（流式时也不展开，避免界面跳动）
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFullOutput, setShowFullOutput] = useState(false);
   const [showToolDetails, setShowToolDetails] = useState(false);
@@ -1010,14 +984,6 @@ const ToolCallBlockRenderer = memo(function ToolCallBlockRenderer({ block }: { b
 
   // 提取关键信息
   const keyInfo = useMemo(() => extractToolKeyInfo(block.name, block.input), [block.name, block.input]);
-
-  // 生成输出摘要
-  const outputSummary = useMemo(() => {
-    if (block.status === 'completed' && block.output) {
-      return generateOutputSummary(block.name, block.output, block.status, block.input);
-    }
-    return null;
-  }, [block.name, block.output, block.status, block.input]);
 
   // Edit 工具的简化输出提示
   const editOutputSummary = useMemo(() => {
@@ -1069,15 +1035,23 @@ const ToolCallBlockRenderer = memo(function ToolCallBlockRenderer({ block }: { b
   // 判断输出是否需要展开功能（修复：基于实际长度而非 outputSummary）
   const outputNeedsExpand = (block.output?.length ?? 0) > 1000;
 
+  // 生成折叠状态的简化摘要（用于单行显示）
+  const collapsedSummary = useMemo(() => {
+    if (block.status === 'completed' || block.status === 'failed') {
+      return generateCollapsedSummary(block.name, block.input, block.output, block.status);
+    }
+    return null;
+  }, [block.name, block.input, block.output, block.status]);
+
+  // 获取工具缩写
+  const toolShortName = useMemo(() => getToolShortName(block.name), [block.name]);
+
   // 格式化输入参数（非 TodoWrite 工具使用）
   const formatInput = (input: Record<string, unknown>): string => {
     const entries = Object.entries(input);
     if (entries.length === 0) return '';
     return entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n');
   };
-
-  // 工具图标组件
-  const ToolIcon = toolConfig.icon;
 
   // 是否可展开（有输入参数或有输出）
   const hasInput = block.input && Object.keys(block.input).length > 0;
@@ -1226,93 +1200,92 @@ const ToolCallBlockRenderer = memo(function ToolCallBlockRenderer({ block }: { b
   return (
     <div
       className={clsx(
-        'my-2 rounded-lg overflow-hidden w-full transition-all duration-200',
-        'border border-border',
-        'bg-background-surface',
-        statusAnimationClass
+        'my-1.5 rounded-lg overflow-hidden w-full transition-all duration-200',
+        'border border-border bg-background-elevated',
+        statusAnimationClass,
+        block.status === 'failed' && 'border-error/30 bg-error-faint/50'
       )}
     >
-      {/* 工具调用头部 - 左侧色条 */}
+      {/* 统一头部 - 折叠和展开共用 */}
       <div
         className={clsx(
-          'flex items-center gap-3 px-3 py-2',
-          canExpand ? 'cursor-pointer hover:bg-background-hover' : 'cursor-default',
-          'border-l-4',
+          'flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-background-hover transition-colors',
+          'border-l-2',
           toolConfig.borderColor
         )}
         onClick={() => canExpand && setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            canExpand && setIsExpanded(!isExpanded);
+          }
+        }}
+        tabIndex={canExpand ? 0 : -1}
+        role="button"
+        aria-expanded={isExpanded}
       >
-        {/* 工具类型图标 */}
-        <div className={clsx('p-1.5 rounded-md', toolConfig.bgColor)}>
-          <ToolIcon className={clsx('w-4 h-4', toolConfig.color)} />
+        {/* 工具缩写图标 - 始终使用字母缩写 */}
+        <div
+          className={clsx(
+            'w-5 h-5 rounded text-[10px] font-semibold flex items-center justify-center shrink-0',
+            toolConfig.bgColor,
+            toolConfig.color
+          )}
+        >
+          {toolShortName}
         </div>
 
-        {/* 操作描述 */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-text-secondary">
-              {block.status === 'running' ? t('tool.running') : t('tool.completed')}{toolConfig.label}
-            </span>
-            {keyInfo && (
-              <span className={clsx('font-medium truncate', toolConfig.color)}>
-                {keyInfo}
-              </span>
-            )}
-          </div>
-          {/* 输出摘要（折叠时显示） */}
-          {!isExpanded && outputSummary && (
-            <div className="text-xs text-text-tertiary mt-0.5 flex items-center gap-1">
-              {isGrepTool(block) && grepData ? (
-                <>
-                  <FileSearch className="w-3 h-3 shrink-0" />
-                  <span>{outputSummary.summary}</span>
-                </>
-              ) : (
-                <span>{outputSummary.summary}</span>
-              )}
-              {(outputSummary.expandable || outputNeedsExpand) && (
-                <ChevronRight className="w-3 h-3 shrink-0" />
-              )}
-            </div>
-          )}
-          {/* TodoWrite 任务预览（折叠时显示前2个任务） */}
-          {!isExpanded && todoData && todoData.total > 0 && (
-            <div className="mt-1.5 space-y-0.5">
-              {todoData.todos.slice(0, 2).map((todo, idx) => (
-                <div key={idx} className="text-xs text-text-tertiary flex items-center gap-1.5">
-                  {getTodoStatusIcon(todo.status)}
-                  <span className="truncate">{todo.content}</span>
-                </div>
-              ))}
-              {todoData.total > 2 && (
-                <div className="text-xs text-text-muted">
-                  {t('tool.moreTasks', { count: todoData.total - 2 })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* 工具名称 */}
+        <span className="text-xs font-medium text-text-secondary shrink-0">
+          {toolConfig.label}
+        </span>
 
-        {/* 状态与耗时 */}
-        <div className="flex items-center gap-2 shrink-0">
-          {duration && (
-            <span className="text-xs text-text-tertiary">{duration}</span>
-          )}
-          <StatusIcon className={clsx('w-4 h-4', statusConfig.className)} />
-        </div>
+        {/* 关键参数 */}
+        {keyInfo && (
+          <span className={clsx('text-xs truncate flex-1 min-w-0', toolConfig.color)}>
+            {keyInfo}
+          </span>
+        )}
 
-        {/* 展开/收起图标 */}
+        {/* 耗时 */}
+        {duration && (
+          <span className="text-[10px] text-text-muted px-1.5 py-0.5 bg-background-secondary rounded shrink-0">
+            {duration}
+          </span>
+        )}
+
+        {/* 输出摘要 */}
+        {collapsedSummary && collapsedSummary.summary && (
+          <span className={clsx(
+            'text-[10px] px-1.5 py-0.5 rounded shrink-0',
+            collapsedSummary.summaryType === 'lines' && 'text-sky-500 bg-sky-500/10',
+            collapsedSummary.summaryType === 'files' && 'text-primary bg-primary/10',
+            collapsedSummary.summaryType === 'matches' && 'text-cyan-500 bg-cyan-500/10',
+            collapsedSummary.summaryType === 'diff' && 'text-warning bg-warning/10',
+            collapsedSummary.summaryType === 'status' && (block.status === 'completed' ? 'text-success bg-success/10' : 'text-error bg-error/10'),
+            collapsedSummary.summaryType === 'size' && 'text-sky-500 bg-sky-500/10',
+            collapsedSummary.summaryType === 'count' && 'text-primary bg-primary/10',
+            collapsedSummary.summaryType === 'plain' && 'text-text-tertiary bg-background-secondary'
+          )}>
+            {collapsedSummary.summary}
+          </span>
+        )}
+
+        {/* 状态图标 */}
+        <StatusIcon className={clsx('w-3.5 h-3.5 shrink-0', statusConfig.className)} />
+
+        {/* 展开/收起箭头 */}
         {canExpand && (
           <ChevronDown
             className={clsx(
-              'w-4 h-4 text-text-muted transition-transform shrink-0',
+              'w-3 h-3 text-text-muted shrink-0 transition-transform duration-200',
               isExpanded && 'rotate-180'
             )}
           />
         )}
       </div>
 
-      {/* 可展开的详情 */}
+      {/* 展开时显示详情区域 */}
       {isExpanded && (
         <div className="px-4 py-3 bg-background-subtle border-t border-border">
           {/* 工具名称和时间 */}
@@ -1880,83 +1853,20 @@ const AssistantBubble = memo(function AssistantBubble({
   return true;
 });
 
-/** 工具聚合配置 */
-const TOOL_GROUP_CONFIG = {
-  /** 最小工具数量（少于此数量不聚合） */
-  minToolsForGroup: 2,
-  /** 时间窗口（毫秒），超过此时间的工具不聚合 */
-  timeWindowMs: 3000,
-}
-
 /**
- * 检测并聚合相邻的工具调用块
- * 返回渲染后的 React 节点数组
+ * 渲染内容块数组
+ * 每个块独立渲染，不再聚合工具调用
  */
 function renderBlocksWithGrouping(
   blocks: ContentBlock[],
   isStreaming: boolean | undefined,
   renderMode: MessageRenderMode
 ): React.ReactNode[] {
-  const result: React.ReactNode[] = []
-  let i = 0
-
-  while (i < blocks.length) {
-    const block = blocks[i]
-
-    // 检测是否为工具调用块
-    if (block.type === 'tool_call') {
-      // 收集连续的工具调用块
-      const toolBlocks: ToolCallBlock[] = [block]
-      let j = i + 1
-
-      while (j < blocks.length && blocks[j].type === 'tool_call') {
-        // 检查时间窗口
-        const currentTool = blocks[j] as ToolCallBlock
-        const prevTool = toolBlocks[toolBlocks.length - 1]
-        const prevTime = prevTool.startedAt ? new Date(prevTool.startedAt).getTime() : 0
-        const currTime = currentTool.startedAt ? new Date(currentTool.startedAt).getTime() : Date.now()
-
-        // 如果在时间窗口内，添加到组
-        if (currTime - prevTime < TOOL_GROUP_CONFIG.timeWindowMs) {
-          toolBlocks.push(currentTool)
-          j++
-        } else {
-          break
-        }
-      }
-
-      // 判断是否聚合
-      if (toolBlocks.length >= TOOL_GROUP_CONFIG.minToolsForGroup) {
-        // 渲染工具组
-        result.push(
-          <ToolGroupRenderer
-            key={`tool-group-${i}`}
-            tools={toolBlocks}
-            renderMode={renderMode}
-          />
-        )
-        i = j
-      } else {
-        // 单独渲染
-        result.push(
-          <div key={`block-${i}`}>
-            {renderContentBlock(block, isStreaming, renderMode)}
-          </div>
-        )
-        i++
-      }
-    } else {
-      // 非工具块，正常渲染
-      result.push(
-        <div key={`block-${i}`}>
-          {renderContentBlock(block, isStreaming, renderMode)}
-        </div>
-      )
-      i++
-    }
-  }
-
-  return result
+  return blocks.map((block, index) => (
+    <div key={`block-${index}`}>
+      {renderContentBlock(block, isStreaming, renderMode)}
+    </div>
+  ))
 }
 
 /** 系统消息组件 */

@@ -48,6 +48,51 @@ import {
 
 const t = (key: string, options?: Record<string, unknown>) => i18n.t(key, { ns: 'tools', ...options });
 
+// ========================================
+// 工具缩写映射（用于单行紧凑显示）
+// ========================================
+
+const TOOL_SHORT_NAMES: Record<string, string> = {
+  'Read': 'R',
+  'read_file': 'R',
+  'ReadFile': 'R',
+  'Glob': 'G',
+  'Grep': 'G',
+  'Edit': 'E',
+  'str_replace_editor': 'E',
+  'Write': 'W',
+  'write_file': 'W',
+  'WriteFile': 'W',
+  'CreateFile': 'W',
+  'create_file': 'W',
+  'Bash': 'B',
+  'BashCommand': 'B',
+  'run_command': 'B',
+  'WebSearch': 'S',
+  'web_search': 'S',
+  'WebFetch': 'F',
+  'web_fetch': 'F',
+  'TodoWrite': 'T',
+  'todowrite': 'T',
+  'Task': 'A',
+  'task': 'A',
+  'Agent': 'A',
+  'agent': 'A',
+  'Skill': 'K',
+  'skill': 'K',
+  'GitCommand': 'G',
+  'git_command': 'G',
+  'DeleteFile': 'D',
+  'delete_file': 'D',
+  'Analyze': 'Z',
+  'analyze': 'Z',
+};
+
+/** 获取工具缩写名称 */
+export function getToolShortName(toolName: string): string {
+  return TOOL_SHORT_NAMES[toolName] || toolName.charAt(0).toUpperCase();
+}
+
 const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'read_file': FileText,
   'Read': FileText,
@@ -167,6 +212,11 @@ const CATEGORY_CONFIG: Record<ToolCategory, {
     borderColor: 'border-l-sky-500',
     bgColor: 'bg-sky-500/10',
   },
+  agent: {
+    color: 'text-teal-500',
+    borderColor: 'border-l-teal-500',
+    bgColor: 'bg-teal-500/10',
+  },
   other: {
     color: 'text-gray-500',
     borderColor: 'border-l-gray-500',
@@ -224,10 +274,12 @@ const TOOL_CATEGORY: Record<string, ToolCategory> = {
   'http_request': 'network',
   'database_query': 'other',
   'DatabaseQuery': 'other',
-  'task': 'other',
-  'Task': 'other',
-  'Skill': 'other',
-  'skill': 'other',
+  'task': 'agent',
+  'Task': 'agent',
+  'Agent': 'agent',
+  'agent': 'agent',
+  'Skill': 'agent',
+  'skill': 'agent',
   'AskUserQuestion': 'other',
   'ask_user_question': 'other',
 };
@@ -262,6 +314,8 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   'DatabaseQuery': 'labels.database',
   'task': 'labels.task',
   'Task': 'labels.task',
+  'Agent': 'labels.agent',
+  'agent': 'labels.agent',
   'Skill': 'labels.skill',
   'skill': 'labels.skill',
   'TodoWrite': 'labels.todoList',

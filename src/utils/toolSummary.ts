@@ -18,10 +18,15 @@ const t = (key: string, options?: Record<string, unknown>) => i18n.t(key, { ns: 
 const TOOL_NAME_MAP: Record<string, string> = {
   'str_replace_editor': 'names.editFile',
   'Edit': 'names.editFile',
+  'Read': 'names.readFile',
   'ReadFile': 'names.readFile',
   'read_file': 'names.readFile',
+  'Glob': 'names.searchFiles',
+  'Grep': 'names.searchContent',
+  'Bash': 'names.executeCommand',
   'BashCommand': 'names.executeCommand',
   'run_command': 'names.executeCommand',
+  'Write': 'names.writeFile',
   'WriteFile': 'names.writeFile',
   'write_file': 'names.writeFile',
   'ListFiles': 'names.listFiles',
@@ -36,6 +41,8 @@ const TOOL_NAME_MAP: Record<string, string> = {
   'api_call': 'names.apiRequest',
   'WebSearch': 'names.webSearch',
   'web_search': 'names.webSearch',
+  'WebFetch': 'names.webRequest',
+  'web_fetch': 'names.webRequest',
   'FileBrowser': 'names.browseFiles',
   'file_browser': 'names.browseFiles',
   'CreateFile': 'names.createFile',
@@ -46,6 +53,14 @@ const TOOL_NAME_MAP: Record<string, string> = {
   'move_file': 'names.moveFile',
   'CopyFile': 'names.copyFile',
   'copy_file': 'names.copyFile',
+  'TodoWrite': 'names.todoList',
+  'todowrite': 'names.todoList',
+  'Task': 'names.task',
+  'task': 'names.task',
+  'Agent': 'names.agent',
+  'agent': 'names.agent',
+  'Skill': 'names.skill',
+  'skill': 'names.skill',
 };
 
 function getToolFriendlyName(toolName: string): string {
@@ -215,13 +230,182 @@ export type OutputSummaryType =
   | 'todoProgress'
   | 'urlFetch'
   | 'diffSummary'
-  | 'plain';
+  | 'plain'
+  | 'agentSummary'
+  | 'skillSummary';
 
 export interface OutputSummary {
   type: OutputSummaryType;
   summary: string;
   fullOutput?: string;
   expandable?: boolean;
+}
+
+/**
+ * 生成折叠状态的简化单行摘要
+ * 用于工具调用块的默认显示
+ */
+export interface CollapsedSummary {
+  /** 主要信息（文件名、搜索词等） */
+  target: string;
+  /** 输出摘要（行数、匹配数等） */
+  summary: string;
+  /** 摘要类型（用于样式） */
+  summaryType: 'lines' | 'files' | 'matches' | 'diff' | 'status' | 'size' | 'count' | 'plain';
+}
+
+export function generateCollapsedSummary(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  output: string | undefined,
+  status: ToolStatus
+): CollapsedSummary {
+  const normalizedToolName = toolName.toLowerCase();
+  const filePath = extractFilePath(input);
+  const command = extractCommand(input, 30);
+  const query = extractSearchQuery(input, 20);
+
+  // Read 工具：显示行数
+  if (normalizedToolName.includes('read') || normalizedToolName === 'read') {
+    const lines = output ? output.split('\n').length : 0;
+    return {
+      target: filePath || toolName,
+      summary: `${lines} ${t('output.lines')}`,
+      summaryType: 'lines',
+    };
+  }
+
+  // Glob 工具：显示文件数
+  if (normalizedToolName.includes('glob')) {
+    const files = output ? output.trim().split('\n').filter(f => f.trim()).length : 0;
+    return {
+      target: input?.pattern as string || query || toolName,
+      summary: `${files} ${t('output.files')}`,
+      summaryType: 'files',
+    };
+  }
+
+  // Grep 工具：显示匹配数
+  if (normalizedToolName.includes('grep')) {
+    const matches = output ? output.trim().split('\n').filter(l => l.trim()).length : 0;
+    return {
+      target: `"${query || input?.pattern || ''}"`,
+      summary: `${matches} ${t('output.matches')}`,
+      summaryType: 'matches',
+    };
+  }
+
+  // Edit 工具：显示 diff 统计
+  if (normalizedToolName.includes('edit') || normalizedToolName.includes('str_replace')) {
+    // 尝试解析 diff 统计
+    const diffStats = parseDiffStats(output);
+    return {
+      target: filePath || toolName,
+      summary: diffStats,
+      summaryType: 'diff',
+    };
+  }
+
+  // Write 工具：显示写入状态
+  if (normalizedToolName.includes('write') || normalizedToolName.includes('create')) {
+    const lines = output ? output.split('\n').length : 0;
+    return {
+      target: filePath || toolName,
+      summary: lines > 0 ? `${lines} ${t('output.lines')}` : t('output.newFile'),
+      summaryType: 'lines',
+    };
+  }
+
+  // Bash 工具：显示状态
+  if (normalizedToolName.includes('bash') || normalizedToolName.includes('command')) {
+    const isSuccess = status === 'completed' && !output?.toLowerCase().includes('error');
+    return {
+      target: command || toolName,
+      summary: isSuccess ? '✓' : (status === 'failed' ? '✗' : ''),
+      summaryType: 'status',
+    };
+  }
+
+  // WebSearch 工具：显示结果数
+  if (normalizedToolName.includes('search') || normalizedToolName.includes('web_search')) {
+    const countMatch = output?.match(/found?\s*(\d+)\s*result/i);
+    const count = countMatch ? countMatch[1] : '?';
+    return {
+      target: `"${query || ''}"`,
+      summary: `${count} ${t('output.results')}`,
+      summaryType: 'count',
+    };
+  }
+
+  // WebFetch 工具：显示大小
+  if (normalizedToolName.includes('webfetch') || normalizedToolName.includes('fetch')) {
+    const sizeKB = output ? (output.length / 1024).toFixed(1) : '0';
+    const url = (input?.url as string) || '';
+    const host = url ? new URL(url).host : toolName;
+    return {
+      target: host,
+      summary: `${sizeKB} KB`,
+      summaryType: 'size',
+    };
+  }
+
+  // TodoWrite 工具：显示待办数
+  if (normalizedToolName.includes('todo')) {
+    const todos = input?.todos as Array<unknown> | undefined;
+    const count = todos?.length || 0;
+    return {
+      target: toolName,
+      summary: `${count} ${t('output.todos')}`,
+      summaryType: 'count',
+    };
+  }
+
+  // Task/Agent 工具：显示状态
+  if (normalizedToolName.includes('task') || normalizedToolName.includes('agent')) {
+    const agentType = (input?.agentType as string) || (input?.subagent_type as string) || toolName;
+    return {
+      target: agentType,
+      summary: status === 'completed' ? '✓' : (status === 'failed' ? '✗' : ''),
+      summaryType: 'status',
+    };
+  }
+
+  // Skill 工具：显示状态
+  if (normalizedToolName.includes('skill')) {
+    const skillName = (input?.skill as string) || toolName;
+    return {
+      target: skillName,
+      summary: status === 'completed' ? '✓' : (status === 'failed' ? '✗' : ''),
+      summaryType: 'status',
+    };
+  }
+
+  // 默认：显示完成状态
+  return {
+    target: filePath || command || query || toolName,
+    summary: status === 'completed' ? '✓' : (status === 'failed' ? '✗' : ''),
+    summaryType: 'status',
+  };
+}
+
+/**
+ * 解析 diff 统计信息
+ */
+function parseDiffStats(output: string | undefined): string {
+  if (!output) return '';
+
+  // 尝试从输出中提取 +/- 行数
+  const plusMatch = output.match(/\+(\d+)/g);
+  const minusMatch = output.match(/-(\d+)/g);
+
+  const plusCount = plusMatch?.reduce((sum, m) => sum + parseInt(m.slice(1)), 0) || 0;
+  const minusCount = minusMatch?.reduce((sum, m) => sum + parseInt(m.slice(1)), 0) || 0;
+
+  if (plusCount > 0 || minusCount > 0) {
+    return `+${plusCount} -${minusCount}`;
+  }
+
+  return '';
 }
 
 export interface GrepMatch {
@@ -499,6 +683,96 @@ export function generateOutputSummary(
     normalizedToolName.includes('create')
   ) {
     return parseWriteOutput(output);
+  }
+
+  // 新增：WebFetch 工具
+  if (normalizedToolName.includes('webfetch') || normalizedToolName.includes('web_fetch')) {
+    return parseWebFetchOutput(output);
+  }
+
+  // 新增：TodoWrite 工具
+  if (normalizedToolName.includes('todo') || normalizedToolName.includes('todowrite')) {
+    return parseTodoOutput(output, input);
+  }
+
+  // 新增：Task/Agent 工具
+  if (normalizedToolName.includes('task') || normalizedToolName.includes('agent')) {
+    return parseTaskOutput(output);
+  }
+
+  // 新增：Skill 工具
+  if (normalizedToolName.includes('skill')) {
+    return parseSkillOutput(output);
+  }
+
+  const preview = output.slice(0, 50);
+  return {
+    type: 'plain',
+    summary: preview + (output.length > 50 ? '...' : ''),
+    fullOutput: output,
+    expandable: output.length > 50,
+  };
+}
+
+/**
+ * 解析 WebFetch 输出
+ */
+function parseWebFetchOutput(output: string): OutputSummary | null {
+  if (!output.trim()) {
+    return { type: 'urlFetch', summary: t('output.fetchCompleted') };
+  }
+
+  const sizeKB = (output.length / 1024).toFixed(1);
+  return {
+    type: 'urlFetch',
+    summary: `${sizeKB} KB`,
+    fullOutput: output,
+    expandable: output.length > 200,
+  };
+}
+
+/**
+ * 解析 TodoWrite 输出
+ */
+function parseTodoOutput(output: string, input?: Record<string, unknown>): OutputSummary | null {
+  // 从 input 解析待办数量
+  const todos = input?.todos as Array<unknown> | undefined;
+  if (todos && Array.isArray(todos)) {
+    const count = todos.length;
+    return {
+      type: 'todoProgress',
+      summary: t('output.todosUpdated', { count }),
+      fullOutput: output,
+    };
+  }
+
+  return {
+    type: 'todoProgress',
+    summary: t('output.todoUpdated'),
+    fullOutput: output,
+  };
+}
+
+/**
+ * 解析 Task/Agent 输出
+ */
+function parseTaskOutput(output: string): OutputSummary | null {
+  const lines = output.trim().split('\n').length;
+
+  return {
+    type: 'plain',
+    summary: lines > 1 ? `${lines} ${t('output.lines')}` : t('output.completed'),
+    fullOutput: output,
+    expandable: output.length > 100,
+  };
+}
+
+/**
+ * 解析 Skill 输出
+ */
+function parseSkillOutput(output: string): OutputSummary | null {
+  if (!output.trim()) {
+    return { type: 'plain', summary: t('output.completed') };
   }
 
   const preview = output.slice(0, 50);
