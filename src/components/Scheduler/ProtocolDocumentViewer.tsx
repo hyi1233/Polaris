@@ -205,7 +205,7 @@ export function ProtocolDocumentViewer({ task, onClose }: ProtocolDocumentViewer
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background-elevated rounded-xl w-[900px] max-h-[85vh] overflow-hidden border border-border-subtle shadow-2xl flex flex-col">
+      <div className="bg-background-elevated rounded-xl w-[900px] h-[85vh] overflow-hidden border border-border-subtle shadow-2xl flex flex-col">
         {/* 头部 */}
         <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <div>
