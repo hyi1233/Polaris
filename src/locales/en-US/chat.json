@@ -93,6 +93,7 @@
     "outputResult": "Output",
     "duration": "Duration: {{duration}}",
     "moreTasks": "...{{count}} more tasks",
+    "moreTools": "{{count}} more tool calls...",
     "startTime": "Start: {{time}}",
     "endTime": "End: {{time}}",
     "fileDiff": "File Diff",

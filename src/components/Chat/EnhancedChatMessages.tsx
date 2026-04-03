@@ -32,7 +32,7 @@ import {
   type GrepMatch,
   type GrepOutputData
 } from '../../utils/toolSummary';
-import { Check, XCircle, Loader2, AlertTriangle, Play, ChevronDown, ChevronRight, Circle, FileSearch, FolderOpen, Code, FileDiff, RotateCcw, Copy, GitPullRequest, Brain, ListOrdered, Trash2, Pencil, X } from 'lucide-react';
+import { Check, XCircle, Loader2, AlertTriangle, Play, ChevronDown, ChevronRight, ChevronUp, Circle, FileSearch, FolderOpen, Code, FileDiff, RotateCcw, Copy, GitPullRequest, Brain, ListOrdered, Trash2, Pencil, X } from 'lucide-react';
 import { ChatNavigator } from './ChatNavigator';
 import { useMessageSearch, MessageSearchPanel } from './MessageSearchPanel';
 import { QuestionBlockRenderer, SimplifiedQuestionRenderer } from './QuestionBlockRenderer';
@@ -52,6 +52,26 @@ import { ContextMenu, type ContextMenuItem } from '../FileExplorer/ContextMenu';
 /** Markdown 渲染器（使用缓存优化） */
 function formatContent(content: string): string {
   return markdownCache.render(content);
+}
+
+// ========================================
+// 工具调用折叠配置
+// ========================================
+
+/** 工具调用折叠配置 */
+const TOOL_COLLAPSE_CONFIG = {
+  /** 折叠前最多显示的工具数 */
+  maxVisibleTools: 4,
+  /** 触发折叠的最小工具数（超过此值才折叠） */
+  collapseThreshold: 5,
+};
+
+/** 工具调用分组 */
+interface ToolCallGroup {
+  /** 在 blocks 数组中的起始索引 */
+  startIndex: number;
+  /** 连续的工具调用块 */
+  tools: ToolCallBlock[];
 }
 
 // ========================================
@@ -1853,20 +1873,189 @@ const AssistantBubble = memo(function AssistantBubble({
   return true;
 });
 
+// ========================================
+// 工具调用分组识别
+// ========================================
+
 /**
- * 渲染内容块数组
- * 每个块独立渲染，不再聚合工具调用
+ * 识别连续的工具调用分组
+ * 文本块、思考块等会打断分组
+ */
+function identifyToolCallGroups(blocks: ContentBlock[]): ToolCallGroup[] {
+  const groups: ToolCallGroup[] = [];
+  let currentGroup: ToolCallBlock[] = [];
+  let groupStartIndex = 0;
+
+  blocks.forEach((block, index) => {
+    if (block.type === 'tool_call') {
+      // 收集工具调用
+      if (currentGroup.length === 0) {
+        groupStartIndex = index;
+      }
+      currentGroup.push(block as ToolCallBlock);
+    } else {
+      // 非工具块，保存之前的组
+      if (currentGroup.length > 0) {
+        groups.push({
+          startIndex: groupStartIndex,
+          tools: currentGroup,
+        });
+        currentGroup = [];
+      }
+    }
+  });
+
+  // 处理末尾的工具组
+  if (currentGroup.length > 0) {
+    groups.push({
+      startIndex: groupStartIndex,
+      tools: currentGroup,
+    });
+  }
+
+  return groups;
+}
+
+// ========================================
+// 工具折叠组组件
+// ========================================
+
+/** 工具折叠组组件 - 超过阈值时折叠显示 */
+const ToolCollapseGroup = memo(function ToolCollapseGroup({
+  tools,
+  maxVisible,
+  isStreaming,
+  renderMode,
+}: {
+  tools: ToolCallBlock[];
+  maxVisible: number;
+  isStreaming?: boolean;
+  renderMode: MessageRenderMode;
+}) {
+  const { t } = useTranslation('chat');
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const hiddenCount = tools.length - maxVisible;
+  const visibleTools = isExpanded ? tools : tools.slice(0, maxVisible);
+
+  return (
+    <div className="tool-collapse-group">
+      {/* 渲染可见的工具 */}
+      {visibleTools.map((tool, index) => (
+        <div key={`tool-${index}`}>
+          {renderContentBlock(tool, isStreaming, renderMode)}
+        </div>
+      ))}
+
+      {/* 折叠/展开指示器 */}
+      {hiddenCount > 0 && (
+        <div
+          className={clsx(
+            'flex items-center gap-1.5 px-3 py-2 my-1',
+            'bg-background-surface border border-dashed border-border rounded-md',
+            'cursor-pointer text-xs text-text-secondary',
+            'hover:bg-background-hover hover:border-primary hover:text-primary',
+            'transition-all duration-150',
+            'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-base'
+          )}
+          onClick={() => setIsExpanded(!isExpanded)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsExpanded(!isExpanded);
+            }
+          }}
+          aria-expanded={isExpanded}
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="w-3.5 h-3.5" />
+              <span>{t('tool.collapse')}</span>
+            </>
+          ) : (
+            <>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span>{t('tool.moreTools', { count: hiddenCount })}</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+/**
+ * 渲染内容块数组（支持工具折叠聚合）
  */
 function renderBlocksWithGrouping(
   blocks: ContentBlock[],
   isStreaming: boolean | undefined,
   renderMode: MessageRenderMode
 ): React.ReactNode[] {
-  return blocks.map((block, index) => (
-    <div key={`block-${index}`}>
-      {renderContentBlock(block, isStreaming, renderMode)}
-    </div>
-  ))
+  // 识别工具分组
+  const toolGroups = identifyToolCallGroups(blocks);
+
+  // 如果没有工具分组，直接渲染
+  if (toolGroups.length === 0) {
+    return blocks.map((block, index) => (
+      <div key={`block-${index}`}>
+        {renderContentBlock(block, isStreaming, renderMode)}
+      </div>
+    ));
+  }
+
+  // 构建分组映射：block index -> ToolCallGroup
+  const groupMap = new Map<number, ToolCallGroup>();
+  toolGroups.forEach(group => {
+    for (let i = 0; i < group.tools.length; i++) {
+      groupMap.set(group.startIndex + i, group);
+    }
+  });
+
+  const result: React.ReactNode[] = [];
+  const processedIndices = new Set<number>();
+
+  blocks.forEach((block, index) => {
+    if (processedIndices.has(index)) return;
+
+    const group = groupMap.get(index);
+
+    if (group && group.tools.length > TOOL_COLLAPSE_CONFIG.collapseThreshold) {
+      // 需要折叠的组
+      result.push(
+        <ToolCollapseGroup
+          key={`tool-group-${group.startIndex}`}
+          tools={group.tools}
+          maxVisible={TOOL_COLLAPSE_CONFIG.maxVisibleTools}
+          isStreaming={isStreaming}
+          renderMode={renderMode}
+        />
+      );
+      // 标记组内所有工具已处理
+      group.tools.forEach((_, i) => processedIndices.add(group.startIndex + i));
+    } else if (group) {
+      // 不需要折叠的组，逐个渲染
+      group.tools.forEach((tool, i) => {
+        result.push(
+          <div key={`block-${group.startIndex + i}`}>
+            {renderContentBlock(tool, isStreaming, renderMode)}
+          </div>
+        );
+        processedIndices.add(group.startIndex + i);
+      });
+    } else {
+      // 非工具块
+      result.push(
+        <div key={`block-${index}`}>
+          {renderContentBlock(block, isStreaming, renderMode)}
+        </div>
+      );
+    }
+  });
+
+  return result;
 }
 
 /** 系统消息组件 */
