@@ -17,12 +17,23 @@
 import type { HistorySlice, HistoryEntry, UnifiedHistoryItem } from './types'
 import type { ChatMessage, UserChatMessage, AssistantChatMessage, SystemChatMessage, EngineId } from '../../types'
 import { createLogger } from '../../utils/logger'
+import { useWorkspaceStore } from '../workspaceStore'
+import { createSessionFromHistory } from '../sessionSync'
 
 const log = createLogger('EventChatStore')
 import { MAX_MESSAGES, SESSION_HISTORY_KEY, MAX_SESSION_HISTORY } from './types'
 import { getIFlowHistoryService } from '../../services/iflowHistoryService'
 import { getClaudeCodeHistoryService } from '../../services/claudeCodeHistoryService'
 import { listCodexSessions, getCodexSessionHistory } from '../../services/tauri'
+
+/**
+ * 从路径中提取名称
+ */
+function getPathBasename(pathStr: string): string {
+  const normalized = pathStr.replace(/\\/g, '/')
+  const parts = normalized.split('/')
+  return parts[parts.length - 1] || pathStr
+}
 
 /**
  * 创建历史管理 Slice
@@ -261,75 +272,76 @@ export const createHistorySlice: HistorySlice = (set, get) => ({
     try {
       set({ isLoadingHistory: true })
 
-      // 1. 先尝试从 localStorage 恢复
+      // ========== 1. 准备工作区 ==========
+      let workspaceId: string | undefined
+      let workspaceName: string | undefined
+
+      if (projectPath) {
+        // 查找已存在的工作区
+        const workspaces = useWorkspaceStore.getState().workspaces
+        const existingWorkspace = workspaces.find(w => w.path === projectPath)
+
+        if (existingWorkspace) {
+          workspaceId = existingWorkspace.id
+          workspaceName = existingWorkspace.name
+          log.debug('找到已存在的工作区', { workspaceId, workspaceName })
+        } else {
+          // 工作区不存在，自动创建
+          workspaceName = getPathBasename(projectPath)
+          log.info('工作区不存在，自动创建', { projectPath, workspaceName })
+
+          try {
+            // 创建工作区但不切换
+            await useWorkspaceStore.getState().createWorkspace(workspaceName, projectPath, false)
+            // 获取新创建的工作区
+            const newWorkspaces = useWorkspaceStore.getState().workspaces
+            const newWorkspace = newWorkspaces.find(w => w.path === projectPath)
+            if (newWorkspace) {
+              workspaceId = newWorkspace.id
+            }
+          } catch (e) {
+            log.warn('创建工作区失败，将创建自由会话', { error: String(e), projectPath })
+            // 工作区创建失败，继续创建自由会话
+          }
+        }
+      }
+
+      // ========== 2. 从历史源加载消息 ==========
+      let chatMessages: ChatMessage[] = []
+      let title = '恢复的会话'
+      let externalSessionId: string | undefined
+
+      // 2.1 尝试从 localStorage 恢复
       const historyJson = localStorage.getItem(SESSION_HISTORY_KEY)
       const localHistory = historyJson ? JSON.parse(historyJson) : []
       const localSession = localHistory.find((h: HistoryEntry) => h.id === sessionId)
 
       if (localSession) {
-        set({
-          messages: localSession.data.messages || [],
-          archivedMessages: localSession.data.archivedMessages || [],
-          conversationId: localSession.id,
-          isStreaming: false,
-          error: null,
-        })
-
-        // 注意：不再调用 saveToStorage()，由 zustand persist 自动管理
-        log.info('已从本地历史恢复会话', { title: localSession.title })
-        return true
+        chatMessages = localSession.data.messages || []
+        title = localSession.title
+        externalSessionId = localSession.id
+        log.debug('从本地历史加载消息', { messageCount: chatMessages.length, title })
       }
-
-      // 2. 尝试从 Claude Code 原生历史恢复
-      if (!engineId || engineId === 'claude-code') {
+      // 2.2 尝试从 Claude Code 原生历史恢复
+      else if (!engineId || engineId === 'claude-code') {
         const claudeCodeService = getClaudeCodeHistoryService()
-
-        const messages = await claudeCodeService.getSessionHistory(
-          sessionId,
-          projectPath
-        )
+        const messages = await claudeCodeService.getSessionHistory(sessionId, projectPath)
 
         if (messages.length > 0) {
-          const chatMessages = claudeCodeService.convertToChatMessages(messages)
-          const toolCalls = claudeCodeService.extractToolCalls(messages)
-
-          // 使用依赖注入操作工具面板
-          const toolPanelActions = get().getToolPanelActions()
-          toolPanelActions?.clearTools()
-          for (const tool of toolCalls) {
-            toolPanelActions?.addTool(tool)
-          }
-
-          set({
-            messages: chatMessages,
-            archivedMessages: [],
-            conversationId: sessionId,
-            isStreaming: false,
-            error: null,
-          })
-
-          log.info('已从 Claude Code 原生历史恢复会话', { sessionId })
-          return true
+          chatMessages = claudeCodeService.convertToChatMessages(messages)
+          title = '恢复的会话' // Claude Code 历史没有标题，使用默认
+          externalSessionId = sessionId
+          log.debug('从 Claude Code 历史加载消息', { messageCount: chatMessages.length })
         }
       }
-
-      // 3. 尝试从 IFlow 恢复
-      if (!engineId || engineId === 'iflow') {
+      // 2.3 尝试从 IFlow 恢复
+      else if (engineId === 'iflow') {
         const iflowService = getIFlowHistoryService()
         const messages = await iflowService.getSessionHistory(sessionId)
 
         if (messages.length > 0) {
           const convertedMessages = iflowService.convertMessagesToFormat(messages)
-          const toolCalls = iflowService.extractToolCalls(messages)
-
-          // 使用依赖注入操作工具面板
-          const toolPanelActions = get().getToolPanelActions()
-          toolPanelActions?.clearTools()
-          for (const tool of toolCalls) {
-            toolPanelActions?.addTool(tool)
-          }
-
-          const chatMessages: ChatMessage[] = convertedMessages.map((msg) => {
+          chatMessages = convertedMessages.map((msg) => {
             if (msg.role === 'user') {
               return {
                 id: msg.id,
@@ -355,26 +367,16 @@ export const createHistorySlice: HistorySlice = (set, get) => ({
               } satisfies SystemChatMessage
             }
           })
-
-          set({
-            messages: chatMessages,
-            archivedMessages: [],
-            conversationId: sessionId,
-            isStreaming: false,
-            error: null,
-          })
-
-          log.info('已从 IFlow 恢复会话', { sessionId })
-          return true
+          externalSessionId = sessionId
+          log.debug('从 IFlow 历史加载消息', { messageCount: chatMessages.length })
         }
       }
-
-      // 4. 尝试从 Codex 恢复
-      if (engineId === 'codex') {
+      // 2.4 尝试从 Codex 恢复
+      else if (engineId === 'codex') {
         const messages = await getCodexSessionHistory(sessionId)
 
         if (messages && messages.length > 0) {
-          const chatMessages: ChatMessage[] = messages.map((msg) => {
+          chatMessages = messages.map((msg) => {
             if (msg.type === 'user') {
               return {
                 id: msg.id,
@@ -392,21 +394,36 @@ export const createHistorySlice: HistorySlice = (set, get) => ({
               } satisfies AssistantChatMessage
             }
           })
-
-          set({
-            messages: chatMessages,
-            archivedMessages: [],
-            conversationId: sessionId,
-            isStreaming: false,
-            error: null,
-          })
-
-          log.info('已从 Codex 恢复会话', { sessionId })
-          return true
+          externalSessionId = sessionId
+          log.debug('从 Codex 历史加载消息', { messageCount: chatMessages.length })
         }
       }
 
-      return false
+      // ========== 3. 检查是否成功加载消息 ==========
+      if (chatMessages.length === 0) {
+        log.warn('无法从历史加载消息', { sessionId, engineId })
+        return false
+      }
+
+      // ========== 4. 创建新会话并加载消息 ==========
+      const newSessionId = await createSessionFromHistory({
+        title,
+        workspaceId,
+        engineId: engineId as EngineId,
+        externalSessionId,
+        messages: chatMessages,
+        conversationId: externalSessionId || null,
+      })
+
+      log.info('从历史恢复成功，已创建新会话', {
+        sessionId: newSessionId,
+        title,
+        workspaceId,
+        messageCount: chatMessages.length,
+        originalSessionId: sessionId,
+      })
+
+      return true
     } catch (e) {
       log.error('从历史恢复失败', e instanceof Error ? e : new Error(String(e)))
       return false

@@ -288,3 +288,75 @@ export function createSessionWithSync(options: CreateSessionOptions): string {
 
   return newSessionId
 }
+
+/**
+ * 从历史会话创建新会话
+ *
+ * 流程：
+ * 1. 保存当前会话消息（如果有）
+ * 2. 创建新会话（可指定工作区）
+ * 3. 加载历史消息到新会话
+ * 4. 切换到新会话
+ *
+ * @param options 选项
+ * @returns 新会话 ID
+ */
+export async function createSessionFromHistory(options: {
+  title: string
+  workspaceId?: string
+  engineId?: 'claude-code' | 'iflow' | 'codex' | `provider-${string}`
+  externalSessionId?: string
+  messages: ChatMessage[]
+  conversationId?: string | null
+}): Promise<string> {
+  const { activeSessionId } = useSessionStore.getState()
+
+  // 1. 保存当前会话消息（如果有活跃会话）
+  if (activeSessionId) {
+    saveCurrentMessagesToSession(activeSessionId)
+  }
+
+  // 2. 创建新会话
+  const newSessionId = useSessionStore.getState().createSession({
+    type: options.workspaceId ? 'project' : 'free',
+    workspaceId: options.workspaceId,
+    title: options.title,
+    engineId: options.engineId,
+    externalSessionId: options.externalSessionId,
+  })
+
+  // 3. 将历史消息存入 SessionStore
+  const sessionSyncActions = useEventChatStore.getState().getSessionSyncActions()
+  if (sessionSyncActions) {
+    sessionSyncActions.setSessionMessages(newSessionId, {
+      messages: options.messages,
+      archivedMessages: [],
+      conversationId: options.conversationId || options.externalSessionId || null,
+    })
+    sessionSyncActions.updateSessionStatus(newSessionId, 'idle')
+  }
+
+  // 4. 清空当前 EventChatStore
+  clearEventChatState()
+
+  // 5. 加载新会话消息到 EventChatStore
+  useEventChatStore.setState({
+    messages: options.messages,
+    archivedMessages: [],
+    conversationId: options.conversationId || options.externalSessionId || null,
+    isStreaming: false,
+    error: null,
+    currentMessage: null,
+    progressMessage: null,
+  })
+
+  log.info('从历史创建新会话', {
+    newSessionId,
+    title: options.title,
+    workspaceId: options.workspaceId,
+    messageCount: options.messages.length,
+    previousSessionId: activeSessionId,
+  })
+
+  return newSessionId
+}

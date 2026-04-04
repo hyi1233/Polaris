@@ -33,6 +33,22 @@ vi.mock('../../services/tauri', () => ({
   getCodexSessionHistory: vi.fn(() => Promise.resolve(null)),
 }))
 
+// Mock workspaceStore
+vi.mock('../workspaceStore', () => ({
+  useWorkspaceStore: {
+    getState: () => ({
+      workspaces: [],
+      currentWorkspaceId: null,
+      createWorkspace: vi.fn(async () => {}),
+    }),
+  },
+}))
+
+// Mock sessionSync
+vi.mock('../sessionSync', () => ({
+  createSessionFromHistory: vi.fn(async () => 'test-new-session-id'),
+}))
+
 // Import after mocking
 import { createHistorySlice } from './historySlice'
 import type { EventChatState } from './types'
