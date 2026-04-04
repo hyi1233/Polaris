@@ -15,7 +15,6 @@ import { TranslatePanel, SelectionContextMenu } from './components/Translate';
 import { SchedulerPanel } from './components/Scheduler/SchedulerPanel';
 import { RequirementPanel } from './components/RequirementPanel/RequirementPanel';
 import { TerminalPanel } from './components/Terminal/TerminalPanel';
-import { SessionsPanel } from './components/Session';
 
 // 懒加载大型组件，减少初始 bundle 大小
 // 这些组件使用命名导出，所以需要使用 then 提取
@@ -29,7 +28,6 @@ import { bootstrapEngines, bootstrapOpenAIProviders } from './core/engine-bootst
 import { bootstrapAgents } from './core/agent-bootstrap';
 import { bootstrapTools } from './core/tool-bootstrap';
 import { clearOpenAIProviderEngines } from './engines/openai-provider';
-import { initializeSessionSync } from './stores/sessionSync';
 import { listen } from '@tauri-apps/api/event';
 import './index.css';
 import type { EngineId } from './types';
@@ -234,13 +232,12 @@ function App() {
           },
         });
 
-        // 初始化会话消息同步
-        initializeSessionSync();
-
-        // 初始化会话消息：从外部 sessionId 恢复消息
-        useSessionStore.getState().initializeSessionMessages().catch((e) => {
-          log.error('会话消息初始化失败', e);
-        });
+        // 如果没有活跃会话，创建一个默认会话
+        const { sessions, activeSessionId, createSession } = useSessionStore.getState()
+        if (sessions.size === 0 && !activeSessionId) {
+          createSession({ type: 'free' })
+          log.info('已创建默认会话')
+        }
 
         // 恢复窗口透明度（初始使用大窗透明度，后续根据窗口尺寸自动切换）
         if (config?.window) {
@@ -250,8 +247,6 @@ function App() {
             log.info(`窗口透明度已恢复: ${initialOpacity}`);
           }
         }
-
-        // 注意：会话状态由 zustand persist 中间件自动恢复，无需手动调用 restoreFromStorage
 
         // 初始化集成管理器并自动连接 QQ Bot（如果配置了）
         const qqbotConfig = config?.qqbot;
@@ -535,7 +530,6 @@ function App() {
                     <DeveloperPanel fillRemaining />
                   </Suspense>
                 }
-                sessionsContent={<SessionsPanel />}
               />
             </LeftPanel>
           )}

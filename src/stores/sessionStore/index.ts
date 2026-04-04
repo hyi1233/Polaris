@@ -5,10 +5,11 @@
  * 1. 管理多个独立会话的状态
  * 2. 处理会话切换和隔离
  * 3. 管理会话与工作区的关系
+ *
+ * 注意：会话数据不持久化，仅在运行期间保持
  */
 
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   ChatSession,
   CreateSessionOptions,
@@ -17,11 +18,6 @@ import type {
   IslandExpandMode,
   SessionMessageState
 } from '@/types/session'
-import { useWorkspaceStore } from '../workspaceStore'
-import { getClaudeCodeHistoryService } from '../../services/claudeCodeHistoryService'
-import { createLogger } from '../../utils/logger'
-
-const log = createLogger('SessionStore')
 
 // ============================================================================
 // 类型定义
@@ -69,12 +65,6 @@ export interface SessionActions {
   getRecentSessions: (limit: number) => ChatSession[]
   getSessionMessages: (sessionId: string) => SessionMessageState | undefined
   setSessionMessages: (sessionId: string, state: SessionMessageState) => void
-
-  // 消息恢复
-  /** 从外部会话恢复消息 */
-  restoreSessionFromExternal: (sessionId: string) => Promise<boolean>
-  /** 初始化时恢复所有会话消息 */
-  initializeSessionMessages: () => Promise<void>
 }
 
 export type SessionStore = SessionState & SessionActions
@@ -104,20 +94,18 @@ const createInitialMessageState = (): SessionMessageState => ({
 // Store 实现
 // ============================================================================
 
-export const useSessionStore = create<SessionStore>()(
-  persist(
-    (set, get) => ({
-      // ========== 初始状态 ==========
-      sessions: new Map(),
-      activeSessionId: null,
-      recentSessionIds: [],
-      isIslandExpanded: false,
-      islandExpandMode: null,
-      sessionMessages: new Map(),
+export const useSessionStore = create<SessionStore>()((set, get) => ({
+  // ========== 初始状态 ==========
+  sessions: new Map(),
+  activeSessionId: null,
+  recentSessionIds: [],
+  isIslandExpanded: false,
+  islandExpandMode: null,
+  sessionMessages: new Map(),
 
-      // ========== 会话操作 ==========
+  // ========== 会话操作 ==========
 
-      createSession: (options: CreateSessionOptions) => {
+  createSession: (options: CreateSessionOptions) => {
         const id = generateSessionId()
         const now = new Date().toISOString()
 
@@ -378,152 +366,7 @@ export const useSessionStore = create<SessionStore>()(
           return { sessionMessages: newSessionMessages }
         })
       },
-
-      // ========== 消息恢复 ==========
-
-      restoreSessionFromExternal: async (sessionId: string) => {
-        const { sessions } = get()
-        const session = sessions.get(sessionId)
-
-        log.debug('restoreSessionFromExternal 被调用', {
-          sessionId,
-          hasSession: !!session,
-          externalSessionId: session?.externalSessionId,
-          workspaceId: session?.workspaceId,
-        })
-
-        if (!session?.externalSessionId || !session?.workspaceId) {
-          log.debug('会话无外部 ID 或工作区，跳过恢复', { sessionId })
-          return false
-        }
-
-        try {
-          // 获取工作区路径
-          const workspaces = useWorkspaceStore.getState().workspaces
-          const workspace = workspaces.find(w => w.id === session.workspaceId)
-
-          log.debug('查找工作区', {
-            workspaceId: session.workspaceId,
-            workspaceCount: workspaces.length,
-            foundWorkspace: !!workspace,
-            workspacePath: workspace?.path,
-          })
-
-          if (!workspace?.path) {
-            log.warn('工作区路径不存在', { sessionId, workspaceId: session.workspaceId })
-            return false
-          }
-
-          log.info('开始从外部恢复会话消息', {
-            sessionId,
-            externalSessionId: session.externalSessionId,
-            projectPath: workspace.path
-          })
-
-          // 调用 Claude Code API 获取历史
-          const claudeCodeService = getClaudeCodeHistoryService()
-          const messages = await claudeCodeService.getSessionHistory(
-            session.externalSessionId,
-            workspace.path
-          )
-
-          log.debug('Claude Code API 返回消息', {
-            sessionId,
-            messageCount: messages.length,
-          })
-
-          if (messages.length > 0) {
-            const chatMessages = claudeCodeService.convertToChatMessages(messages)
-
-            // 保存到 SessionStore.sessionMessages
-            get().setSessionMessages(sessionId, {
-              messages: chatMessages,
-              archivedMessages: [],
-              conversationId: session.externalSessionId,
-              restoredFromExternal: true,
-              restoredAt: new Date().toISOString(),
-            })
-
-            log.info('从外部会话恢复成功', {
-              sessionId,
-              messageCount: chatMessages.length
-            })
-            return true
-          }
-
-          log.debug('外部会话无消息', { sessionId })
-          return false
-        } catch (e) {
-          log.error('从外部会话恢复失败', e as Error)
-          return false
-        }
-      },
-
-      initializeSessionMessages: async () => {
-        const { sessions } = get()
-
-        log.info('开始初始化会话消息', {
-          totalSessions: sessions.size,
-          sessions: Array.from(sessions.entries()).map(([id, s]) => ({
-            id,
-            externalSessionId: s.externalSessionId,
-            workspaceId: s.workspaceId,
-            workspaceLocked: s.workspaceLocked,
-          }))
-        })
-
-        const restorePromises: Promise<boolean>[] = []
-
-        for (const [id, session] of sessions) {
-          if (session.externalSessionId) {
-            log.debug('准备恢复会话', {
-              sessionId: id,
-              externalSessionId: session.externalSessionId,
-              workspaceId: session.workspaceId
-            })
-            restorePromises.push(get().restoreSessionFromExternal(id))
-          }
-        }
-
-        const results = await Promise.all(restorePromises)
-        const successCount = results.filter(r => r).length
-
-        log.info('会话消息初始化完成', {
-          totalSessions: sessions.size,
-          restoredCount: successCount
-        })
-      },
-    }),
-    {
-      name: 'polaris-sessions',
-      storage: createJSONStorage(() => localStorage, {
-        reviver: (key, value) => {
-          if (key === 'sessions' && Array.isArray(value)) {
-            return new Map(value)
-          }
-          if (key === 'sessionMessages' && Array.isArray(value)) {
-            return new Map(value)
-          }
-          return value
-        },
-        replacer: (key, value) => {
-          if (key === 'sessions' && value instanceof Map) {
-            return Array.from(value.entries())
-          }
-          if (key === 'sessionMessages' && value instanceof Map) {
-            return Array.from(value.entries())
-          }
-          return value
-        },
-      }),
-      partialize: (state) => ({
-        sessions: state.sessions,
-        activeSessionId: state.activeSessionId,
-        recentSessionIds: state.recentSessionIds,
-        // sessionMessages 可选是否持久化，暂时不持久化
-      }),
-    }
-  )
+    })
 )
 
 // ============================================================================

@@ -75,22 +75,7 @@ export async function loadSessionMessagesToEventChat(sessionId: string): Promise
   }
 
   // 从 SessionStore 获取消息状态
-  let sessionMessages = sessionSyncActions.getSessionMessages(sessionId)
-
-  // 如果没有消息但有 externalSessionId，尝试从外部恢复
-  if (!sessionMessages || sessionMessages.messages.length === 0) {
-    const session = useSessionStore.getState().sessions.get(sessionId)
-
-    if (session?.externalSessionId && session?.workspaceId) {
-      log.debug('会话消息为空，尝试从外部恢复', { sessionId })
-
-      // 调用恢复方法
-      await useSessionStore.getState().restoreSessionFromExternal(sessionId)
-
-      // 重新获取消息
-      sessionMessages = sessionSyncActions.getSessionMessages(sessionId)
-    }
-  }
+  const sessionMessages = sessionSyncActions.getSessionMessages(sessionId)
 
   if (!sessionMessages || sessionMessages.messages.length === 0) {
     // 没有保存的消息，初始化为空状态
