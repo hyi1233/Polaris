@@ -609,11 +609,12 @@ pub struct ClaudeHistoryMessage {
     pub timestamp: Option<String>,
 }
 
-/// 解析会话文件获取元数据
-fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option<String>) {
+/// 解析会话文件获取元数据（包括真实工作区路径 cwd）
+fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option<String>, Option<String>) {
     let mut first_prompt: Option<String> = None;
     let mut message_count = 0usize;
     let mut created: Option<String> = None;
+    let mut cwd: Option<String> = None;
 
     if let Ok(file) = std::fs::File::open(file_path) {
         let reader = BufReader::new(file);
@@ -659,6 +660,10 @@ fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option
                         if created.is_none() {
                             created = json.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string());
                         }
+                        // 获取真实工作区路径（cwd）
+                        if cwd.is_none() {
+                            cwd = json.get("cwd").and_then(|c| c.as_str()).map(|s| s.to_string());
+                        }
                     } else if msg_type == "assistant" {
                         message_count += 1;
                     }
@@ -667,7 +672,7 @@ fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option
         }
     }
 
-    (first_prompt, message_count, created)
+    (first_prompt, message_count, created, cwd)
 }
 
 /// 列出 Claude Code 会话（旧接口）
@@ -716,11 +721,14 @@ pub async fn list_claude_code_sessions(
                                 });
 
                             // 解析会话内容获取详细信息
-                            let (first_prompt, message_count, created) = parse_session_metadata(&path);
+                            let (first_prompt, message_count, created, real_cwd) = parse_session_metadata(&path);
+
+                            // 使用真实 cwd 路径，如果不存在则使用目录名
+                            let project_path = real_cwd.unwrap_or_else(|| project_name.clone());
 
                             sessions.push(ClaudeSessionMeta {
                                 session_id,
-                                project_path: project_name.clone(),
+                                project_path,
                                 first_prompt,
                                 message_count,
                                 created,
