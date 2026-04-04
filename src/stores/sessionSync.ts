@@ -16,6 +16,7 @@
 import { useEventChatStore } from './eventChatStore'
 import { useSessionStore } from './sessionStore'
 import type { ChatMessage } from '../types'
+import type { CreateSessionOptions } from '../types/session'
 import { createLogger } from '../utils/logger'
 
 const log = createLogger('SessionSync')
@@ -255,8 +256,50 @@ export function initializeSessionSync(): void {
       updateSessionStatus: (sessionId: string, status: 'idle' | 'running' | 'waiting' | 'error') => {
         useSessionStore.getState().updateSessionStatus(sessionId, status)
       },
+      updateSessionExternalId: (sessionId: string, externalSessionId: string) => {
+        useSessionStore.getState().updateSessionExternalId(sessionId, externalSessionId)
+      },
     },
   })
 
   log.info('SessionSync 初始化完成')
+}
+
+/**
+ * 创建新会话并同步消息
+ *
+ * 流程：
+ * 1. 保存当前会话消息（如果有）
+ * 2. 创建新会话
+ * 3. 清空 EventChatStore 消息
+ *
+ * @param options 创建会话选项
+ * @returns 新会话 ID
+ */
+export function createSessionWithSync(options: CreateSessionOptions): string {
+  const { activeSessionId } = useSessionStore.getState()
+
+  // 1. 保存当前会话消息（如果有活跃会话）
+  if (activeSessionId) {
+    saveCurrentMessagesToSession(activeSessionId)
+  }
+
+  // 2. 创建新会话
+  const newSessionId = useSessionStore.getState().createSession(options)
+
+  // 3. 清空 EventChatStore 消息
+  clearEventChatState()
+
+  // 更新会话状态
+  const sessionSyncActions = useEventChatStore.getState().getSessionSyncActions()
+  if (sessionSyncActions) {
+    sessionSyncActions.updateSessionStatus(newSessionId, 'idle')
+  }
+
+  log.info('创建新会话并同步消息', {
+    newSessionId,
+    previousSessionId: activeSessionId,
+  })
+
+  return newSessionId
 }

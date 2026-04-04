@@ -15,6 +15,7 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { StatusDot } from './StatusDot'
 import { SessionList } from './SessionList'
 import { WorkspaceMenu } from './WorkspaceMenu'
+import { createSessionWithSync } from '@/stores/sessionSync'
 
 interface SessionIslandProps {
   onCreateSession?: () => void
@@ -27,7 +28,6 @@ export function SessionIsland({ onCreateSession }: SessionIslandProps) {
   const isIslandExpanded = useSessionStore((state) => state.isIslandExpanded)
   const toggleIsland = useSessionStore((state) => state.toggleIsland)
   const collapseIsland = useSessionStore((state) => state.collapseIsland)
-  const createSession = useSessionStore((state) => state.createSession)
 
   const workspaces = useWorkspaceStore((state) => state.workspaces)
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId)
@@ -71,8 +71,8 @@ export function SessionIsland({ onCreateSession }: SessionIslandProps) {
     if (onCreateSession) {
       onCreateSession()
     } else {
-      // 默认行为：创建自由会话
-      createSession({
+      // 默认行为：创建自由会话（带消息同步）
+      createSessionWithSync({
         type: 'free',
         workspaceId: currentWorkspaceId || undefined,
       })

@@ -247,26 +247,8 @@ export const createEventHandlerSlice: EventHandlerSlice = (set, get) => ({
             },
           })
           set({ conversationId: newSessionId })
-
-          // 同步 externalSessionId 到 SessionStore 并锁定工作区
-          const sessionSyncActions = get().getSessionSyncActions()
-          if (sessionSyncActions) {
-            const activeSessionId = sessionSyncActions.getActiveSessionId()
-            if (activeSessionId) {
-              // 动态导入避免循环依赖
-              import('../../stores/sessionStore')
-                .then(({ useSessionStore }) => {
-                  useSessionStore.getState().updateSessionExternalId(activeSessionId, newSessionId)
-                  log.debug('已同步 externalSessionId 到 SessionStore', {
-                    sessionId: activeSessionId,
-                    externalSessionId: newSessionId
-                  })
-                })
-                .catch((e) => {
-                  log.warn('同步 externalSessionId 失败', { error: String(e) })
-                })
-            }
-          }
+          // 注意：externalSessionId 的更新在 handleAIEvent 的 session_start 事件中处理
+          // 因为 start_chat 返回的是临时 UUID，真实的 Claude Code sessionId 通过 session_start 事件传递
         }
       }
     } catch (e) {

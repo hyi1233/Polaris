@@ -228,6 +228,9 @@ function App() {
             updateSessionStatus: (sessionId: string, status: 'idle' | 'running' | 'waiting' | 'error') => {
               useSessionStore.getState().updateSessionStatus(sessionId, status)
             },
+            updateSessionExternalId: (sessionId: string, externalSessionId: string) => {
+              useSessionStore.getState().updateSessionExternalId(sessionId, externalSessionId)
+            },
           },
         });
 

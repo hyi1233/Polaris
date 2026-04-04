@@ -79,6 +79,15 @@ function createMockStoreSet() {
     },
   })
 
+  // Mock SessionSyncActions
+  state.getSessionSyncActions = () => ({
+    getActiveSessionId: () => 'test-active-session-id',
+    getSessionMessages: () => undefined,
+    setSessionMessages: vi.fn(),
+    updateSessionStatus: vi.fn(),
+    updateSessionExternalId: vi.fn(),
+  })
+
   return { set, get, state }
 }
 
@@ -198,6 +207,26 @@ describe('handleAIEvent', () => {
         isStreaming: true,
       })
       expect(mockClearTools).toHaveBeenCalled()
+    })
+
+    it('应更新 externalSessionId 到 SessionStore', () => {
+      const mockUpdateExternalId = vi.fn()
+      mockStore.state.getSessionSyncActions = () => ({
+        getActiveSessionId: () => 'test-active-session-id',
+        getSessionMessages: () => undefined,
+        setSessionMessages: vi.fn(),
+        updateSessionStatus: vi.fn(),
+        updateSessionExternalId: mockUpdateExternalId,
+      })
+
+      const event: AIEvent = {
+        type: 'session_start',
+        sessionId: 'real-claude-session-id',
+      }
+
+      handleAIEvent(event, mockStore.set, mockStore.get)
+
+      expect(mockUpdateExternalId).toHaveBeenCalledWith('test-active-session-id', 'real-claude-session-id')
     })
   })
 

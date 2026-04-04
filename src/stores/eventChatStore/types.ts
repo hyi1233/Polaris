@@ -157,6 +157,8 @@ export interface SessionSyncActions {
   }) => void
   /** 更新会话状态 */
   updateSessionStatus: (sessionId: string, status: 'idle' | 'running' | 'waiting' | 'error') => void
+  /** 更新会话的外部 ID（Claude Code 真实 sessionId） */
+  updateSessionExternalId: (sessionId: string, externalSessionId: string) => void
 }
 
 /**

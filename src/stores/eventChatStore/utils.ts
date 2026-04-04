@@ -90,6 +90,17 @@ export function handleAIEvent(
     case 'session_start':
       storeSet({ conversationId: event.sessionId, isStreaming: true })
       console.log('[EventChatStore] Session started:', event.sessionId)
+
+      // 更新 SessionStore 的 externalSessionId（使用真实的 Claude Code sessionId）
+      const sessionSyncActions = state.getSessionSyncActions()
+      if (sessionSyncActions) {
+        const activeSessionId = sessionSyncActions.getActiveSessionId()
+        if (activeSessionId) {
+          sessionSyncActions.updateSessionExternalId(activeSessionId, event.sessionId)
+          console.log('[EventChatStore] 已更新 externalSessionId:', { activeSessionId, externalSessionId: event.sessionId })
+        }
+      }
+
       if (toolPanelActions) {
         toolPanelActions.clearTools()
       }

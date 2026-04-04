@@ -385,6 +385,13 @@ export const useSessionStore = create<SessionStore>()(
         const { sessions } = get()
         const session = sessions.get(sessionId)
 
+        log.debug('restoreSessionFromExternal 被调用', {
+          sessionId,
+          hasSession: !!session,
+          externalSessionId: session?.externalSessionId,
+          workspaceId: session?.workspaceId,
+        })
+
         if (!session?.externalSessionId || !session?.workspaceId) {
           log.debug('会话无外部 ID 或工作区，跳过恢复', { sessionId })
           return false
@@ -395,12 +402,19 @@ export const useSessionStore = create<SessionStore>()(
           const workspaces = useWorkspaceStore.getState().workspaces
           const workspace = workspaces.find(w => w.id === session.workspaceId)
 
+          log.debug('查找工作区', {
+            workspaceId: session.workspaceId,
+            workspaceCount: workspaces.length,
+            foundWorkspace: !!workspace,
+            workspacePath: workspace?.path,
+          })
+
           if (!workspace?.path) {
             log.warn('工作区路径不存在', { sessionId, workspaceId: session.workspaceId })
             return false
           }
 
-          log.debug('开始从外部恢复会话消息', {
+          log.info('开始从外部恢复会话消息', {
             sessionId,
             externalSessionId: session.externalSessionId,
             projectPath: workspace.path
@@ -412,6 +426,11 @@ export const useSessionStore = create<SessionStore>()(
             session.externalSessionId,
             workspace.path
           )
+
+          log.debug('Claude Code API 返回消息', {
+            sessionId,
+            messageCount: messages.length,
+          })
 
           if (messages.length > 0) {
             const chatMessages = claudeCodeService.convertToChatMessages(messages)
@@ -442,10 +461,26 @@ export const useSessionStore = create<SessionStore>()(
 
       initializeSessionMessages: async () => {
         const { sessions } = get()
+
+        log.info('开始初始化会话消息', {
+          totalSessions: sessions.size,
+          sessions: Array.from(sessions.entries()).map(([id, s]) => ({
+            id,
+            externalSessionId: s.externalSessionId,
+            workspaceId: s.workspaceId,
+            workspaceLocked: s.workspaceLocked,
+          }))
+        })
+
         const restorePromises: Promise<boolean>[] = []
 
         for (const [id, session] of sessions) {
           if (session.externalSessionId) {
+            log.debug('准备恢复会话', {
+              sessionId: id,
+              externalSessionId: session.externalSessionId,
+              workspaceId: session.workspaceId
+            })
             restorePromises.push(get().restoreSessionFromExternal(id))
           }
         }
