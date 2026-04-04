@@ -14,6 +14,7 @@
 import { useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEventChatStore, useConfigStore, useChatInputStore } from '../../stores';
+import { useActiveSessionActions } from '../../stores/conversationStore/useActiveSession';
 import { MessageSquare, Wrench, Clock, Paperclip, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { IconMic, IconVolume, IconVolumeX } from '../Common/Icons';
@@ -55,7 +56,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
   const messages = useEventChatStore(state => state.messages);
   const currentMessage = useEventChatStore(state => state.currentMessage);
   const isStreaming = useEventChatStore(state => state.isStreaming);
-  const interruptChat = useEventChatStore(state => state.interruptChat);
+  const { interrupt } = useActiveSessionActions();
   const { config, healthStatus, updateConfig } = useConfigStore();
   const {
     inputLength,
@@ -134,7 +135,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
     switch (speechCommand) {
       case 'interrupt':
         if (isStreaming) {
-          interruptChat();
+          interrupt();
         }
         break;
       case 'undo':
@@ -147,7 +148,7 @@ export function ChatStatusBar({ compact = false }: ChatStatusBarProps) {
     if (speechCommand === 'interrupt' || speechCommand === 'undo') {
       setSpeechCommand(null);
     }
-  }, [speechCommand, isStreaming, interruptChat, setSpeechCommand, undoSpeechTranscript]);
+  }, [speechCommand, isStreaming, interrupt, setSpeechCommand, undoSpeechTranscript]);
 
   // 计算统计数据
   const stats = useMemo(() => {

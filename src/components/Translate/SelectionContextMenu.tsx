@@ -11,7 +11,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useTranslateStore, useConfigStore, useViewStore, useEventChatStore, useWorkspaceStore } from '../../stores';
+import { useTranslateStore, useConfigStore, useViewStore, useWorkspaceStore } from '../../stores';
+import { useActiveSessionActions } from '../../stores/conversationStore/useActiveSession';
 import { baiduTranslate } from '../../services/tauri';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Copy, Search, Languages, Quote, MessageSquare, Check, X, Send, Loader2 } from 'lucide-react';
@@ -49,7 +50,7 @@ export function SelectionContextMenu() {
   const config = useConfigStore((state) => state.config);
   const setLeftPanelType = useViewStore((state) => state.setLeftPanelType);
   const setSourceText = useTranslateStore((state) => state.setSourceText);
-  const sendMessage = useEventChatStore((state) => state.sendMessage);
+  const { sendMessage } = useActiveSessionActions();
   const currentWorkspace = useWorkspaceStore((state) => state.getCurrentWorkspace());
 
   // 右键菜单显示
