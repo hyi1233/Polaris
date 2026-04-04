@@ -229,7 +229,6 @@ function createSessionManagerStore() {
 
     dispatchEvent: (event: AIEvent & { sessionId: string }) => {
       const { sessionId } = event
-      let activeSessionId = get().activeSessionId
       let store = get().stores.get(sessionId)
 
       // 如果会话不存在，自动创建
@@ -241,7 +240,6 @@ function createSessionManagerStore() {
           title: '新对话',
         })
         store = get().stores.get(sessionId)
-        activeSessionId = get().activeSessionId // 更新活跃会话ID
 
         if (!store) {
           console.error('[SessionStoreManager] 自动创建会话失败:', sessionId)
@@ -250,12 +248,17 @@ function createSessionManagerStore() {
       }
 
       // 调用新架构的事件处理器
+      // 注意：事件总是路由到 event.sessionId 对应的会话，而不是当前活跃会话
+      // 这是多会话并行的核心：每个会话独立处理自己的事件
       store.getState().handleAIEvent(event)
 
-      // 对于活跃会话，同步事件到旧架构（EventChatStore）
-      // 这确保当前显示的UI组件能正确更新
-      // 注意：如果activeSessionId为null（首次创建），也同步到旧架构
-      if (sessionId === activeSessionId || !activeSessionId) {
+      // 实时获取当前活跃会话 ID（避免闭包中的过期值）
+      // 用于决定是否同步到旧架构（EventChatStore）
+      const currentActiveSessionId = get().activeSessionId
+
+      // 仅当事件属于当前活跃会话时，同步到旧架构
+      // 这确保 UI 组件（依赖旧架构）能正确显示当前会话的消息
+      if (sessionId === currentActiveSessionId) {
         try {
           const oldStore = useEventChatStore
           const oldState = oldStore.getState()
