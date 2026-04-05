@@ -30,8 +30,6 @@ export const QuickSwitchTrigger = memo(function QuickSwitchTrigger({
   return (
     <div
       className={cn(
-        // 位置：右侧贴边
-        'absolute right-0 top-[100px]',
         // 尺寸：32x44px
         'w-8 h-11',
         // 玻璃风格

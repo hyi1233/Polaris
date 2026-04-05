@@ -13,6 +13,8 @@ export interface QuickSessionInfo {
   title: string
   status: SessionStatus
   isActive: boolean
+  /** 是否可删除（非当前会话且至少有一个其他会话） */
+  canDelete: boolean
 }
 
 /** 工作区项信息 */
@@ -20,8 +22,12 @@ export interface QuickWorkspaceInfo {
   id: string
   name: string
   path: string
+  /** 是否为当前会话的主工作区 */
   isMain: boolean
-  contextCount: number
+  /** 是否为关联工作区 */
+  isContext: boolean
+  /** 关联工作区数量（仅主工作区使用） */
+  contextCount?: number
 }
 
 /** QuickSwitchPanel Props */
