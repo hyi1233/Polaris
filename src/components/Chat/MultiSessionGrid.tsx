@@ -8,9 +8,9 @@
  * - 支持展开/关闭操作
  */
 
-import { memo, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import { memo, useCallback, useMemo, useRef, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { LayoutGrid, Square, RowsIcon, ColumnsIcon } from 'lucide-react';
+import { LayoutGrid, Square, RowsIcon, ColumnsIcon, Minus, Plus } from 'lucide-react';
 import { SessionCell } from './SessionCell';
 import { useViewStore } from '../../stores';
 import {
@@ -252,5 +252,107 @@ export const MultiSessionRowsToggle = memo(function MultiSessionRowsToggle() {
         <ColumnsIcon className="w-4 h-4" />
       )}
     </button>
+  );
+});
+
+/** 预设宽度选项 */
+const WIDTH_PRESETS = [250, 300, 350, 400, 450];
+
+/**
+ * 格子宽度设置上拉面板
+ */
+export const MultiSessionWidthPopover = memo(function MultiSessionWidthPopover() {
+  const multiSessionCellWidth = useViewStore(state => state.multiSessionCellWidth);
+  const setMultiSessionCellWidth = useViewStore(state => state.setMultiSessionCellWidth);
+  const multiSessionMode = useViewStore(state => state.multiSessionMode);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // 非多窗口模式时不显示
+  if (!multiSessionMode) return null;
+
+  // 点击外部关闭
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  // 调整宽度
+  const handleAdjust = useCallback((delta: number) => {
+    const newWidth = Math.max(200, Math.min(600, multiSessionCellWidth + delta));
+    setMultiSessionCellWidth(newWidth);
+  }, [multiSessionCellWidth, setMultiSessionCellWidth]);
+
+  // 选择预设
+  const handleSelectPreset = useCallback((width: number) => {
+    setMultiSessionCellWidth(width);
+    setIsOpen(false);
+  }, [setMultiSessionCellWidth]);
+
+  return (
+    <div className="relative" ref={panelRef}>
+      {/* 触发按钮 */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background-hover transition-colors"
+        title="设置格子宽度"
+      >
+        <Minus className="w-4 h-4" />
+      </button>
+
+      {/* 上拉面板 */}
+      {isOpen && (
+        <div className="absolute bottom-full left-0 mb-1 z-50 p-3 bg-background-elevated border border-border rounded-lg shadow-lg min-w-[180px]">
+          {/* 标题 */}
+          <div className="text-xs text-text-secondary mb-2">格子宽度</div>
+
+          {/* 滑块区域 */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => handleAdjust(-25)}
+              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-background-hover"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <div className="flex-1 text-center text-sm font-medium tabular-nums">
+              {multiSessionCellWidth}px
+            </div>
+            <button
+              onClick={() => handleAdjust(25)}
+              className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-background-hover"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+
+          {/* 预设按钮 */}
+          <div className="flex gap-1">
+            {WIDTH_PRESETS.map((width) => (
+              <button
+                key={width}
+                onClick={() => handleSelectPreset(width)}
+                className={clsx(
+                  'px-2 py-1 text-xs rounded transition-colors',
+                  width === multiSessionCellWidth
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:bg-background-hover hover:text-text-primary'
+                )}
+              >
+                {width}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 });
