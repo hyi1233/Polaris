@@ -2,6 +2,7 @@ import { memo, useMemo, useCallback } from 'react';
 import { FileTreeNode } from './FileTreeNode';
 import { SearchResultsList } from './SearchResultsList';
 import { useFileExplorerStore } from '../../stores';
+import { normalizePath } from '../../utils/path';
 import type { FileInfo } from '../../types';
 
 interface FileTreeProps {
@@ -80,7 +81,7 @@ export const FileTree = memo<FileTreeProps>(({ files, className = '' }) => {
           key={file.path}
           file={file}
           level={0}
-          isExpanded={expanded_folders.has(file.path)}
+          isExpanded={expanded_folders.has(normalizePath(file.path))}
           isSelected={selected_file?.path === file.path}
           expandedFolders={expanded_folders}
           loadingFolders={loading_folders}
