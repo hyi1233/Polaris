@@ -31,11 +31,35 @@ const SHOW_DELAY = 0
 /** 关闭延迟（毫秒） */
 const HIDE_DELAY = 150
 
+/** 钉住状态存储 key */
+const PINNED_STORAGE_KEY = 'quick-switch-panel-pinned'
+
+/** 从 localStorage 读取钉住状态 */
+function getPinnedState(): boolean {
+  try {
+    return localStorage.getItem(PINNED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/** 保存钉住状态到 localStorage */
+function savePinnedState(pinned: boolean): void {
+  try {
+    localStorage.setItem(PINNED_STORAGE_KEY, String(pinned))
+  } catch {
+    // ignore
+  }
+}
+
 export const QuickSwitchPanel = memo(function QuickSwitchPanel({
   className,
 }: QuickSwitchPanelProps) {
   // 面板可见状态
   const [isPanelVisible, setIsPanelVisible] = useState(false)
+
+  // 钉住状态（从 localStorage 初始化）
+  const [isPinned, setIsPinned] = useState(getPinnedState)
 
   // 新建会话弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -86,8 +110,14 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
     log.info('scheduleHide 调用', {
       dropdownRefCurrent: workspaceDropdownOpenRef.current,
       isHoveringTrigger: isHoveringTriggerRef.current,
-      isHoveringPanel: isHoveringPanelRef.current
+      isHoveringPanel: isHoveringPanelRef.current,
+      isPinned,
     })
+    // 钉住状态下不关闭面板
+    if (isPinned) {
+      log.info('面板已钉住，跳过关闭')
+      return
+    }
     clearTimers()
     hideTimerRef.current = setTimeout(() => {
       // 下拉打开时不关闭面板（使用 ref，同步更新）
@@ -100,7 +130,7 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
         setIsPanelVisible(false)
       }
     }, HIDE_DELAY)
-  }, [clearTimers])
+  }, [clearTimers, isPinned])
 
   // 组件卸载时清理
   useEffect(() => {
@@ -146,6 +176,14 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
   const handleCreateSession = useCallback(() => {
     setShowCreateModal(true)
   }, [])
+
+  // 切换钉住状态
+  const handleTogglePin = useCallback(() => {
+    const newPinned = !isPinned
+    setIsPinned(newPinned)
+    savePinnedState(newPinned)
+    log.info('切换钉住状态', { newPinned })
+  }, [isPinned])
 
   // 计算会话列表数据
   const sessionList = useMemo<QuickSessionInfo[]>(() => {
@@ -274,7 +312,7 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
         />
 
         {/* 面板 */}
-        {isPanelVisible && (
+        {(isPanelVisible || isPinned) && (
           <div className="absolute right-10 top-0">
             <QuickSwitchContent
               sessions={sessionList}
@@ -282,6 +320,8 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
               workspaces={workspaceList}
               contextWorkspaceIds={contextWorkspaceIds}
               isWorkspaceLocked={isWorkspaceLocked}
+              isPinned={isPinned}
+              onTogglePin={handleTogglePin}
               onSwitchSession={handleSwitchSession}
               onDeleteSession={handleDeleteSession}
               onCreateSession={handleCreateSession}

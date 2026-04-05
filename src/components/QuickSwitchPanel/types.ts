@@ -35,3 +35,11 @@ export interface QuickSwitchPanelProps {
   /** 自定义类名 */
   className?: string
 }
+
+/** QuickSwitchContent Props（扩展用于钉住功能） */
+export interface QuickSwitchContentBaseProps {
+  /** 是否钉住面板 */
+  isPinned?: boolean
+  /** 切换钉住状态回调 */
+  onTogglePin?: () => void
+}

@@ -7,7 +7,7 @@
 import { memo, useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/utils/cn'
-import { Plus, Loader2, X, FolderOpen, ChevronDown, Lock, Check, Download, Clock, FolderPlus } from 'lucide-react'
+import { Plus, Loader2, X, FolderOpen, ChevronDown, Lock, Check, Download, Clock, FolderPlus, Pin, PinOff } from 'lucide-react'
 import { StatusSymbol } from './StatusSymbol'
 import { CreateWorkspaceModal } from '@/components/Workspace/CreateWorkspaceModal'
 import { createLogger } from '@/utils/logger'
@@ -26,6 +26,10 @@ interface QuickSwitchContentProps {
   contextWorkspaceIds: string[]
   /** 工作区是否锁定 */
   isWorkspaceLocked: boolean
+  /** 面板是否钉住 */
+  isPinned?: boolean
+  /** 切换钉住状态回调 */
+  onTogglePin?: () => void
   /** 切换会话回调 */
   onSwitchSession: (sessionId: string) => void
   /** 删除会话回调 */
@@ -56,6 +60,8 @@ export const QuickSwitchContent = memo(function QuickSwitchContent({
   workspaces,
   contextWorkspaceIds,
   isWorkspaceLocked,
+  isPinned = false,
+  onTogglePin,
   onSwitchSession,
   onDeleteSession,
   onCreateSession,
@@ -325,6 +331,28 @@ export const QuickSwitchContent = memo(function QuickSwitchContent({
             >
               <Clock className="w-3 h-3" />
               <span>历史</span>
+            </button>
+          )}
+          {/* 钉住按钮 */}
+          {onTogglePin && (
+            <button
+              onClick={onTogglePin}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded',
+                'text-[10px]',
+                isPinned
+                  ? 'text-primary bg-primary/10'
+                  : 'text-text-tertiary hover:bg-background-hover/50 hover:text-text-secondary',
+                'transition-colors'
+              )}
+              title={isPinned ? '取消钉住' : '钉住面板'}
+            >
+              {isPinned ? (
+                <PinOff className="w-3 h-3" />
+              ) : (
+                <Pin className="w-3 h-3" />
+              )}
+              <span>{isPinned ? '取消钉' : '钉住'}</span>
             </button>
           )}
         </div>
