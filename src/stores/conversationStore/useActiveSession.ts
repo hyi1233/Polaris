@@ -10,7 +10,7 @@
  * 3. useActiveSessionStreaming() - 只订阅流式状态
  */
 
-import { useMemo, useCallback, useSyncExternalStore } from 'react'
+import { useMemo, useCallback, useSyncExternalStore, useRef } from 'react'
 import { useStore } from 'zustand'
 import {
   sessionStoreManager,
@@ -22,6 +22,7 @@ import type { ConversationStore, ConversationState } from './types'
  * 订阅活跃会话的特定状态
  *
  * 内部使用 useSyncExternalStore 确保响应式更新
+ * 使用 useRef 缓存返回值，避免 getSnapshot 返回不稳定引用导致无限循环
  */
 function useActiveSessionSelector<T>(
   selector: (state: ConversationState) => T,
@@ -32,10 +33,33 @@ function useActiveSessionSelector<T>(
 
   const store = sessionId ? stores.get(sessionId) : null
 
+  // 缓存上次的值，确保引用稳定
+  const cachedValueRef = useRef<T>(defaultValue)
+  const cachedStoreRef = useRef<typeof store>(null)
+
   // 使用 getSnapshot 和 subscribe 模式
   const getSnapshot = useCallback(() => {
-    if (!store) return defaultValue
-    return selector(store.getState())
+    if (!store) {
+      // store 不存在时返回稳定的默认值
+      return defaultValue
+    }
+
+    const newValue = selector(store.getState())
+
+    // 检查值是否真正变化（引用比较或浅比较）
+    // 对于原始类型直接比较，对于对象/数组检查引用
+    if (
+      cachedStoreRef.current === store &&
+      cachedValueRef.current === newValue
+    ) {
+      // store 相同且值引用相同，返回缓存值
+      return cachedValueRef.current
+    }
+
+    // 值变化了，更新缓存
+    cachedStoreRef.current = store
+    cachedValueRef.current = newValue
+    return newValue
   }, [store, selector, defaultValue])
 
   const subscribe = useCallback((onChange: () => void) => {
@@ -43,7 +67,10 @@ function useActiveSessionSelector<T>(
     return store.subscribe(onChange)
   }, [store])
 
-  return useSyncExternalStore(subscribe, getSnapshot, () => defaultValue)
+  // 服务端快照使用稳定的默认值
+  const getServerSnapshot = useCallback(() => defaultValue, [defaultValue])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
 
 /**
@@ -131,57 +158,62 @@ export function useActiveSessionBlockMaps() {
 
 /**
  * 获取活跃会话的操作方法
+ * 
+ * 返回稳定的方法引用，内部动态获取最新的 sessionId 和 store
  */
 export function useActiveSessionActions() {
-  const sessionId = useActiveSessionId()
-  const stores = useStore(sessionStoreManager, (state) => state.stores)
-  const managerActions = useStore(
-    sessionStoreManager,
-    useCallback((state) => ({
-      switchSession: state.switchSession,
-      deleteSession: state.deleteSession,
-      createSession: state.createSession,
-    }), [])
-  )
-
-  const getStore = useCallback(() => {
-    if (!sessionId) return null
-    return stores.get(sessionId)?.getState() ?? null
-  }, [sessionId, stores])
-
-  return useMemo(() => ({
-    sendMessage: async (...args: Parameters<ConversationStore['sendMessage']>) => {
-      const store = getStore()
-      if (!store) return
-      return store.sendMessage(...args)
-    },
-    interrupt: async () => {
-      const store = getStore()
-      if (!store) return
-      return store.interrupt()
-    },
-    continueChat: async (prompt?: string) => {
-      const store = getStore()
-      if (!store) return
-      return store.continueChat(prompt)
-    },
-    deleteMessage: (messageId: string) => {
-      const store = getStore()
-      if (!store) return
-      return store.deleteMessage(messageId)
-    },
-    editAndResend: async (messageId: string, newContent: string) => {
-      const store = getStore()
-      if (!store) return
-      return store.editAndResend(messageId, newContent)
-    },
-    regenerateResponse: async (messageId: string) => {
-      const store = getStore()
-      if (!store) return
-      return store.regenerateResponse(messageId)
-    },
-    ...managerActions,
-  }), [getStore, managerActions])
+  // 使用 useMemo 确保返回的对象引用稳定
+  return useMemo(() => {
+    const actions = {
+      sendMessage: async (...args: Parameters<ConversationStore['sendMessage']>) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.sendMessage(...args)
+      },
+      interrupt: async () => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.interrupt()
+      },
+      continueChat: async (prompt?: string) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.continueChat(prompt)
+      },
+      deleteMessage: (messageId: string) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.deleteMessage(messageId)
+      },
+      editAndResend: async (messageId: string, newContent: string) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.editAndResend(messageId, newContent)
+      },
+      regenerateResponse: async (messageId: string) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.regenerateResponse(messageId)
+      },
+      // Manager actions
+      switchSession: sessionStoreManager.getState().switchSession,
+      deleteSession: sessionStoreManager.getState().deleteSession,
+      createSession: sessionStoreManager.getState().createSession,
+    }
+    return actions
+  }, []) // 空依赖数组，对象引用永远不变
 }
 
 /**
