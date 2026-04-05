@@ -8,7 +8,6 @@
  */
 
 import { createStore, useStore } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import type { AIEvent } from '../../ai-runtime'
 import type {
   ConversationStore,
@@ -25,7 +24,6 @@ import { handleAIEvent as oldHandleAIEvent } from '../eventChatStore/utils'
 import { getEventRouter } from '../../services/eventRouter'
 import { useConfigStore } from '../configStore'
 import { useWorkspaceStore } from '../workspaceStore'
-import { useMemo } from 'react'
 
 // ============================================================================
 // Manager Store Type
@@ -445,9 +443,28 @@ function createSessionManagerStore() {
  */
 export const sessionStoreManager = createSessionManagerStore()
 
+/**
+ * 缓存的 actions 对象，确保引用稳定
+ */
+const cachedActions = {
+  get createSession() { return sessionStoreManager.getState().createSession },
+  get deleteSession() { return sessionStoreManager.getState().deleteSession },
+  get switchSession() { return sessionStoreManager.getState().switchSession },
+  get addToBackground() { return sessionStoreManager.getState().addToBackground },
+  get removeFromBackground() { return sessionStoreManager.getState().removeFromBackground },
+  get addToNotifications() { return sessionStoreManager.getState().addToNotifications },
+  get removeFromNotifications() { return sessionStoreManager.getState().removeFromNotifications },
+  get interruptSession() { return sessionStoreManager.getState().interruptSession },
+  get interruptAllBackground() { return sessionStoreManager.getState().interruptAllBackground },
+}
+
 // ============================================================================
 // React Hooks
 // ============================================================================
+
+// Cache variables for useSessionMetadataList to prevent infinite render loops
+let cachedMetadataMap: Map<string, SessionMetadata> | null = null
+let cachedMetadataArray: SessionMetadata[] | null = null
 
 /**
  * 获取当前活跃会话的 Store
@@ -483,7 +500,30 @@ export function useConversationStore(sessionId: string | null): ConversationStor
 export function useSessionMetadataList(): SessionMetadata[] {
   return useStore(
     sessionStoreManager,
-    useShallow((state) => Array.from(state.sessionMetadata.values()))
+    (state) => {
+      // Implement caching logic to prevent infinite render loops
+      // If the Map reference hasn't changed, return the cached array
+      if (state.sessionMetadata === cachedMetadataMap && cachedMetadataArray !== null) {
+        return cachedMetadataArray
+      }
+      
+      // Map reference has changed, create new array and update cache
+      const newArray = Array.from(state.sessionMetadata.values())
+      cachedMetadataMap = state.sessionMetadata
+      cachedMetadataArray = newArray
+      
+      return newArray
+    },
+    // 自定义比较函数：只有当数组长度或元素内容变化时才更新
+    (prev, next) => {
+      if (prev.length !== next.length) return false
+      return prev.every((item, index) => {
+        const nextItem = next[index]
+        return item.id === nextItem.id &&
+          item.status === nextItem.status &&
+          item.updatedAt === nextItem.updatedAt
+      })
+    }
   )
 }
 
@@ -501,11 +541,15 @@ export function useActiveSessionId(): string | null {
 export function useBackgroundSessions(): SessionMetadata[] {
   return useStore(
     sessionStoreManager,
-    useShallow((state) =>
+    (state) =>
       state.backgroundSessionIds
         .map((id) => state.sessionMetadata.get(id))
-        .filter((m): m is SessionMetadata => m !== undefined)
-    )
+        .filter((m): m is SessionMetadata => m !== undefined),
+    // 自定义比较函数
+    (prev, next) => {
+      if (prev.length !== next.length) return false
+      return prev.every((item, index) => item.id === next[index]?.id)
+    }
   )
 }
 
@@ -516,32 +560,25 @@ export function useBackgroundSessions(): SessionMetadata[] {
 export function useCompletedNotifications(): SessionMetadata[] {
   return useStore(
     sessionStoreManager,
-    useShallow((state) =>
+    (state) =>
       state.completedNotifications
         .map((id) => state.sessionMetadata.get(id))
-        .filter((m): m is SessionMetadata => m !== undefined)
-    )
+        .filter((m): m is SessionMetadata => m !== undefined),
+    // 自定义比较函数
+    (prev, next) => {
+      if (prev.length !== next.length) return false
+      return prev.every((item, index) => item.id === next[index]?.id)
+    }
   )
 }
 
 /**
  * 获取 Manager 操作方法
+ * 
+ * 注意：返回缓存的 actions 对象，引用永远不变
  */
 export function useSessionManagerActions() {
-  return useMemo(
-    () => ({
-      createSession: sessionStoreManager.getState().createSession,
-      deleteSession: sessionStoreManager.getState().deleteSession,
-      switchSession: sessionStoreManager.getState().switchSession,
-      addToBackground: sessionStoreManager.getState().addToBackground,
-      removeFromBackground: sessionStoreManager.getState().removeFromBackground,
-      addToNotifications: sessionStoreManager.getState().addToNotifications,
-      removeFromNotifications: sessionStoreManager.getState().removeFromNotifications,
-      interruptSession: sessionStoreManager.getState().interruptSession,
-      interruptAllBackground: sessionStoreManager.getState().interruptAllBackground,
-    }),
-    []
-  )
+  return cachedActions
 }
 
 // 导出创建函数（用于测试）
