@@ -410,11 +410,12 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
         throw new DOMException('搜索已取消', 'AbortError');
       }
 
-      // 防止循环
-      if (visited.has(dirPath)) {
+      // 防止循环（使用规范化路径）
+      const normalizedDirPath = normalizePath(dirPath);
+      if (visited.has(normalizedDirPath)) {
         return;
       }
-      visited.add(dirPath);
+      visited.add(normalizedDirPath);
 
       try {
         const files = await tauri.readDirectory(dirPath) as FileInfo[];
