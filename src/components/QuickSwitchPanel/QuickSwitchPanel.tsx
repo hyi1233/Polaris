@@ -265,7 +265,7 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
   return (
     <div className={cn('fixed right-0 top-0 bottom-0 pointer-events-none z-20', className)}>
       {/* 触发器容器 */}
-      <div className="absolute right-0 top-[45%] -translate-y-1/2 pointer-events-auto">
+      <div className="absolute right-0 top-[25%] -translate-y-1/2 pointer-events-auto">
         <QuickSwitchTrigger
           status={currentStatus}
           isHovering={isPanelVisible}

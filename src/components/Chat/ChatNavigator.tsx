@@ -149,7 +149,7 @@ export function ChatNavigator({
           'fixed right-0 top-1/2 -translate-y-1/2',
           // 尺寸：28x48px，贴边设计
           'w-7 h-12 -mr-3',
-          // 玻璃风格（替换原来的蓝色）
+          // 玻璃风格
           'rounded-l-xl',
           'bg-background-elevated/85 backdrop-blur-xl',
           'border border-border/50 border-r-0',
@@ -168,24 +168,25 @@ export function ChatNavigator({
         onMouseLeave={handleFloatingBallMouseLeave}
         title={t('navigator.title')}
       >
-        {/* 三横线图标（改为灰色） */}
+        {/* 列表图标 - 表示对话轮次 */}
         <div className={clsx(
           'w-4 h-4 flex flex-col items-center justify-center gap-0.5',
           'transition-transform duration-200',
-          isPanelVisible ? 'rotate-45' : 'group-hover:scale-110'
+          isPanelVisible ? 'scale-110' : 'group-hover:scale-110'
         )}>
-          <div className={clsx(
-            'w-3 h-0.5 bg-text-muted rounded-full transition-all duration-200',
-            isPanelVisible ? 'rotate-90 absolute' : ''
-          )} />
-          <div className={clsx(
-            'w-3 h-0.5 bg-text-muted rounded-full transition-all duration-200',
-            isPanelVisible ? 'opacity-0' : ''
-          )} />
-          <div className={clsx(
-            'w-3 h-0.5 bg-text-muted rounded-full transition-all duration-200',
-            isPanelVisible ? '-rotate-90 absolute' : ''
-          )} />
+          {/* 数字列表样式 */}
+          <div className="flex items-center gap-1 w-full">
+            <div className="w-1 h-1 bg-text-secondary rounded-full" />
+            <div className="flex-1 h-0.5 bg-text-muted rounded" />
+          </div>
+          <div className="flex items-center gap-1 w-full">
+            <div className="w-1 h-1 bg-text-tertiary rounded-full" />
+            <div className="w-2.5 h-0.5 bg-text-muted rounded" />
+          </div>
+          <div className="flex items-center gap-1 w-full">
+            <div className="w-1 h-1 bg-text-tertiary rounded-full" />
+            <div className="w-2 h-0.5 bg-text-muted rounded" />
+          </div>
         </div>
       </div>
 

@@ -29,8 +29,8 @@ export const QuickSwitchTrigger = memo(function QuickSwitchTrigger({
   return (
     <div
       className={cn(
-        // 尺寸：拨片开关造型
-        'w-10 h-14',
+        // 尺寸：贴边胶囊，与其他导航一致
+        'w-7 h-12 -mr-3',
         // 位置
         'relative',
         // 交互
@@ -41,73 +41,54 @@ export const QuickSwitchTrigger = memo(function QuickSwitchTrigger({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      {/* 拨片主体 - 斜切几何造型 */}
+      {/* 贴边玻璃风格主体 */}
       <div
         className={cn(
           'absolute inset-0',
-          // 几何造型：左上斜切
-          'bg-gradient-to-b from-background-elevated/95 to-background-elevated/80',
-          // 斜切角落
-          '[clip-path:polygon(20%_0,_100%_0,_100%_100%,_0_100%,_0_20%)]',
-          // 微妙边框发光
-          'border-l-2 border-l-border/30',
-          // 阴影
-          'shadow-lg shadow-black/20',
+          // 玻璃风格，与其他导航统一
+          'rounded-l-xl',
+          'bg-background-elevated/85 backdrop-blur-xl',
+          'border border-border/50 border-r-0',
+          'shadow-lg shadow-black/5',
           // 过渡
-          'transition-all duration-200'
+          'transition-all duration-200',
+          // 悬停效果
+          isHovering && 'bg-background-elevated/95 shadow-xl'
         )}
       />
 
       {/* 状态边缘发光线 */}
       <div
         className={cn(
-          'absolute left-0 top-[20%] bottom-0 w-0.5',
+          'absolute left-0 top-2 bottom-2 w-0.5 rounded-l',
           'transition-all duration-300',
           // 根据状态显示不同颜色
-          status === 'running' && 'bg-success shadow-[0_0_8px_rgba(52,211,153,0.6)]',
-          status === 'waiting' && 'bg-info shadow-[0_0_8px_rgba(96,165,250,0.6)]',
-          status === 'error' && 'bg-danger shadow-[0_0_8px_rgba(248,113,113,0.6)]',
+          status === 'running' && 'bg-success shadow-[0_0_6px_rgba(52,211,153,0.5)]',
+          status === 'waiting' && 'bg-info shadow-[0_0_6px_rgba(96,165,250,0.5)]',
+          status === 'error' && 'bg-danger shadow-[0_0_6px_rgba(248,113,113,0.5)]',
           status === 'idle' && 'bg-text-muted',
-          status === 'background-running' && 'bg-text-tertiary shadow-[0_0_6px_rgba(142,142,147,0.4)]'
+          status === 'background-running' && 'bg-text-tertiary shadow-[0_0_4px_rgba(142,142,147,0.3)]'
         )}
       />
 
-      {/* 内容区域 */}
+      {/* 内容区域 - 切换图标 */}
       <div
         className={cn(
-          'absolute inset-0 [clip-path:polygon(20%_0,_100%_0,_100%_100%,_0_100%,_0_20%)]',
-          'flex flex-col items-center justify-center gap-1.5',
-          'px-2 py-2',
-          // 悬停时的变换效果
-          isHovering && 'scale-[1.02] translate-x-[-1px]'
+          'absolute inset-0',
+          'flex flex-col items-center justify-center gap-1',
+          'transition-transform duration-200',
+          isHovering && 'scale-110'
         )}
       >
         {/* 状态几何符号 */}
         <StatusSymbol status={status} size="sm" />
 
-        {/* 快捷指示图标 */}
-        <div
-          className={cn(
-            'w-3 h-3',
-            // 双横线造型（表示"面板/抽屉"）
-            'flex flex-col gap-0.5 items-center justify-center'
-          )}
-        >
-          <div className="w-2 h-0.5 bg-text-muted rounded-full" />
-          <div className="w-1.5 h-0.5 bg-text-tertiary rounded-full" />
+        {/* 切换指示图标 - 双箭头样式 */}
+        <div className="flex items-center gap-0.5">
+          <div className="w-0 h-0 border-t-[3px] border-t-transparent border-r-[3px] border-r-text-muted border-b-[3px] border-b-transparent" />
+          <div className="w-0 h-0 border-t-[3px] border-t-transparent border-l-[3px] border-l-text-muted border-b-[3px] border-b-transparent" />
         </div>
       </div>
-
-      {/* 悬停时的顶部发光 */}
-      {isHovering && (
-        <div
-          className={cn(
-            'absolute top-0 left-[20%] right-0 h-px',
-            'bg-gradient-to-r from-primary/0 via-primary/60 to-primary/0',
-            'shadow-[0_0_12px_rgba(59,130,246,0.4)]'
-          )}
-        />
-      )}
     </div>
   )
 })

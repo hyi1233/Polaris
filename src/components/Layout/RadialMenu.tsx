@@ -291,14 +291,15 @@ export function RadialMenuTrigger({
         /* 贴边半圆：左半圆在屏幕外，右半圆在屏幕内 */
         w-8 h-14 -ml-4
         rounded-r-full
-        flex items-center justify-end pr-1
-        shadow-lg
+        flex items-center justify-center
         transition-all duration-200 ease-out
         group
-        ${isOpen
-          ? 'bg-primary-hover shadow-xl'
-          : 'bg-primary hover:bg-primary-hover hover:shadow-xl'
-        }
+        /* 玻璃透明风格 */
+        bg-background-elevated/85 backdrop-blur-xl
+        border border-border/50 border-l-0
+        shadow-lg shadow-black/10
+        hover:bg-background-elevated/95 hover:shadow-xl
+        ${isOpen ? 'bg-background-elevated/95 shadow-xl' : ''}
       `}
       style={{
         top: '50%',
@@ -307,15 +308,16 @@ export function RadialMenuTrigger({
       }}
       title={t('labels.showActivityBar')}
     >
-      {/* 三横线图标 */}
+      {/* 网格图标 - 表示功能菜单 */}
       <div className={`
-        w-4 h-4 flex flex-col items-center justify-center gap-0.5
+        w-4 h-4 grid grid-cols-2 gap-0.5
         transition-transform duration-200
         ${isOpen ? 'rotate-45' : 'group-hover:scale-110'}
       `}>
-        <div className={`w-3 h-0.5 bg-white rounded-full transition-all duration-200 ${isOpen ? 'rotate-90 absolute' : ''}`} />
-        <div className={`w-3 h-0.5 bg-white rounded-full transition-all duration-200 ${isOpen ? 'opacity-0' : ''}`} />
-        <div className={`w-3 h-0.5 bg-white rounded-full transition-all duration-200 ${isOpen ? '-rotate-90 absolute' : ''}`} />
+        <div className={`w-1.5 h-1.5 bg-text-secondary rounded-sm transition-all duration-200 ${isOpen ? 'bg-primary' : ''}`} />
+        <div className={`w-1.5 h-1.5 bg-text-secondary rounded-sm transition-all duration-200 ${isOpen ? 'bg-primary' : ''}`} />
+        <div className={`w-1.5 h-1.5 bg-text-secondary rounded-sm transition-all duration-200 ${isOpen ? 'bg-primary' : ''}`} />
+        <div className={`w-1.5 h-1.5 bg-text-secondary rounded-sm transition-all duration-200 ${isOpen ? 'bg-primary' : ''}`} />
       </div>
     </button>
   )
