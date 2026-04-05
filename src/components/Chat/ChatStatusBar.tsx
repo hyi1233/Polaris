@@ -13,7 +13,7 @@
 import { useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfigStore, useChatInputStore } from '../../stores';
-import { useActiveSessionActions, useActiveSessionMessages, useActiveSessionStreaming } from '../../stores/conversationStore/useActiveSession';
+import { useActiveSessionActions, useActiveSessionStreaming } from '../../stores/conversationStore/useActiveSession';
 import { Paperclip, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { IconMic, IconVolume, IconVolumeX } from '../Common/Icons';

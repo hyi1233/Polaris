@@ -12,7 +12,7 @@ import {
   formatDuration,
   calculateDuration,
 } from '../../utils/toolSummary';
-import { Check, XCircle, Loader2, AlertTriangle, ChevronDown, Circle, ListChecks } from 'lucide-react';
+import { Check, XCircle, Loader2, AlertTriangle, ChevronDown, Circle, ListChecks, Play } from 'lucide-react';
 
 // ========================================
 // AgentRun 渲染器

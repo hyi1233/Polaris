@@ -258,7 +258,7 @@ export function generateCollapsedSummary(
   toolName: string,
   input: Record<string, unknown> | undefined,
   output: string | undefined,
-  status: ToolStatus
+  _status: ToolStatus
 ): CollapsedSummary {
   const normalizedToolName = toolName.toLowerCase();
   const filePath = extractFilePath(input);
