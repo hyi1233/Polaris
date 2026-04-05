@@ -8,6 +8,7 @@
  */
 
 import { createStore, useStore } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import type { AIEvent } from '../../ai-runtime'
 import type {
   ConversationStore,
@@ -477,11 +478,13 @@ export function useConversationStore(sessionId: string | null): ConversationStor
 
 /**
  * 获取所有会话元数据列表
+ * 使用 useShallow 避免数组实例变化导致的无限更新
  */
 export function useSessionMetadataList(): SessionMetadata[] {
-  return useStore(sessionStoreManager, (state) => {
-    return Array.from(state.sessionMetadata.values())
-  })
+  return useStore(
+    sessionStoreManager,
+    useShallow((state) => Array.from(state.sessionMetadata.values()))
+  )
 }
 
 /**
@@ -493,24 +496,32 @@ export function useActiveSessionId(): string | null {
 
 /**
  * 获取后台运行会话列表
+ * 使用 useShallow 避免数组实例变化导致的无限更新
  */
 export function useBackgroundSessions(): SessionMetadata[] {
-  return useStore(sessionStoreManager, (state) => {
-    return state.backgroundSessionIds
-      .map((id) => state.sessionMetadata.get(id))
-      .filter((m): m is SessionMetadata => m !== undefined)
-  })
+  return useStore(
+    sessionStoreManager,
+    useShallow((state) =>
+      state.backgroundSessionIds
+        .map((id) => state.sessionMetadata.get(id))
+        .filter((m): m is SessionMetadata => m !== undefined)
+    )
+  )
 }
 
 /**
  * 获取已完成通知列表
+ * 使用 useShallow 避免数组实例变化导致的无限更新
  */
 export function useCompletedNotifications(): SessionMetadata[] {
-  return useStore(sessionStoreManager, (state) => {
-    return state.completedNotifications
-      .map((id) => state.sessionMetadata.get(id))
-      .filter((m): m is SessionMetadata => m !== undefined)
-  })
+  return useStore(
+    sessionStoreManager,
+    useShallow((state) =>
+      state.completedNotifications
+        .map((id) => state.sessionMetadata.get(id))
+        .filter((m): m is SessionMetadata => m !== undefined)
+    )
+  )
 }
 
 /**
