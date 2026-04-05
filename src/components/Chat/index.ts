@@ -11,3 +11,8 @@ export { ChatStatusBar } from './ChatStatusBar';
 export { EnhancedChatMessages } from './EnhancedChatMessages';
 export { ToolBubble } from './ToolBubble';
 export { ToolGroupBubble } from './ToolGroupBubble';
+
+// 多会话窗口组件
+export { MultiSessionGrid, MultiSessionToggle } from './MultiSessionGrid';
+export { SessionCell } from './SessionCell';
+export { NewSessionButton } from './NewSessionButton';

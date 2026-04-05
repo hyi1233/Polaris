@@ -6,7 +6,7 @@ import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { TopMenuBar as TopMenuBarComponent } from './components/TopMenuBar';
 import { GitPanel } from './components/GitPanel';
 import { ActivityBar, LeftPanel, LeftPanelContent, CenterStage, RightPanel } from './components/Layout';
-import { EnhancedChatMessages, ChatInput, ChatStatusBar, SessionHistoryPanel } from './components/Chat';
+import { EnhancedChatMessages, ChatInput, ChatStatusBar, SessionHistoryPanel, MultiSessionGrid, MultiSessionToggle, NewSessionButton } from './components/Chat';
 import type { SettingsTabId } from './components/Settings/SettingsSidebar';
 import { SimpleTodoPanel } from './components/TodoPanel/SimpleTodoPanel';
 import { TranslatePanel, SelectionContextMenu } from './components/Translate';
@@ -86,6 +86,8 @@ function App() {
     // 会话历史面板
     showSessionHistory,
     toggleSessionHistory,
+    // 多会话窗口模式
+    multiSessionMode,
   } = useViewStore();
   const { openDiffTab, tabs } = useTabStore();
   const hasOpenTabs = tabs.length > 0;
@@ -536,8 +538,12 @@ function App() {
             </div>
           )}
 
-          {/* 消息区域 */}
-          <EnhancedChatMessages />
+          {/* 消息区域 - 根据多会话模式选择渲染 */}
+          {multiSessionMode ? (
+            <MultiSessionGrid />
+          ) : (
+            <EnhancedChatMessages />
+          )}
 
           {/* 状态栏容器（带通知） */}
           <div className="relative">
@@ -545,7 +551,12 @@ function App() {
             <ToastContainer />
 
             {/* 对话状态栏 */}
-            <ChatStatusBar />
+            <ChatStatusBar>
+              {/* 多会话切换按钮 */}
+              <MultiSessionToggle />
+              {/* 新建会话按钮 */}
+              <NewSessionButton />
+            </ChatStatusBar>
           </div>
 
           {/* 输入区域 */}

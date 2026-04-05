@@ -10,7 +10,7 @@
  * - 输入字数
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConfigStore, useChatInputStore } from '../../stores';
 import { useActiveSessionActions, useActiveSessionStreaming } from '../../stores/conversationStore/useActiveSession';
@@ -22,10 +22,14 @@ import { useTTS } from '../../hooks/useTTS';
 import type { SpeechConfig, VoiceCommand, TTSConfig } from '../../types/speech';
 import { DEFAULT_TTS_CONFIG } from '../../types/speech';
 
+interface ChatStatusBarProps {
+  children?: ReactNode;
+}
+
 /**
  * 聊天状态栏组件
  */
-export function ChatStatusBar() {
+export function ChatStatusBar({ children }: ChatStatusBarProps) {
   const { t } = useTranslation('chat');
   const { config, healthStatus, updateConfig } = useConfigStore();
   const isStreaming = useActiveSessionStreaming();
@@ -145,8 +149,9 @@ export function ChatStatusBar() {
       'flex items-center justify-between gap-4 px-4 py-1.5 text-xs text-text-tertiary',
       'bg-background-surface/50 border-t border-border-subtle'
     )}>
-      {/* 左侧：版本 */}
+      {/* 左侧：版本 + children（多会话切换按钮等） */}
       <div className="flex items-center gap-2">
+        {children}
         {config?.defaultEngine === 'claude-code' && healthStatus?.claudeVersion && (
           <span className="px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
             v{healthStatus.claudeVersion}
