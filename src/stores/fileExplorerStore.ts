@@ -577,14 +577,22 @@ export function initFileWatcherListener(): () => void {
 
     if (!current_path) return;
 
+    // 规范化 expanded_folders 中的路径，确保比较时格式一致
+    // Windows 上 file.path 可能是反斜杠格式，需要统一为正斜杠
+    const normalizedExpanded = new Set<string>();
+    for (const path of expanded_folders) {
+      normalizedExpanded.add(normalizePath(path));
+    }
+
     // 找出需要刷新的目录（受影响且已展开的）
     const dirsToRefresh: string[] = [];
 
     for (const relDir of affectedDirs) {
-      // 构建绝对路径
-      const absPath = relDir === '.'
+      // 构建绝对路径并规范化
+      const rawAbsPath = relDir === '.'
         ? current_path
-        : normalizePath(joinPath(current_path, relDir));
+        : joinPath(current_path, relDir);
+      const normalizedAbsPath = normalizePath(rawAbsPath);
 
       // 根目录始终刷新
       if (relDir === '.') {
@@ -592,15 +600,18 @@ export function initFileWatcherListener(): () => void {
         continue;
       }
 
-      // 检查是否已展开
-      if (expanded_folders.has(absPath)) {
-        dirsToRefresh.push(absPath);
+      // 检查是否已展开（使用规范化后的路径比较）
+      if (normalizedExpanded.has(normalizedAbsPath)) {
+        dirsToRefresh.push(rawAbsPath);
       }
 
       // 也检查父目录是否已展开（新文件可能在已展开的目录中）
-      const parentDir = getParentPath(absPath);
-      if (parentDir && expanded_folders.has(parentDir) && !dirsToRefresh.includes(parentDir)) {
-        dirsToRefresh.push(parentDir);
+      const normalizedParentDir = getParentPath(normalizedAbsPath);
+      if (normalizedParentDir && normalizedExpanded.has(normalizedParentDir)) {
+        const rawParentPath = getParentPath(rawAbsPath);
+        if (rawParentPath && !dirsToRefresh.includes(rawParentPath)) {
+          dirsToRefresh.push(rawParentPath);
+        }
       }
     }
 
