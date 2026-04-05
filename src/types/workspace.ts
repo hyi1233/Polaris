@@ -67,6 +67,8 @@ export interface WorkspaceActions {
   getContextWorkspaces: () => Workspace[];
   /** 获取所有可访问的工作区（当前 + 关联） */
   getAllAccessibleWorkspaces: () => Workspace[];
+  /** 获取按最近访问时间排序的工作区列表 */
+  getSortedWorkspaces: () => Workspace[];
 
   // FileExplorer 浏览工作区操作
   /** 设置 FileExplorer 当前浏览的工作区 */

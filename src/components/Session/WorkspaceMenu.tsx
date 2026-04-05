@@ -5,14 +5,15 @@
  *
  * UI 设计：
  * - 顶部标题行 + 新增按钮
+ * - 锁定提示（如有消息）
  * - 工作区列表（点击切换主工作区，右侧按钮添加/移除关联）
  * - 底部关联状态汇总
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/utils/cn'
-import { Check, Plus, X, Link } from 'lucide-react'
+import { Check, Plus, X, Link, Lock } from 'lucide-react'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useSessionMetadataList, useSessionManagerActions } from '@/stores/conversationStore/sessionStoreManager'
 import { CreateWorkspaceModal } from '@/components/Workspace/CreateWorkspaceModal'
@@ -24,19 +25,24 @@ interface WorkspaceMenuProps {
 }
 
 export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuProps) {
-  const workspaces = useWorkspaceStore((state) => state.workspaces)
+  const workspacesRaw = useWorkspaceStore((state) => state.workspaces)
+  const workspaces = useMemo(() =>
+    workspacesRaw.slice().sort((a, b) =>
+      new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
+    ), [workspacesRaw]
+  )
   const sessions = useSessionMetadataList()
   const { updateSessionWorkspace, addContextWorkspace, removeContextWorkspace } = useSessionManagerActions()
 
   // 新增工作区弹窗状态
   const [showCreateModal, setShowCreateModal] = useState(false)
-  
+
   // 菜单位置
   const [position, setPosition] = useState({ top: 0, left: 0 })
 
   // 点击外部关闭
   const menuRef = useRef<HTMLDivElement>(null)
-  
+
   useEffect(() => {
     // 计算菜单位置
     if (anchorEl) {
@@ -47,7 +53,7 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
       })
     }
   }, [anchorEl])
-  
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -62,16 +68,18 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
 
   // 获取当前会话
   const session = sessions.find(s => s.id === sessionId)
-  
+
   if (!session) {
     return null
   }
 
   const effectiveWorkspaceId = session.workspaceId
   const contextWorkspaceIds = session.contextWorkspaceIds || []
+  const isLocked = session.workspaceLocked || false
 
   // 点击主工作区项（不关闭面板）
   const handleWorkspaceClick = (workspaceId: string) => {
+    if (isLocked) return // 锁定时不允许切换
     console.log('[WorkspaceMenu] 切换工作区:', sessionId, workspaceId)
     updateSessionWorkspace(sessionId, workspaceId)
     // 不关闭面板，用户可能还要操作关联工作区
@@ -95,8 +103,8 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
   const contextWorkspaces = workspaces.filter(w => contextWorkspaceIds.includes(w.id))
 
   const menuContent = (
-    <div 
-      ref={menuRef} 
+    <div
+      ref={menuRef}
       className="fixed w-64 bg-background-elevated border border-border rounded-xl shadow-lg overflow-hidden z-50"
       style={{
         top: `${position.top}px`,
@@ -114,6 +122,14 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
         </button>
       </div>
 
+      {/* 锁定提示 */}
+      {isLocked && (
+        <div className="px-3 py-2 bg-warning/10 border-b border-border-subtle flex items-center gap-2 text-xs text-warning">
+          <Lock className="w-3.5 h-3.5" />
+          <span>会话进行中，主工作区已锁定</span>
+        </div>
+      )}
+
       {/* 工作区列表 */}
       <div className="max-h-48 overflow-y-auto">
         {workspaces.length === 0 ? (
@@ -130,12 +146,19 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
                 key={workspace.id}
                 className={cn(
                   'group relative flex items-center',
-                  isCurrent && 'bg-primary/10'
+                  isCurrent && (isLocked ? 'bg-primary/10 opacity-80' : 'bg-primary/10')
                 )}
               >
                 {/* 当前工作区左侧指示条 */}
                 {isCurrent && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
+                )}
+
+                {/* 锁定图标 */}
+                {isCurrent && isLocked && (
+                  <div className="px-2">
+                    <Lock className="w-3.5 h-3.5 text-text-muted" />
+                  </div>
                 )}
 
                 {/* 工作区名称和路径 */}
@@ -144,21 +167,30 @@ export function WorkspaceMenu({ sessionId, anchorEl, onClose }: WorkspaceMenuPro
                     e.stopPropagation()
                     handleWorkspaceClick(workspace.id)
                   }}
+                  disabled={isLocked && isCurrent}
                   className={cn(
                     'flex-1 text-left px-3 py-2 text-sm transition-colors',
                     isCurrent
                       ? 'text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-background-hover'
+                      : isLocked
+                        ? 'text-text-secondary cursor-not-allowed'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-background-hover',
+                    isLocked && isCurrent && 'cursor-not-allowed'
                   )}
                 >
                   <div className="pr-16 font-medium truncate flex items-center gap-2">
-                    {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                    {isCurrent && !isLocked && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
                     {workspace.name}
                   </div>
                   <div className="text-xs truncate text-text-tertiary">
                     {workspace.path}
                   </div>
                 </button>
+
+                {/* 主标签 */}
+                {isCurrent && (
+                  <span className="px-2 text-xs text-primary">主</span>
+                )}
 
                 {/* 关联按钮（所有工作区都显示，除了当前主工作区） */}
                 {workspaces.length > 1 && !isCurrent && (

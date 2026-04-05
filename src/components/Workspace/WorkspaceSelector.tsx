@@ -2,7 +2,7 @@
  * 工作区选择器组件
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWorkspaceStore } from '../../stores';
 import { Button } from '../Common';
@@ -14,13 +14,19 @@ const log = createLogger('WorkspaceSelector');
 export function WorkspaceSelector() {
   const { t } = useTranslation('workspace');
   const {
-    workspaces,
+    workspaces: workspacesRaw,
     currentWorkspaceId,
     switchWorkspace,
     deleteWorkspace,
     error,
     clearError,
   } = useWorkspaceStore();
+
+  const workspaces = useMemo(() =>
+    workspacesRaw.slice().sort((a, b) =>
+      new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
+    ), [workspacesRaw]
+  );
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -108,9 +114,7 @@ export function WorkspaceSelector() {
 
         {/* 当前工作区 */}
         <div className="space-y-1">
-          {workspaces
-            .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
-            .map((workspace) => (
+          {workspaces.map((workspace) => (
               <div
                 key={workspace.id}
                 className={`group relative rounded-lg transition-colors ${

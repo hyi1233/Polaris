@@ -4,7 +4,7 @@
  * 显示当前工作区和关联数量，点击展开下拉菜单
  */
 
-import { memo, useState, useRef, useEffect } from 'react'
+import { memo, useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/utils/cn'
 import { FolderOpen, ChevronDown, Lock, Check, X, Link } from 'lucide-react'
@@ -121,7 +121,12 @@ const WorkspaceDropdown = memo(function WorkspaceDropdown({
 }: WorkspaceDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { updateSessionWorkspace, addContextWorkspace, removeContextWorkspace } = useSessionManagerActions()
-  const workspaces = useWorkspaceStore((state) => state.workspaces)
+  const workspacesRaw = useWorkspaceStore((state) => state.workspaces)
+  const workspaces = useMemo(() =>
+    workspacesRaw.slice().sort((a, b) =>
+      new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
+    ), [workspacesRaw]
+  )
 
   // 新建工作区弹窗
   const [showCreateModal, setShowCreateModal] = useState(false)

@@ -332,7 +332,12 @@ export function FileExplorer() {
                         }`}
                       >
                         <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                        <span className="flex-1 truncate">{currentWorkspace?.name || tc('labels.noWorkspaceSelected')}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{currentWorkspace?.name || tc('labels.noWorkspaceSelected')}</div>
+                          {currentWorkspace?.path && (
+                            <div className="text-xs truncate text-text-tertiary">{currentWorkspace.path}</div>
+                          )}
+                        </div>
                         {(!viewingWorkspace || viewingWorkspace.id === currentWorkspaceId) && (
                           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -352,7 +357,10 @@ export function FileExplorer() {
                             }`}
                           >
                             <span className="w-2 h-2 rounded-full bg-primary/50 shrink-0" />
-                            <span className="flex-1 truncate">{workspace.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{workspace.name}</div>
+                              <div className="text-xs truncate text-text-tertiary">{workspace.path}</div>
+                            </div>
                             {viewingWorkspace?.id === workspace.id && (
                               <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

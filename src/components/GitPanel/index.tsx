@@ -37,8 +37,10 @@ export function GitPanel({ className = '', onOpenDiffInTab }: GitPanelProps) {
   const { t } = useTranslation('git')
   const { status, isLoading, error, refreshStatus, getWorktreeFileDiff, getIndexFileDiff, stageFile, unstageFile, discardChanges, initRepository } = useGitStore()
   const currentWorkspace = useWorkspaceStore((s) => {
-    const { workspaces, currentWorkspaceId } = s
-    return workspaces.find(w => w.id === currentWorkspaceId) || null
+    // 优先使用文件浏览器的 viewingWorkspaceId，如果没有则使用 currentWorkspaceId
+    const { workspaces, currentWorkspaceId, viewingWorkspaceId } = s
+    const targetId = viewingWorkspaceId || currentWorkspaceId
+    return workspaces.find(w => w.id === targetId) || null
   })
   const toast = useToastStore()
 
