@@ -1,15 +1,21 @@
 /**
  * TopMenuBar Component
+ *
+ * 顶部菜单栏，包含：
+ * - Logo/应用名称
+ * - 拖拽区域
+ * - ActivityBar 显示/隐藏按钮
+ * - 右侧 AI 面板切换按钮
+ * - 窗口置顶按钮
+ * - 窗口控制按钮（最小化、最大化、关闭）
  */
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Minus, Square, X, Clock, Download, PanelRight, Pin, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Minus, Square, X, PanelRight, Pin, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useViewStore } from '../../stores';
-import { useActiveSessionMessages, useActiveSessionStreaming } from '../../stores/conversationStore/useActiveSession';
 import * as tauri from '../../services/tauri';
-import { exportToMarkdown, generateFileName } from '../../services/chatExport';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { createLogger } from '../../utils/logger';
 
@@ -19,21 +25,16 @@ const log = createLogger('TopMenuBar');
 const isTauriEnv = typeof window !== 'undefined' && '__TAURI__' in window;
 
 interface TopMenuBarProps {
-  onNewConversation: () => void;
   onToggleRightPanel?: () => void;
   rightPanelCollapsed?: boolean;
   isCompactMode?: boolean;
 }
 
-export function TopMenuBar({ onNewConversation, onToggleRightPanel, rightPanelCollapsed, isCompactMode }: TopMenuBarProps) {
+export function TopMenuBar({ onToggleRightPanel, rightPanelCollapsed, isCompactMode }: TopMenuBarProps) {
   const { t } = useTranslation('common');
-  const { toggleSessionHistory, activityBarCollapsed, toggleActivityBar } = useViewStore();
-  const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const { activityBarCollapsed, toggleActivityBar } = useViewStore();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
-  const { messages } = useActiveSessionMessages();
-  const isStreaming = useActiveSessionStreaming();
 
   useEffect(() => {
     if (!isTauriEnv) return;
@@ -75,40 +76,6 @@ export function TopMenuBar({ onNewConversation, onToggleRightPanel, rightPanelCo
     syncOnTopState();
   }, []);
 
-  const handleExportChat = async () => {
-    if (messages.length === 0) {
-      return;
-    }
-
-    setIsExporting(true);
-    try {
-      const content = exportToMarkdown(messages);
-      const fileName = generateFileName('md');
-      const filePath = await tauri.saveChatToFile(content, fileName);
-
-      if (filePath) {
-        log.info('导出聊天成功', { path: filePath });
-      }
-    } catch (error) {
-      log.error('导出聊天失败', error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleNewConversation = () => {
-    if (messages.length > 0) {
-      setShowNewChatConfirm(true);
-    } else {
-      onNewConversation();
-    }
-  };
-
-  const confirmNewChat = () => {
-    onNewConversation();
-    setShowNewChatConfirm(false);
-  };
-
   // 切换窗口置顶状态
   const handleToggleAlwaysOnTop = async () => {
     try {
@@ -139,29 +106,6 @@ export function TopMenuBar({ onNewConversation, onToggleRightPanel, rightPanelCo
         {/* 小屏模式：显示置顶按钮和窗口控制按钮 */}
         {isCompactMode ? (
           <>
-            {/* 新建对话按钮 */}
-            <button
-              onClick={handleNewConversation}
-              disabled={isStreaming}
-              className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors disabled:opacity-50"
-              title={t('menu.newChat')}
-              data-tauri-drag-region={false}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-
-            {/* 会话历史按钮 */}
-            <button
-              onClick={toggleSessionHistory}
-              className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors"
-              title={t('menu.sessionHistory')}
-              data-tauri-drag-region={false}
-            >
-              <Clock className="w-4 h-4" />
-            </button>
-
             {/* 窗口置顶按钮 */}
             <button
               onClick={handleToggleAlwaysOnTop}
@@ -239,44 +183,6 @@ export function TopMenuBar({ onNewConversation, onToggleRightPanel, rightPanelCo
               <PanelRight className="w-4 h-4" />
             </button>
 
-            <button
-              onClick={handleExportChat}
-              disabled={messages.length === 0 || isExporting}
-              className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('menu.exportChat')}
-              data-tauri-drag-region={false}
-            >
-              {isExporting ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 2l4 4-4 4" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 6h-4" />
-                </svg>
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-            </button>
-
-            <button
-              onClick={toggleSessionHistory}
-              className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors"
-              title={t('menu.sessionHistory')}
-              data-tauri-drag-region={false}
-            >
-              <Clock className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={handleNewConversation}
-              className="p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-background-hover transition-colors"
-              title={t('menu.newChat')}
-              data-tauri-drag-region={false}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-
             {/* 窗口置顶按钮 */}
             <button
               onClick={handleToggleAlwaysOnTop}
@@ -323,38 +229,6 @@ export function TopMenuBar({ onNewConversation, onToggleRightPanel, rightPanelCo
           </>
         )}
       </div>
-
-      {/* 新对话确认对话框 */}
-      {showNewChatConfirm && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-50"
-            onClick={() => setShowNewChatConfirm(false)}
-          />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-80 bg-background-elevated rounded-xl border border-border shadow-xl p-5">
-            <h3 className="text-base font-semibold text-text-primary mb-2">
-              {t('messages.confirmNewChat')}
-            </h3>
-            <p className="text-sm text-text-secondary mb-5">
-              {t('messages.confirmNewChatMessage', { count: messages.length })}
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowNewChatConfirm(false)}
-                className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary hover:bg-background-hover rounded-lg transition-colors"
-              >
-                {t('buttons.cancel')}
-              </button>
-              <button
-                onClick={confirmNewChat}
-                className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
-              >
-                {t('buttons.confirm')}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

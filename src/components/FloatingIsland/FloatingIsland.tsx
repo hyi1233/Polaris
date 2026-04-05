@@ -2,7 +2,6 @@
  * FloatingIsland - 悬浮岛主组件
  *
  * 位于聊天区域顶部居中，包含：
- * - Q 图标（窗口拖拽区域）
  * - 会话选择器
  * - 工作区选择器
  * - 更多工具按钮
@@ -76,18 +75,6 @@ export const FloatingIsland = memo(function FloatingIsland() {
           'shadow-lg shadow-black/5'
         )}
       >
-        {/* Q 图标（窗口拖拽区域） */}
-        <div
-          data-tauri-drag-region
-          className="flex items-center justify-center w-7 h-7 rounded-full cursor-move select-none"
-          title="拖拽移动窗口"
-        >
-          <span className="text-xs font-bold text-primary pointer-events-none">Q</span>
-        </div>
-
-        {/* 分隔线 */}
-        <div className="w-px h-5 bg-border" />
-
         {/* 会话选择器 */}
         <SessionSelector
           isOpen={sessionDropdownOpen}

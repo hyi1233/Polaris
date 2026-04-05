@@ -4,8 +4,6 @@
  * 下拉菜单包含：
  * - 导出聊天
  * - 历史会话
- * - 窗口置顶
- * - 最小化、最大化、关闭
  */
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react'
@@ -15,20 +13,12 @@ import {
   MoreHorizontal,
   Download,
   Clock,
-  Pin,
-  Minus,
-  Square,
-  X,
   Loader2,
-  PanelLeft,
-  PanelLeftClose,
 } from 'lucide-react'
 import { useViewStore } from '@/stores'
 import { useActiveSessionMessages } from '@/stores/conversationStore/useActiveSession'
 import { exportToMarkdown, generateFileName } from '@/services/chatExport'
 import * as tauri from '@/services/tauri'
-import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createLogger } from '@/utils/logger'
 
 const log = createLogger('MoreToolsButton')
@@ -127,45 +117,9 @@ const MoreToolsDropdown = memo(function MoreToolsDropdown({
   position,
   onClose,
 }: MoreToolsDropdownProps) {
-  const { toggleSessionHistory, activityBarCollapsed, toggleActivityBar } = useViewStore()
+  const { toggleSessionHistory } = useViewStore()
   const { messages } = useActiveSessionMessages()
   const [isExporting, setIsExporting] = useState(false)
-  const [isMaximized, setIsMaximized] = useState(false)
-  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false)
-
-  // 同步窗口状态
-  useEffect(() => {
-    const syncWindowState = async () => {
-      try {
-        const window = getCurrentWindow()
-        const [maximized, onTop] = await Promise.all([
-          window.isMaximized(),
-          invoke<boolean>('is_always_on_top'),
-        ])
-        setIsMaximized(maximized)
-        setIsAlwaysOnTop(onTop)
-      } catch (error) {
-        // 非 Tauri 环境会抛出错误，忽略即可
-        log.warn('Failed to sync window state:', { error: String(error) })
-      }
-    }
-
-    syncWindowState()
-
-    // 监听窗口大小变化
-    try {
-      const window = getCurrentWindow()
-      const unlisten = window.onResized(() => {
-        syncWindowState()
-      })
-
-      return () => {
-        unlisten.then((fn) => fn())
-      }
-    } catch {
-      // 非 Tauri 环境，忽略
-    }
-  }, [])
 
   // 导出聊天
   const handleExport = async () => {
@@ -194,43 +148,6 @@ const MoreToolsDropdown = memo(function MoreToolsDropdown({
   const handleHistory = () => {
     toggleSessionHistory()
     onClose()
-  }
-
-  // 左侧边栏切换
-  const handleToggleSidebar = () => {
-    toggleActivityBar()
-    onClose()
-  }
-
-  // 窗口置顶
-  const handleToggleAlwaysOnTop = async () => {
-    try {
-      const newOnTop = !isAlwaysOnTop
-      await invoke('set_always_on_top', { alwaysOnTop: newOnTop })
-      setIsAlwaysOnTop(newOnTop)
-      log.info(`窗口置顶: ${newOnTop}`)
-    } catch (error) {
-      log.error(
-        '切换置顶失败',
-        error instanceof Error ? error : new Error(String(error))
-      )
-    }
-  }
-
-  // 最小化
-  const handleMinimize = async () => {
-    await tauri.minimizeWindow()
-  }
-
-  // 最大化/还原
-  const handleToggleMaximize = async () => {
-    await tauri.toggleMaximizeWindow()
-    setIsMaximized((prev) => !prev)
-  }
-
-  // 关闭
-  const handleClose = async () => {
-    await tauri.closeWindow()
   }
 
   const hasMessages = messages.length > 0
@@ -269,42 +186,6 @@ const MoreToolsDropdown = memo(function MoreToolsDropdown({
             icon={Clock}
             label="历史会话"
             onClick={handleHistory}
-          />
-          <MenuItem
-            icon={activityBarCollapsed ? PanelLeft : PanelLeftClose}
-            label={activityBarCollapsed ? '显示侧边栏' : '隐藏侧边栏'}
-            onClick={handleToggleSidebar}
-          />
-        </div>
-
-        {/* 窗口控制组 */}
-        <div className="h-px bg-border-subtle" />
-        <div className="py-1">
-          <MenuItem
-            icon={Pin}
-            label="窗口置顶"
-            active={isAlwaysOnTop}
-            onClick={handleToggleAlwaysOnTop}
-          />
-        </div>
-
-        <div className="h-px bg-border-subtle" />
-        <div className="py-1">
-          <MenuItem
-            icon={Minus}
-            label="最小化"
-            onClick={handleMinimize}
-          />
-          <MenuItem
-            icon={Square}
-            label={isMaximized ? '还原' : '最大化'}
-            onClick={handleToggleMaximize}
-          />
-          <MenuItem
-            icon={X}
-            label="关闭"
-            danger
-            onClick={handleClose}
           />
         </div>
       </div>
