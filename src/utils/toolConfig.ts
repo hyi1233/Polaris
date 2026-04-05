@@ -370,6 +370,15 @@ function extractUrl(input: Record<string, unknown> | undefined): string {
 export function extractToolKeyInfo(toolName: string, input: Record<string, unknown> | undefined): string {
   const category = TOOL_CATEGORY[toolName];
 
+  // Skill 工具特殊处理：提取 skill 参数
+  if (toolName.toLowerCase() === 'skill' && input) {
+    const skill = input.skill as string | undefined;
+    if (skill) {
+      // 提取技能名称（去掉前缀如 "superpowers:"）
+      return skill.includes(':') ? skill.split(':').pop() || skill : skill;
+    }
+  }
+
   switch (category) {
     case 'read':
     case 'edit':

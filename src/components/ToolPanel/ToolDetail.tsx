@@ -16,6 +16,25 @@ interface ToolDetailProps {
   onBack: () => void;
 }
 
+/** 从工具名称和输入中提取显示信息 */
+function extractToolDisplayInfo(name: string, input?: Record<string, unknown>): { displayName: string; subInfo?: string } {
+  // Skill 工具特殊处理：显示具体技能名称
+  if (name.toLowerCase() === 'skill' && input) {
+    const skill = input.skill as string | undefined;
+    if (skill) {
+      // 提取技能名称（去掉前缀如 "superpowers:"）
+      const skillName = skill.includes(':') ? skill.split(':').pop() || skill : skill;
+      return {
+        displayName: '技能',
+        subInfo: skillName,
+      };
+    }
+  }
+
+  // 默认返回工具名称
+  return { displayName: name };
+}
+
 /** 计算持续时间 */
 function formatDuration(startedAt: string, completedAt?: string): string {
   const end = completedAt ? new Date(completedAt).getTime() : Date.now();
@@ -97,6 +116,7 @@ export function ToolDetail({ toolId, onBack }: ToolDetailProps) {
   }
 
   const { StatusIcon, statusText, statusColor } = getStatusInfo(tool.status);
+  const displayInfo = extractToolDisplayInfo(tool.name, tool.input);
 
   return (
     <div className="h-full flex flex-col">
@@ -110,8 +130,13 @@ export function ToolDetail({ toolId, onBack }: ToolDetailProps) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <span className="font-mono text-sm font-medium text-text-primary">{tool.name}</span>
-        <div className={clsx('flex items-center gap-1.5 ml-auto', statusColor)}>
+        <div className="flex flex-col min-w-0">
+          <span className="font-mono text-sm font-medium text-text-primary truncate">{displayInfo.displayName}</span>
+          {displayInfo.subInfo && (
+            <span className="text-xs text-text-tertiary truncate">{displayInfo.subInfo}</span>
+          )}
+        </div>
+        <div className={clsx('flex items-center gap-1.5 ml-auto shrink-0', statusColor)}>
           <StatusIcon size={14} />
           <span className="text-xs">{statusText}</span>
         </div>

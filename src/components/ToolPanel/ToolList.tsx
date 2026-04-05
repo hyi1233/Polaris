@@ -17,6 +17,25 @@ function getDuration(tool: ToolCall): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** 从工具名称和输入中提取显示信息 */
+function extractToolDisplayInfo(name: string, input?: Record<string, unknown>): { displayName: string; subInfo?: string } {
+  // Skill 工具特殊处理：显示具体技能名称
+  if (name.toLowerCase() === 'skill' && input) {
+    const skill = input.skill as string | undefined;
+    if (skill) {
+      // 提取技能名称（去掉前缀如 "superpowers:"）
+      const skillName = skill.includes(':') ? skill.split(':').pop() || skill : skill;
+      return {
+        displayName: '技能',
+        subInfo: skillName,
+      };
+    }
+  }
+
+  // 默认返回工具名称
+  return { displayName: name };
+}
+
 /** 单个工具项 */
 interface ToolItemProps {
   tool: ToolCall;
@@ -26,6 +45,7 @@ interface ToolItemProps {
 
 function ToolItem({ tool, isSelected, onClick }: ToolItemProps) {
   const StatusIcon = getToolStatusIcon(tool.status);
+  const displayInfo = extractToolDisplayInfo(tool.name, tool.input);
 
   return (
     <button
@@ -37,11 +57,18 @@ function ToolItem({ tool, isSelected, onClick }: ToolItemProps) {
       )}
     >
       {StatusIcon && <StatusIcon size={14} className={clsx('shrink-0', getToolStatusColor(tool.status))} />}
-      <span className="flex-1 font-mono text-sm truncate text-text-primary">
-        {tool.name}
-      </span>
+      <div className="flex-1 min-w-0">
+        <span className="font-mono text-sm text-text-primary truncate block">
+          {displayInfo.displayName}
+        </span>
+        {displayInfo.subInfo && (
+          <span className="text-xs text-text-tertiary truncate block">
+            {displayInfo.subInfo}
+          </span>
+        )}
+      </div>
       <span className={clsx(
-        'text-xs tabular-nums',
+        'text-xs tabular-nums shrink-0',
         tool.status === 'running' ? 'text-warning' : 'text-text-tertiary'
       )}>
         {getDuration(tool)}

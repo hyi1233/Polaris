@@ -32,7 +32,7 @@ import {
   type GrepMatch,
   type GrepOutputData
 } from '../../utils/toolSummary';
-import { Check, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Circle, FileSearch, FolderOpen, Code, FileDiff, Brain, ListOrdered } from 'lucide-react';
+import { Check, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Circle, FileSearch, FolderOpen, Code, FileDiff, Brain, ListOrdered, ArrowUp } from 'lucide-react';
 import { ChatNavigator } from './ChatNavigator';
 import { useMessageSearch, MessageSearchPanel } from './MessageSearchPanel';
 import { QuestionBlockRenderer, SimplifiedQuestionRenderer } from './QuestionBlockRenderer';
@@ -1309,59 +1309,218 @@ const SimplifiedToolCallRenderer = memo(function SimplifiedToolCallRenderer({ bl
   );
 });
 
+/** AI 消息右键菜单组件 */
+const AIMessageContextMenu = memo(function AIMessageContextMenu({
+  visible,
+  x,
+  y,
+  onScrollToStart,
+  onClose,
+}: {
+  visible: boolean;
+  x: number;
+  y: number;
+  onScrollToStart: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation('chat');
+  const menuRef = useRef<HTMLDivElement>(null);
+  const positionRef = useRef({ x, y });
+
+  // 更新位置引用
+  useEffect(() => {
+    positionRef.current = { x, y };
+  }, [x, y]);
+
+  // 调整菜单位置，避免超出视口
+  useEffect(() => {
+    if (!visible || !menuRef.current) return;
+
+    const menu = menuRef.current;
+    const rect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let adjustedX = positionRef.current.x;
+    let adjustedY = positionRef.current.y;
+
+    // 右边界检测
+    if (adjustedX + rect.width > viewportWidth) {
+      adjustedX = viewportWidth - rect.width - 8;
+    }
+
+    // 下边界检测
+    if (adjustedY + rect.height > viewportHeight) {
+      adjustedY = viewportHeight - rect.height - 8;
+    }
+
+    // 应用调整后的位置
+    if (adjustedX !== positionRef.current.x || adjustedY !== positionRef.current.y) {
+      menu.style.left = `${adjustedX}px`;
+      menu.style.top = `${adjustedY}px`;
+    }
+  }, [visible]);
+
+  // 点击外部或 ESC 关闭菜单
+  useEffect(() => {
+    if (!visible) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // 延迟添加监听器，避免立即关闭
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [visible, onClose]);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-[10000] bg-background-surface border border-border rounded-lg shadow-lg py-1 min-w-[160px]"
+      style={{ left: x, top: y }}
+    >
+      <button
+        type="button"
+        className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-background-hover hover:text-text-primary flex items-center gap-2 transition-colors"
+        onClick={() => {
+          onScrollToStart();
+          onClose();
+        }}
+      >
+        <ArrowUp size={14} />
+        <span>{t('contextMenu.scrollToStart') || '跳转到消息开头'}</span>
+      </button>
+    </div>
+  );
+});
+
 /** 助手消息组件 - 使用内容块架构 */
 const AssistantBubble = memo(function AssistantBubble({
   message,
   renderMode = 'full',
+  messageIndex,
+  onScrollToMessage,
 }: {
   message: AssistantChatMessage;
   renderMode?: MessageRenderMode;
+  messageIndex?: number;
+  onScrollToMessage?: (index: number) => void;
 }) {
   const hasBlocks = message.blocks && message.blocks.length > 0;
 
-  return (
-    <div className="flex gap-3 my-2">
-      {/* Avatar */}
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-600
-                      flex items-center justify-center shadow-glow shrink-0">
-        <span className="text-sm font-bold text-white">P</span>
-      </div>
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+  } | null>(null);
 
-      {/* 内容 */}
-      <div className="flex-1 space-y-1 min-w-0">
-        {/* 头部信息 */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-text-primary">Claude</span>
-          <span className="text-xs text-text-tertiary">
-            {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-          </span>
+  // 右键事件处理 - 核心逻辑避免与文字选中冲突
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const selectedText = window.getSelection()?.toString().trim();
+
+    // 有文字选中 → 不拦截，让全局 SelectionContextMenu 处理
+    if (selectedText && selectedText.length > 0) {
+      return; // 不阻止默认行为
+    }
+
+    // 无文字选中 → 显示 AI 消息菜单
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  }, []);
+
+  // 关闭右键菜单
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // 跳转到消息开头
+  const handleScrollToStart = useCallback(() => {
+    if (messageIndex !== undefined && onScrollToMessage) {
+      onScrollToMessage(messageIndex);
+    }
+  }, [messageIndex, onScrollToMessage]);
+
+  return (
+    <>
+      <div className="flex gap-3 my-2" onContextMenu={handleContextMenu}>
+        {/* Avatar */}
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-600
+                        flex items-center justify-center shadow-glow shrink-0">
+          <span className="text-sm font-bold text-white">P</span>
         </div>
 
-        {/* 渲染内容块（支持工具和思考块折叠聚合） */}
-        {hasBlocks ? (
-          <div className="space-y-1">
-            {renderBlocksWithGrouping(message.blocks, message.isStreaming, renderMode)}
-          </div>
-        ) : message.content ? (
-          // 兼容旧格式（content 字符串）
-          <div
-            className="prose prose-invert prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: formatContent(message.content) }}
-          />
-        ) : null}
-
-        {/* 流式光标 */}
-        {message.isStreaming && (
-          <span className="inline-flex ml-1">
-            <span className="flex gap-0.5 items-end h-4">
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        {/* 内容 */}
+        <div className="flex-1 space-y-1 min-w-0">
+          {/* 头部信息 */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-text-primary">Claude</span>
+            <span className="text-xs text-text-tertiary">
+              {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
             </span>
-          </span>
-        )}
+          </div>
+
+          {/* 渲染内容块（支持工具和思考块折叠聚合） */}
+          {hasBlocks ? (
+            <div className="space-y-1">
+              {renderBlocksWithGrouping(message.blocks, message.isStreaming, renderMode)}
+            </div>
+          ) : message.content ? (
+            // 兼容旧格式（content 字符串）
+            <div
+              className="prose prose-invert prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: formatContent(message.content) }}
+            />
+          ) : null}
+
+          {/* 流式光标 */}
+          {message.isStreaming && (
+            <span className="inline-flex ml-1">
+              <span className="flex gap-0.5 items-end h-4">
+                <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </span>
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <AIMessageContextMenu
+          visible={contextMenu.visible}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onScrollToStart={handleScrollToStart}
+          onClose={handleCloseContextMenu}
+        />
+      )}
+    </>
   );
 }, (prevProps, nextProps) => {
   // 优化重渲染：使用浅比较代替深度序列化
