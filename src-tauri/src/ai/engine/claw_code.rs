@@ -451,12 +451,22 @@ impl ClawCodeEngine {
         };
 
         // 获取工具定义（如果启用）
+        tracing::debug!(
+            "[ClawCodeEngine] build_request: enable_tools={}, tool_executor={:?}",
+            config.enable_tools,
+            config.tool_executor.as_ref().map(|_| "Some(executor)")
+        );
         let tools = if config.enable_tools {
             config.tool_executor.as_ref()
                 .map(|e| e.available_tools())
         } else {
             None
         };
+
+        tracing::debug!(
+            "[ClawCodeEngine] build_request: tools_count={:?}",
+            tools.as_ref().map(|t| t.len())
+        );
 
         // 设置工具选择策略
         let tool_choice = if config.enable_tools {
@@ -745,6 +755,8 @@ impl AIEngine for ClawCodeEngine {
         let cancel_tokens_clone = self.cancel_tokens.clone();
         // 克隆 client 用于异步任务
         let client_clone = self.client.clone();
+        // 克隆 config 用于异步任务
+        let config_clone = self.config.clone();
 
         let sid = session_id.clone();
 
@@ -752,7 +764,7 @@ impl AIEngine for ClawCodeEngine {
         tokio::spawn(async move {
             // 创建临时引擎实例，共享 cancel_tokens
             let mut engine_clone = ClawCodeEngine {
-                config: None,
+                config: config_clone,
                 client: client_clone,
                 sessions: SessionManager::new(),
                 cancel_tokens: cancel_tokens_clone,
@@ -799,6 +811,8 @@ impl AIEngine for ClawCodeEngine {
         let cancel_tokens_clone = self.cancel_tokens.clone();
         // 克隆 client 用于异步任务
         let client_clone = self.client.clone();
+        // 克隆 config 用于异步任务
+        let config_clone = self.config.clone();
 
         let sid = session_id.clone();
 
@@ -806,7 +820,7 @@ impl AIEngine for ClawCodeEngine {
         tokio::spawn(async move {
             // 创建临时引擎实例，共享 cancel_tokens
             let mut engine_clone = ClawCodeEngine {
-                config: None,
+                config: config_clone,
                 client: client_clone,
                 sessions: SessionManager::new(),
                 cancel_tokens: cancel_tokens_clone,
