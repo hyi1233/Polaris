@@ -2,23 +2,62 @@
  *
  * 使用 claw-code 适配层实现的 AI 引擎。
  * 基于 OpenAiCompatClient 和 convert.rs 转换层。
+ * 支持工具调用和工具执行器集成。
  */
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
 use crate::ai::adapters::{
     history_entries_to_input_messages, stream_event_to_ai_event,
-    InputMessage, MessageRequest, OpenAiCompatClient, OpenAiCompatConfig,
+    InputContentBlock, InputMessage, MessageRequest, OpenAiCompatClient, OpenAiCompatConfig,
+    ToolChoice, ContentBlockDelta, StreamEvent,
 };
 use crate::ai::session::SessionManager;
+use crate::ai::tools::executor::PolarisToolExecutor;
+use crate::ai::tools::types::ToolError;
 use crate::ai::traits::{AIEngine, EngineId, SessionOptions};
 use crate::error::{AppError, Result};
 use crate::models::AIEvent;
 
-/// ClawCode 引擎配置
+/// 工具调用状态
+///
+/// 用于跟踪流式响应中的工具调用进度。
 #[derive(Debug, Clone)]
+pub enum ToolCallState {
+    /// 空闲（无工具调用）
+    Idle,
+    /// 收集工具参数（正在接收 delta）
+    CollectingInput {
+        /// 工具调用 ID
+        tool_id: String,
+        /// 工具名称
+        tool_name: String,
+        /// 已收集的 JSON 输入
+        input_json: String,
+    },
+    /// 参数收集完成，等待执行
+    ReadyToExecute {
+        /// 工具调用 ID
+        tool_id: String,
+        /// 工具名称
+        tool_name: String,
+        /// 解析后的输入参数
+        input: serde_json::Value,
+    },
+    /// 执行中
+    Executing {
+        /// 工具调用 ID
+        tool_id: String,
+        /// 工具名称
+        tool_name: String,
+    },
+}
+
+/// ClawCode 引擎配置
+#[derive(Clone)]
 pub struct ClawCodeConfig {
     /// Provider 名称（用于日志）
     pub provider_name: String,
@@ -32,6 +71,28 @@ pub struct ClawCodeConfig {
     pub max_tokens: u32,
     /// 温度参数
     pub temperature: f32,
+    /// 工具执行器（可选）
+    pub tool_executor: Option<Arc<dyn PolarisToolExecutor>>,
+    /// 启用工具调用（默认 false）
+    pub enable_tools: bool,
+    /// 工具选择策略（默认 Auto）
+    pub tool_choice: Option<ToolChoice>,
+}
+
+impl std::fmt::Debug for ClawCodeConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClawCodeConfig")
+            .field("provider_name", &self.provider_name)
+            .field("api_key", &"[REDACTED]")
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("max_tokens", &self.max_tokens)
+            .field("temperature", &self.temperature)
+            .field("tool_executor", &self.tool_executor.as_ref().map(|_| "PolarisToolExecutor"))
+            .field("enable_tools", &self.enable_tools)
+            .field("tool_choice", &self.tool_choice)
+            .finish()
+    }
 }
 
 impl Default for ClawCodeConfig {
@@ -43,6 +104,9 @@ impl Default for ClawCodeConfig {
             model: String::new(),
             max_tokens: 4096,
             temperature: 0.7,
+            tool_executor: None,
+            enable_tools: false,
+            tool_choice: None,
         }
     }
 }
@@ -73,6 +137,27 @@ impl ClawCodeConfig {
     /// 设置温度
     pub fn with_temperature(mut self, temperature: f32) -> Self {
         self.temperature = temperature;
+        self
+    }
+
+    /// 配置工具执行器
+    ///
+    /// 设置工具执行器后，自动启用工具调用。
+    pub fn with_tool_executor(mut self, executor: Arc<dyn PolarisToolExecutor>) -> Self {
+        self.tool_executor = Some(executor);
+        self.enable_tools = true;
+        self
+    }
+
+    /// 设置工具选择策略
+    pub fn with_tool_choice(mut self, choice: ToolChoice) -> Self {
+        self.tool_choice = Some(choice);
+        self
+    }
+
+    /// 启用工具调用
+    pub fn enable_tools(mut self, enable: bool) -> Self {
+        self.enable_tools = enable;
         self
     }
 
@@ -141,13 +226,44 @@ impl ClawCodeEngine {
         messages: Vec<InputMessage>,
         system_prompt: Option<&str>,
     ) -> MessageRequest {
+        let config = match &self.config {
+            Some(c) => c,
+            None => {
+                return MessageRequest {
+                    model: String::new(),
+                    max_tokens: 4096,
+                    messages,
+                    system: system_prompt.map(|s| s.to_string()),
+                    tools: None,
+                    tool_choice: None,
+                    stream: true,
+                };
+            }
+        };
+
+        // 获取工具定义（如果启用）
+        let tools = if config.enable_tools {
+            config.tool_executor.as_ref()
+                .map(|e| e.available_tools())
+        } else {
+            None
+        };
+
+        // 设置工具选择策略
+        let tool_choice = if config.enable_tools {
+            config.tool_choice.clone()
+                .or(Some(ToolChoice::Auto))
+        } else {
+            None
+        };
+
         MessageRequest {
-            model: self.config.as_ref().map(|c| c.model.clone()).unwrap_or_default(),
-            max_tokens: self.config.as_ref().map(|c| c.max_tokens).unwrap_or(4096),
+            model: config.model.clone(),
+            max_tokens: config.max_tokens,
             messages,
             system: system_prompt.map(|s| s.to_string()),
-            tools: None,
-            tool_choice: None,
+            tools,
+            tool_choice,
             stream: true,
         }
     }
