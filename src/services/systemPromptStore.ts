@@ -26,7 +26,7 @@ interface SystemPromptState {
 
 /** 默认配置 */
 const DEFAULT_CONFIG: SystemPromptConfig = {
-  mode: 'default',
+  mode: 'append',
   customPrompt: '',
   enabled: false,
 };

@@ -143,11 +143,11 @@ export interface HealthStatus {
 }
 
 /** 系统提示词模式 */
-export type SystemPromptMode = 'default' | 'append' | 'replace';
+export type SystemPromptMode = 'append' | 'replace';
 
 /** 系统提示词配置（localStorage 独立存储） */
 export interface SystemPromptConfig {
-  /** 模式：default=使用默认, append=追加到默认后, replace=完全替换 */
+  /** 模式：append=追加到默认后（默认）, replace=完全替换 */
   mode: SystemPromptMode;
   /** 用户自定义提示词内容 */
   customPrompt: string;

@@ -132,7 +132,7 @@ export function SystemPromptTab() {
           {t('systemPrompt.mode', '模式')}
         </h3>
         <div className="grid grid-cols-3 gap-3">
-          {(['default', 'append', 'replace'] as const).map((mode) => (
+          {(['append', 'replace'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
@@ -154,9 +154,8 @@ export function SystemPromptTab() {
           ))}
         </div>
         <p className="text-xs text-text-secondary mt-2">
-          {config.mode === 'default' && t('systemPrompt.modeDefaultHint', '使用默认的系统提示词')}
-          {config.mode === 'append' && t('systemPrompt.modeAppendHint', '将自定义内容追加到默认提示词后面')}
-          {config.mode === 'replace' && t('systemPrompt.modeReplaceHint', '完全使用自定义内容替换默认提示词')}
+          {config.mode === 'append' && t('systemPrompt.modeAppendHint', '将自定义内容追加到默认提示词后面（推荐）')}
+          {config.mode === 'replace' && t('systemPrompt.modeReplaceHint', '完全使用自定义内容替换默认提示词（将丢失工作区信息）')}
         </p>
       </div>
 
@@ -249,11 +248,7 @@ export function SystemPromptTab() {
             {t('systemPrompt.preview', '预览')}
           </h3>
           <div className="p-3 bg-background-faint rounded-lg text-xs font-mono whitespace-pre-wrap text-text-secondary max-h-48 overflow-y-auto">
-            {config.mode === 'default' ? (
-              <span className="text-text-muted">
-                {t('systemPrompt.previewDefault', '（使用默认提示词）')}
-              </span>
-            ) : config.mode === 'append' ? (
+            {config.mode === 'append' ? (
               <>
                 <span className="text-text-muted">
                   {t('systemPrompt.previewDefaultLabel', '[默认提示词]')}
