@@ -106,7 +106,7 @@ function extractThinkingSteps(content: string): ThinkingStep[] {
   // 步骤匹配模式
   const patterns = [
     // 数字编号: 1. xxx, 1) xxx, 1、xxx
-    /^(\d+)[\.\)、]\s*(.+)$/,
+    /^(\d+)[.)、]\s*(.+)$/,
     // 中文步骤词: 首先, 其次, 然后, 最后
     /^(首先|其次|然后|接着|最后)[：:\s]+(.+)$/,
     // 步骤标记: 第一步, 第二步, etc.
@@ -910,7 +910,9 @@ const ToolCallBlockRenderer = memo(function ToolCallBlockRenderer({ block }: { b
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            canExpand && setIsExpanded(!isExpanded);
+            if (canExpand) {
+              setIsExpanded(!isExpanded);
+            }
           }
         }}
         tabIndex={canExpand ? 0 : -1}
