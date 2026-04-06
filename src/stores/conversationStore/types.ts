@@ -46,8 +46,12 @@ export interface InputDraft {
 export interface StoreDeps {
   /** 获取配置（简化版，只关心 defaultEngine） */
   getConfig: () => { defaultEngine?: string } | null
-  /** 获取当前工作区 */
+  /** 获取当前会话的工作区 */
   getWorkspace: () => Workspace | null
+  /** 获取当前会话的关联工作区 ID 列表 */
+  getContextWorkspaceIds: () => string[]
+  /** 获取所有工作区列表 */
+  getAllWorkspaces: () => Workspace[]
   /** 获取事件路由器 */
   getEventRouter: () => EventRouter
   /** 事件路由标识（独立 contextId） */

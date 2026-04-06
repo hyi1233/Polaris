@@ -134,6 +134,15 @@ function createSessionManagerStore() {
           console.log('[SessionStoreManager] 回退到全局工作区:', globalWorkspace?.path)
           return globalWorkspace
         },
+        getContextWorkspaceIds: () => {
+          // 获取当前会话的关联工作区 ID 列表
+          const managerState = get()
+          const metadata = managerState.sessionMetadata.get(sessionId)
+          return metadata?.contextWorkspaceIds || []
+        },
+        getAllWorkspaces: () => {
+          return useWorkspaceStore.getState().workspaces
+        },
         getEventRouter: () => getEventRouter(),
         contextId,
       }

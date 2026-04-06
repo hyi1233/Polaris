@@ -11,6 +11,7 @@ import type { ConversationStore, ConversationState, StoreDeps } from './types'
 import { handleAIEvent } from './eventHandler'
 import { toAppError, ErrorSource } from '../../types/errors'
 import { sessionStoreManager } from './sessionStoreManager'
+import { parseWorkspaceReferences, buildSystemPrompt } from '../../services/workspaceReference'
 
 /**
  * 从用户消息生成标题
@@ -649,8 +650,29 @@ export function createConversationStore(
         const config = deps.getConfig()
         const engine = config?.defaultEngine || 'claude-code'
 
-        // 获取工作区路径（提前声明，用于错误处理）
-        const actualWorkspaceDir = workspaceDir || deps.getWorkspace()?.path
+        // 获取工作区信息
+        const currentWorkspace = deps.getWorkspace()
+        const actualWorkspaceDir = workspaceDir || currentWorkspace?.path
+
+        // 获取关联工作区
+        const contextWorkspaceIds = deps.getContextWorkspaceIds()
+        const allWorkspaces = deps.getAllWorkspaces()
+        const contextWorkspaces = allWorkspaces.filter(w => contextWorkspaceIds.includes(w.id))
+
+        // 解析工作区引用
+        const { processedMessage } = parseWorkspaceReferences(
+          content,
+          allWorkspaces,
+          contextWorkspaces,
+          currentWorkspace?.id || null
+        )
+
+        // 构建系统提示词
+        const systemPrompt = buildSystemPrompt(
+          allWorkspaces,
+          contextWorkspaces,
+          currentWorkspace?.id || null
+        )
 
         // 调试日志：打印工作区信息
         console.log('[ConversationStore] sendMessage 调试信息:', {
@@ -658,7 +680,9 @@ export function createConversationStore(
           conversationId,
           providedWorkspaceDir: workspaceDir,
           actualWorkspaceDir,
-          depsWorkspace: deps.getWorkspace(),
+          currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name, path: currentWorkspace.path } : null,
+          contextWorkspaceIds,
+          systemPromptLength: systemPrompt.length,
         })
 
         // 构建用户消息
@@ -707,13 +731,28 @@ export function createConversationStore(
             content: a.content,
           }))
 
+          // 规范化系统提示词（换行符处理）
+          const normalizedSystemPrompt = systemPrompt
+            .replace(/\r\n/g, '\\n')
+            .replace(/\r/g, '\\n')
+            .replace(/\n/g, '\\n')
+            .trim()
+
+          // 规范化消息（换行符处理）
+          const normalizedMessage = processedMessage
+            .replace(/\r\n/g, '\\n')
+            .replace(/\r/g, '\\n')
+            .replace(/\n/g, '\\n')
+            .trim()
+
           // 调用后端 API
           if (conversationId) {
             // 继续会话
             await invoke('continue_chat', {
               sessionId: conversationId,
-              message: content,
+              message: normalizedMessage,
               options: {
+                systemPrompt: normalizedSystemPrompt,
                 workDir: actualWorkspaceDir,
                 contextId: deps.contextId,
                 engineId: engine,
@@ -724,8 +763,9 @@ export function createConversationStore(
           } else {
             // 新会话
             const newSessionId = await invoke<string>('start_chat', {
-              message: content,
+              message: normalizedMessage,
               options: {
+                systemPrompt: normalizedSystemPrompt,
                 workDir: actualWorkspaceDir,
                 contextId: deps.contextId,
                 engineId: engine,
@@ -782,18 +822,41 @@ export function createConversationStore(
         const router = deps.getEventRouter()
         await router.initialize()
 
-        const actualWorkspaceDir = deps.getWorkspace()?.path
+        // 获取工作区信息
+        const currentWorkspace = deps.getWorkspace()
+        const actualWorkspaceDir = currentWorkspace?.path
         const config = deps.getConfig()
         const currentEngine = config?.defaultEngine || 'claude-code'
+
+        // 获取关联工作区
+        const contextWorkspaceIds = deps.getContextWorkspaceIds()
+        const allWorkspaces = deps.getAllWorkspaces()
+        const contextWorkspaces = allWorkspaces.filter(w => contextWorkspaceIds.includes(w.id))
+
+        // 构建系统提示词
+        const systemPrompt = buildSystemPrompt(
+          allWorkspaces,
+          contextWorkspaces,
+          currentWorkspace?.id || null
+        )
 
         // 调试日志：打印工作区信息
         console.log('[ConversationStore] continueChat 调试信息:', {
           conversationId,
           actualWorkspaceDir,
-          depsWorkspace: deps.getWorkspace(),
+          currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name, path: currentWorkspace.path } : null,
+          contextWorkspaceIds,
+          systemPromptLength: systemPrompt.length,
         })
 
         const normalizedPrompt = prompt
+          .replace(/\r\n/g, '\\n')
+          .replace(/\r/g, '\\n')
+          .replace(/\n/g, '\\n')
+          .trim()
+
+        // 规范化系统提示词
+        const normalizedSystemPrompt = systemPrompt
           .replace(/\r\n/g, '\\n')
           .replace(/\r/g, '\\n')
           .replace(/\n/g, '\\n')
@@ -806,6 +869,7 @@ export function createConversationStore(
             sessionId: conversationId,
             message: normalizedPrompt,
             options: {
+              systemPrompt: normalizedSystemPrompt,
               workDir: actualWorkspaceDir,
               contextId: deps.contextId,
               engineId: currentEngine,
