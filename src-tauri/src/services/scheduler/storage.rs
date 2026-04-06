@@ -6,7 +6,7 @@
 
 use crate::error::Result;
 use crate::models::scheduler::{
-    CreateTaskParams, CreateTemplateParams, PostExecutionConfig, PromptTemplate, ScheduledTask, TaskCategory, TaskMode,
+    CreateTaskParams, CreateTemplateParams, PromptTemplate, ScheduledTask, TaskCategory, TaskMode,
     TaskStatus, TriggerType,
 };
 use std::collections::BTreeMap;
@@ -48,7 +48,6 @@ pub struct TaskUpdateParams {
     pub timeout_minutes: Option<u32>,
     pub group: Option<String>,
     pub notify_on_complete: Option<bool>,
-    pub post_execution: Option<PostExecutionConfig>,
 }
 
 /// Task Storage Trait
