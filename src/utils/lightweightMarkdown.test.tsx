@@ -21,17 +21,17 @@ describe('parseInlineMarkdown (via LightweightMarkdown)', () => {
   describe('plain text', () => {
     it('should render plain text unchanged', () => {
       const result = renderToStaticMarkup(<LightweightMarkdown content="Hello World" />);
-      expect(result).toBe('<span class="whitespace-pre-wrap break-words">Hello World</span>');
+      expect(result).toBe('<span class="break-words">Hello World</span>');
     });
 
     it('should handle empty string', () => {
       const result = renderToStaticMarkup(<LightweightMarkdown content="" />);
-      expect(result).toBe('<span class="whitespace-pre-wrap break-words"></span>');
+      expect(result).toBe('<span class="break-words"></span>');
     });
 
     it('should handle whitespace', () => {
       const result = renderToStaticMarkup(<LightweightMarkdown content="  spaces  " />);
-      expect(result).toBe('<span class="whitespace-pre-wrap break-words">  spaces  </span>');
+      expect(result).toBe('<span class="break-words">  spaces  </span>');
     });
 
     it('should handle special characters (escaped by React)', () => {

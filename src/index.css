@@ -97,6 +97,7 @@ body {
   --tw-prose-pre-bg: #25252B;
   --tw-prose-th-borders: rgba(255, 255, 255, 0.15);
   --tw-prose-td-borders: rgba(255, 255, 255, 0.15);
+  line-height: 1.5;
 }
 
 /* Markdown 代码块样式（排除组件自带样式的代码块） */
@@ -191,6 +192,7 @@ body {
 /* 段落样式 */
 .prose p {
   margin: 4px 0;
+  line-height: 1.5;
 }
 
 /* 表格样式 */

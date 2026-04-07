@@ -229,10 +229,14 @@ export const LightweightMarkdown = memo(function LightweightMarkdown({
 }: {
   content: string
 }) {
-  const parts = useMemo(() => parseInlineMarkdown(content), [content]);
+  // 标准化：将单个换行符替换为空格（与 Markdown 规范一致）
+  // 段落内的单个 \n 应视为连续文本，不应产生视觉换行
+  // \n\n 已在 ProgressiveStreamingMarkdown 层面处理（用于段落分割）
+  const normalizedContent = useMemo(() => content.replace(/\n/g, ' '), [content]);
+  const parts = useMemo(() => parseInlineMarkdown(normalizedContent), [normalizedContent]);
 
   return (
-    <span className="whitespace-pre-wrap break-words">
+    <span className="break-words">
       {parts.map((part, index) => renderPart(part, index))}
     </span>
   );
