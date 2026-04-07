@@ -295,11 +295,6 @@ export const QuickSwitchPanel = memo(function QuickSwitchPanel({
     return activeSession ? mapSessionStatus(activeSession.status) : 'idle'
   }, [sessions, activeSessionId])
 
-  // 无会话时不显示
-  if (sessionList.length === 0) {
-    return null
-  }
-
   return (
     <div className={cn('fixed right-0 top-0 bottom-0 pointer-events-none z-20', className)}>
       {/* 触发器容器 */}

@@ -223,7 +223,13 @@ export const QuickSwitchContent = memo(function QuickSwitchContent({
       {/* 会话列表 */}
       <div className="py-1.5">
         <div className="max-h-52 overflow-y-auto custom-scrollbar">
-          {sessions.map((session) => (
+          {sessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 px-3 text-center">
+              <p className="text-xs text-text-muted mb-2">暂无会话</p>
+              <p className="text-[10px] text-text-tertiary">点击下方按钮新建会话</p>
+            </div>
+          ) : (
+            sessions.map((session) => (
             <div
               key={session.id}
               className={cn(
@@ -275,7 +281,8 @@ export const QuickSwitchContent = memo(function QuickSwitchContent({
                 </button>
               )}
             </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
