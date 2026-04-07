@@ -8,16 +8,17 @@
  * - 文件引用 (@/path)
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconSend, IconStop, IconPaperclip } from '../Common/Icons'
 import { useWorkspaceStore, useChatInputStore } from '../../stores'
 import { useActiveSessionId } from '../../stores/conversationStore'
-import { useActiveSessionInputDraft, useActiveSessionActions, useActiveSessionWorkspace, useHasPendingQuestion, useHasActivePlan } from '../../stores/conversationStore/useActiveSession'
+import { useActiveSessionInputDraft, useActiveSessionActions, useActiveSessionWorkspace, useHasPendingQuestion, useHasActivePlan, usePendingQuestions } from '../../stores/conversationStore/useActiveSession'
 import { useDebouncedCallback } from '../../hooks/useDebounce'
 import { UnifiedSuggestion, type SuggestionItem } from './FileSuggestion'
 import { AttachmentPreview } from './AttachmentPreview'
 import { AutoResizingTextarea } from './AutoResizingTextarea'
+import { QuestionFloatingPanel } from './QuestionFloatingPanel'
 import { useFileSearch } from '../../hooks/useFileSearch'
 import type { FileMatch } from '../../services/fileSearch'
 import type { Workspace } from '../../types'
@@ -121,6 +122,23 @@ export function ChatInput({
 
   // 检查是否有活跃的计划（等待审批）
   const hasActivePlan = useHasActivePlan()
+
+  // 获取待回答问题列表 & 管理已关闭的问题
+  const pendingQuestions = usePendingQuestions()
+  const [dismissedQuestionIds, setDismissedQuestionIds] = useState<Set<string>>(new Set())
+  const visibleQuestions = useMemo(
+    () => pendingQuestions.filter(q => !dismissedQuestionIds.has(q.id)),
+    [pendingQuestions, dismissedQuestionIds]
+  )
+
+  // 新的 pending 问题到来时重置 dismissed 集合
+  const prevPendingCountRef = useRef(0)
+  useEffect(() => {
+    if (pendingQuestions.length > prevPendingCountRef.current) {
+      setDismissedQuestionIds(new Set())
+    }
+    prevPendingCountRef.current = pendingQuestions.length
+  }, [pendingQuestions.length])
 
   // 同步状态到 store
   useEffect(() => {
@@ -464,7 +482,21 @@ export function ChatInput({
     setLocalAttachments([])
     // 清空 Store 草稿
     updateInputDraft({ text: '', attachments: [] })
+    // 发送后关闭问题浮窗
+    setDismissedQuestionIds(new Set())
   }, [value, disabled, isStreaming, attachments, onSend, updateInputDraft, cancelPersistDraft, currentWorkspace])
+
+  // 问题浮窗：选项选择 → 填入输入框
+  const handleQuestionSelectOption = useCallback((text: string, _questionId: string) => {
+    setLocalText(text)
+    debouncedPersistDraft(text, attachments)
+    textareaRef.current?.focus()
+  }, [attachments, debouncedPersistDraft])
+
+  // 问题浮窗：关闭单个问题
+  const handleQuestionDismiss = useCallback((questionId: string) => {
+    setDismissedQuestionIds(prev => new Set(prev).add(questionId))
+  }, [])
 
   // 处理语音命令（放在 handleSend 之后，避免变量声明顺序问题）
   useEffect(() => {
@@ -557,7 +589,18 @@ export function ChatInput({
   const canSend = (value.trim() || attachments.length > 0) && !disabled && !isStreaming
 
   return (
-    <div className="border-t border-border bg-background-elevated" ref={containerRef}>
+    <div className="border-t border-border bg-background-elevated relative" ref={containerRef}>
+      {/* 问题浮窗 - 定位在输入框上方 */}
+      {visibleQuestions.length > 0 && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 px-3 z-10">
+          <QuestionFloatingPanel
+            questions={visibleQuestions}
+            onSelectOption={handleQuestionSelectOption}
+            onSend={handleSend}
+            onDismiss={handleQuestionDismiss}
+          />
+        </div>
+      )}
       <div className="p-3">
         {/* 附件预览 */}
         <AttachmentPreview

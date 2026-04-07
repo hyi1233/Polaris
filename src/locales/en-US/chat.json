@@ -119,7 +119,10 @@
     "customInputPlaceholder": "Enter custom answer...",
     "customInputLabel": "Custom answer",
     "multiSelectHint": "Multi-select",
-    "pendingAnswer": "Pending question to answer"
+    "pendingAnswer": "Pending question to answer",
+    "answerBelow": "Answer below",
+    "selectAndSend": "Select & Send",
+    "pendingQuestion": "Pending Question"
   },
   "plan": {
     "defaultTitle": "Execution Plan",

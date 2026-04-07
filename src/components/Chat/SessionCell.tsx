@@ -13,7 +13,7 @@ import { clsx } from 'clsx';
 import { Loader2, XCircle, X, Circle, Maximize2, Minimize2, Square } from 'lucide-react';
 import { SessionMessagesView } from './SessionMessagesView';
 import { useSessionMetadataList, useSessionManagerActions } from '../../stores/conversationStore/sessionStoreManager';
-import { useSessionStreaming } from '../../stores/conversationStore/useActiveSession';
+import { useSessionStreaming, useSessionHasPendingQuestion } from '../../stores/conversationStore/useActiveSession';
 import { sessionStoreManager } from '../../stores/conversationStore/sessionStoreManager';
 
 /** 状态图标映射 */
@@ -51,6 +51,9 @@ export const SessionCell = memo(function SessionCell({
 
   // 获取流式状态
   const isStreaming = useSessionStreaming(sessionId);
+
+  // 是否有待回答的问题
+  const hasPendingQuestion = useSessionHasPendingQuestion(sessionId);
 
   // 状态配置 - 需要将 hyphen 格式转换为 underscore 格式
   const statusKey = (sessionMetadata?.status || 'idle').replace(/-/g, '_') as keyof typeof SESSION_STATUS_CONFIG;
@@ -107,6 +110,11 @@ export const SessionCell = memo(function SessionCell({
         {/* 流式状态指示 */}
         {isStreaming && (
           <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
+        )}
+
+        {/* 待回答问题指示 - 仅非活跃会话显示 */}
+        {hasPendingQuestion && !isActive && !isStreaming && (
+          <span className="w-1.5 h-1.5 bg-warning rounded-full shrink-0" title="有待回答的问题" />
         )}
 
         {/* 状态图标 */}

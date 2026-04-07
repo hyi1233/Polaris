@@ -39,6 +39,24 @@ export const QuestionBlockRenderer = memo(function QuestionBlockRenderer({ block
   const isAnswered = block.status === 'answered';
   const answer = block.answer;
 
+  // Pending 状态：紧凑指示器，交互由浮窗完成
+  if (!isAnswered) {
+    return (
+      <div className={clsx(
+        'my-2 flex items-center gap-2 px-3 py-2 rounded-lg',
+        'bg-accent-faint border border-accent/30'
+      )}>
+        <HelpCircle className="w-4 h-4 text-accent shrink-0" />
+        <span className="text-sm font-medium text-text-primary truncate flex-1">
+          {block.header}
+        </span>
+        <span className="text-xs text-accent whitespace-nowrap">
+          {t('question.answerBelow')}
+        </span>
+      </div>
+    );
+  }
+
   // 当前显示的选项
   const allOptions = block.options;
   const displayOptions = block.options.slice(0, 5);

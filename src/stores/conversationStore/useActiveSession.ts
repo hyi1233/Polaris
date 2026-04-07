@@ -465,6 +465,32 @@ export function useSessionError(sessionId: string | null) {
   )
 }
 
+/**
+ * 获取指定会话的 block 映射
+ */
+function useSessionBlockMaps(sessionId: string | null) {
+  const questionBlockMap = useSessionSelector(
+    sessionId,
+    useCallback((state: ConversationState) => state.questionBlockMap, []),
+    new Map()
+  )
+  return useMemo(() => ({ questionBlockMap }), [questionBlockMap])
+}
+
+/** 指定会话是否有待回答的问题（用于多窗口指示） */
+export function useSessionHasPendingQuestion(sessionId: string | null): boolean {
+  const { questionBlockMap } = useSessionBlockMaps(sessionId)
+  const { currentMessage } = useSessionMessages(sessionId)
+  return useMemo(() => {
+    if (!currentMessage || !questionBlockMap.size) return false
+    for (const blockIndex of questionBlockMap.values()) {
+      const block = currentMessage.blocks[blockIndex]
+      if (block?.type === 'question' && (block as ContentBlock & { status: string }).status === 'pending') return true
+    }
+    return false
+  }, [currentMessage, questionBlockMap])
+}
+
 // ========================================
 // 派生状态 Hooks
 // ========================================
@@ -480,6 +506,23 @@ export function useHasPendingQuestion(): boolean {
       if (block?.type === 'question' && (block as ContentBlock & { status: string }).status === 'pending') return true
     }
     return false
+  }, [currentMessage, questionBlockMap])
+}
+
+/** 获取活跃会话中所有待回答的问题块 */
+export function usePendingQuestions(): import('../../types').QuestionBlock[] {
+  const { questionBlockMap } = useActiveSessionBlockMaps()
+  const { currentMessage } = useActiveSessionMessages()
+  return useMemo(() => {
+    if (!currentMessage || !questionBlockMap.size) return []
+    const result: import('../../types').QuestionBlock[] = []
+    for (const blockIndex of questionBlockMap.values()) {
+      const block = currentMessage.blocks[blockIndex]
+      if (block?.type === 'question' && (block as ContentBlock & { status: string }).status === 'pending') {
+        result.push(block as import('../../types').QuestionBlock)
+      }
+    }
+    return result
   }, [currentMessage, questionBlockMap])
 }
 

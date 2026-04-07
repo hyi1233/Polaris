@@ -411,7 +411,7 @@ export function createConversationStore(
         if (idx === undefined) return
         const blocks = [...currentMessage.blocks]
         if (blocks[idx]?.type === 'question') {
-          blocks[idx] = { ...blocks[idx], answer }
+          blocks[idx] = { ...blocks[idx], answer, status: 'answered' as const }
           set({ currentMessage: { ...currentMessage, blocks } })
         }
       },

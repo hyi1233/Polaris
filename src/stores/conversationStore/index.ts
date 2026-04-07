@@ -30,10 +30,12 @@ export {
   useActiveSessionBlockMaps,
   useHasPendingQuestion,
   useHasActivePlan,
+  usePendingQuestions,
   // 指定会话的 hooks（用于多窗口场景）
   useSessionMessages,
   useSessionStreaming,
   useSessionError,
+  useSessionHasPendingQuestion,
 } from './useActiveSession'
 
 export type {
