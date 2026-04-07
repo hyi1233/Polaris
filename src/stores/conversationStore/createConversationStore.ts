@@ -814,7 +814,6 @@ export function createConversationStore(
             type: a.type,
             fileName: a.fileName,
             fileSize: a.fileSize,
-            preview: a.preview,
           })),
         }
         get().addMessage(userMessage)

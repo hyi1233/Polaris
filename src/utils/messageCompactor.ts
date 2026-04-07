@@ -255,6 +255,12 @@ export class MessageCompactor {
     return {
       ...message,
       content: truncate(message.content, TRUNCATE.userContent),
+      attachments: message.attachments?.map(a => ({
+        id: a.id,
+        type: a.type,
+        fileName: a.fileName,
+        fileSize: a.fileSize,
+      })),
       [COMPACT_MARKER]: true as const,
     }
   }
