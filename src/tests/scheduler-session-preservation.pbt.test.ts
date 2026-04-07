@@ -11,13 +11,12 @@
  * 3.2 - 事件正确路由到对应的会话存储
  * 3.3 - 任务失败时正确更新状态为 'failed'
  * 3.4 - 多任务并行执行时正确隔离会话和事件
- * 3.5 - 切换会话时正确同步到旧架构（EventChatStore）
+ * 3.5 - 切换会话时正确切换活跃会话状态
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fc from 'fast-check';
 import { sessionStoreManager } from '../stores/conversationStore/sessionStoreManager';
-import { useEventChatStore } from '../stores/eventChatStore';
 import type { AIEvent } from '../ai-runtime';
 
 describe('Preservation Property Tests - Scheduler Session Management', () => {
@@ -298,10 +297,10 @@ describe('Preservation Property Tests - Scheduler Session Management', () => {
    * **Validates: Requirements 3.5**
    * 
    * For any user switching active sessions,
-   * the system SHALL CONTINUE TO correctly sync current active session events to old architecture (EventChatStore).
+   * the system SHALL CONTINUE TO correctly switch active session and route events.
    */
-  describe('Property 7: Session Sync Mechanism Preservation', () => {
-    it('should sync active session state to EventChatStore when switching', () => {
+  describe('Property 7: Session Switch Mechanism Preservation', () => {
+    it('should correctly switch active session', () => {
       fc.assert(
         fc.property(
           fc.tuple(
@@ -337,18 +336,19 @@ describe('Preservation Property Tests - Scheduler Session Management', () => {
             // Active session should be second session
             const activeSessionId = sessionStoreManager.getState().activeSessionId;
             expect(activeSessionId).toBe(sessionId2);
-            
-            // EventChatStore should be synced with second session
-            // (This is a basic check - full sync verification would require more setup)
-            const eventChatState = useEventChatStore.getState();
-            expect(eventChatState).toBeDefined();
+
+            // Both session stores should exist independently
+            const store1 = sessionStoreManager.getState().stores.get(sessionId1);
+            const store2 = sessionStoreManager.getState().stores.get(sessionId2);
+            expect(store1).toBeDefined();
+            expect(store2).toBeDefined();
           }
         ),
         { numRuns: 20 }
       );
     });
 
-    it('should only sync events for active session to EventChatStore', () => {
+    it('should correctly route events to target session regardless of active session', () => {
       fc.assert(
         fc.property(
           fc.tuple(

@@ -1012,6 +1012,18 @@ export function createConversationStore(
         console.log('[ConversationStore] editAndResend not implemented yet')
       },
 
+      loadMoreArchivedMessages: (count = 20) => {
+        const { archivedMessages, messages } = get()
+        if (archivedMessages.length === 0) return
+        const loadCount = Math.min(count, archivedMessages.length)
+        const toLoad = archivedMessages.slice(-loadCount)
+        const remaining = archivedMessages.slice(0, -loadCount)
+        set({
+          messages: [...toLoad, ...messages],
+          archivedMessages: remaining,
+        })
+      },
+
       // ===== 资源清理 =====
       dispose: () => {
         // 清理缓冲定时器

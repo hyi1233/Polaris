@@ -7,7 +7,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useEventChatStore, UnifiedHistoryItem } from '../../stores/eventChatStore'
+import { historyService } from '../../services/historyService'
+import type { UnifiedHistoryItem } from '../../services/historyService'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
 import { Clock, MessageSquare, Trash2, RotateCcw, HardDrive, Loader2, X, ChevronDown } from 'lucide-react'
 
@@ -44,7 +45,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
     setLoading(true)
     setDisplayCount(PAGE_SIZE) // 重置显示数量
     try {
-      const items = await useEventChatStore.getState().getUnifiedHistory()
+      const items = await historyService.getUnifiedHistory()
       setAllHistory(items)
     } catch (e) {
       console.error('[SessionHistoryPanel] 加载历史失败:', e)
@@ -62,7 +63,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   const handleRestore = async (item: UnifiedHistoryItem) => {
     setRestoring(item.id)
     try {
-      const success = await useEventChatStore.getState().restoreFromHistory(
+      const success = await historyService.restoreFromHistory(
         item.id,
         item.engineId,
         item.projectPath,
@@ -82,8 +83,8 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   }
 
   // 删除会话
-  const handleDelete = (sessionId: string, source: 'local' | 'claude-code-native') => {
-    useEventChatStore.getState().deleteHistorySession(sessionId, source === 'local' ? 'local' : undefined)
+  const handleDelete = (sessionId: string, _source: 'local' | 'claude-code-native') => {
+    historyService.deleteHistorySession(sessionId)
     setAllHistory(prev => prev.filter(h => h.id !== sessionId))
   }
 

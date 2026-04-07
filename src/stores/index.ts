@@ -4,9 +4,6 @@
 
 export { useConfigStore } from './configStore';
 
-// 统一的 Chat Store（基于 Tauri chat-event，支持历史管理）
-export { useEventChatStore, type UnifiedHistoryItem } from './eventChatStore';
-
 export { useCommandStore } from './commandStore';
 export { useWorkspaceStore } from './workspaceStore';
 export { useFileExplorerStore } from './fileExplorerStore';

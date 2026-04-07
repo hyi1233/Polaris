@@ -11,13 +11,34 @@ import type {
   Workspace,
 } from '../../types'
 import type { Attachment } from '../../types/attachment'
-import type {
-  CurrentAssistantMessage,
-  PendingToolGroup,
-} from '../eventChatStore/types'
 import type { AIEvent } from '../../ai-runtime'
 import type { StoreApi, UseBoundStore } from 'zustand'
 import type { EventRouter } from '../../services/eventRouter'
+
+/** 当前正在构建的 Assistant 消息 */
+export interface CurrentAssistantMessage {
+  id: string
+  blocks: ContentBlock[]
+  isStreaming: true
+}
+
+/** 待聚合的工具组 */
+export interface PendingToolGroup {
+  groupId: string
+  tools: Array<{
+    id: string
+    name: string
+    input?: Record<string, unknown>
+    status: 'pending' | 'running' | 'completed' | 'failed'
+    startedAt: string
+    completedAt?: string
+    output?: string
+    summary?: string
+  }>
+  startedAt: string
+  lastToolAt: number
+  timerId?: ReturnType<typeof setTimeout>
+}
 
 // ============================================================================
 // 输入草稿类型
@@ -183,6 +204,8 @@ export interface ConversationActions {
   interrupt: () => Promise<void>
   regenerateResponse: (assistantMessageId: string) => Promise<void>
   editAndResend: (userMessageId: string, newContent: string) => Promise<void>
+  /** 从归档中加载更多消息 */
+  loadMoreArchivedMessages: (count?: number) => void
 
   // ===== 资源清理 =====
   dispose: () => void

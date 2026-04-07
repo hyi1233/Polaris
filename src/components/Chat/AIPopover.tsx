@@ -8,8 +8,8 @@ import { useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { EnhancedChatMessages, ChatInput } from '../Chat'
-import { useConfigStore, useEventChatStore, useWorkspaceStore } from '../../stores'
-import { useActiveSessionActions } from '../../stores/conversationStore/useActiveSession'
+import { useConfigStore, useWorkspaceStore } from '../../stores'
+import { useActiveSessionStreaming, useActiveSessionError, useActiveSessionActions } from '../../stores/conversationStore/useActiveSession'
 import type { EngineId } from '../../types'
 
 interface AIPopoverProps {
@@ -20,13 +20,9 @@ interface AIPopoverProps {
 export function AIPopover({ isOpen, onClose }: AIPopoverProps) {
   const { t } = useTranslation('common')
   const { config, updateConfig } = useConfigStore()
-  const {
-    isStreaming,
-    error,
-    clearMessages,
-  } = useEventChatStore()
-  // 使用新架构的 sendMessage 和 interrupt
-  const { sendMessage, interrupt: interruptChat } = useActiveSessionActions()
+  const isStreaming = useActiveSessionStreaming()
+  const error = useActiveSessionError()
+  const { sendMessage, interrupt: interruptChat, clearMessages } = useActiveSessionActions()
   const currentWorkspace = useWorkspaceStore(state => state.getCurrentWorkspace())
 
   // ESC 键关闭

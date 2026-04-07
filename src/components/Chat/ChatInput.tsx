@@ -11,9 +11,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconSend, IconStop, IconPaperclip } from '../Common/Icons'
-import { useWorkspaceStore, useChatInputStore, useEventChatStore } from '../../stores'
+import { useWorkspaceStore, useChatInputStore } from '../../stores'
 import { useActiveSessionId } from '../../stores/conversationStore'
-import { useActiveSessionInputDraft, useActiveSessionActions, useActiveSessionWorkspace } from '../../stores/conversationStore/useActiveSession'
+import { useActiveSessionInputDraft, useActiveSessionActions, useActiveSessionWorkspace, useHasPendingQuestion, useHasActivePlan } from '../../stores/conversationStore/useActiveSession'
 import { useDebouncedCallback } from '../../hooks/useDebounce'
 import { UnifiedSuggestion, type SuggestionItem } from './FileSuggestion'
 import { AttachmentPreview } from './AttachmentPreview'
@@ -117,28 +117,10 @@ export function ChatInput({
   }, [speechTranscript, clearSpeechTranscript, localText, attachments, updateInputDraft])
 
   // 检查是否有待回答的问题
-  const hasPendingQuestion = useEventChatStore(state => {
-    if (!state.currentMessage || !state.questionBlockMap.size) return false
-    for (const blockIndex of state.questionBlockMap.values()) {
-      const block = state.currentMessage.blocks[blockIndex]
-      if (block?.type === 'question' && block.status === 'pending') {
-        return true
-      }
-    }
-    return false
-  })
+  const hasPendingQuestion = useHasPendingQuestion()
 
   // 检查是否有活跃的计划（等待审批）
-  const hasActivePlan = useEventChatStore(state => {
-    if (!state.activePlanId || !state.currentMessage) return false
-    const planBlockIndex = state.planBlockMap.get(state.activePlanId)
-    if (planBlockIndex === undefined) return false
-    const block = state.currentMessage.blocks[planBlockIndex]
-    if (block?.type === 'plan_mode') {
-      return block.status === 'pending_approval' || block.status === 'drafting'
-    }
-    return false
-  })
+  const hasActivePlan = useHasActivePlan()
 
   // 同步状态到 store
   useEffect(() => {

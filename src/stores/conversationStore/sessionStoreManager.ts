@@ -19,10 +19,9 @@ import type {
   StoreDeps,
 } from './types'
 import { createConversationStore } from './createConversationStore'
-import { useEventChatStore } from '../eventChatStore'
-import { handleAIEvent as oldHandleAIEvent } from '../eventChatStore/utils'
 import { getEventRouter } from '../../services/eventRouter'
 import { useConfigStore } from '../configStore'
+import { getEventBus } from '../../ai-runtime'
 import { useWorkspaceStore } from '../workspaceStore'
 import { useViewStore } from '../index'
 
@@ -188,17 +187,6 @@ function createSessionManagerStore() {
       if (store) {
         store.getState().setMessagesFromHistory(messages, conversationId)
 
-        // 同步到旧架构（EventChatStore）
-        const storeState = store.getState()
-        useEventChatStore.setState({
-          messages: storeState.messages,
-          archivedMessages: storeState.archivedMessages,
-          currentMessage: storeState.currentMessage,
-          isStreaming: storeState.isStreaming,
-          error: storeState.error,
-          conversationId: storeState.conversationId,
-        })
-
         console.log('[SessionStoreManager] 从历史创建会话:', sessionId, {
           messageCount: messages.length,
           conversationId,
@@ -280,33 +268,6 @@ function createSessionManagerStore() {
 
       // 如果新会话在后台运行列表中，移出（用户主动切换回来了）
       get().removeFromBackground(sessionId)
-
-      // 同步新会话的状态到旧架构（EventChatStore）
-      // 这确保UI组件能显示正确的消息
-      try {
-        const storeState = store.getState()
-        useEventChatStore.setState({
-          messages: storeState.messages,
-          archivedMessages: storeState.archivedMessages,
-          currentMessage: storeState.currentMessage,
-          isStreaming: storeState.isStreaming,
-          error: storeState.error,
-          conversationId: storeState.conversationId,
-          toolBlockMap: storeState.toolBlockMap,
-          questionBlockMap: storeState.questionBlockMap,
-          planBlockMap: storeState.planBlockMap,
-          activePlanId: storeState.activePlanId,
-          agentRunBlockMap: storeState.agentRunBlockMap,
-          activeTaskId: storeState.activeTaskId,
-          toolGroupBlockMap: storeState.toolGroupBlockMap,
-          pendingToolGroup: storeState.pendingToolGroup,
-          permissionRequestBlockMap: storeState.permissionRequestBlockMap,
-          activePermissionRequestId: storeState.activePermissionRequestId,
-        })
-        console.log('[SessionStoreManager] 同步会话状态到旧架构:', sessionId)
-      } catch (e) {
-        console.warn('[SessionStoreManager] 同步会话状态失败:', e)
-      }
 
       console.log('[SessionStoreManager] 切换会话:', sessionId)
     },
@@ -417,44 +378,11 @@ function createSessionManagerStore() {
       // 这是多会话并行的核心：每个会话独立处理自己的事件
       store.getState().handleAIEvent(event)
 
-      // 实时获取当前活跃会话 ID（避免闭包中的过期值）
-      // 用于决定是否同步到旧架构（EventChatStore）
-      const currentActiveSessionId = get().activeSessionId
-
-      // 仅当事件属于当前活跃会话时，同步到旧架构
-      // 优化：token/thinking/assistant_message 等高频流式事件不同步到旧 store
-      // 原因：UI 已全部从新 store 读取渲染数据，旧 store 仅用于历史管理和归档操作
-      // 这些操作只在 session_end 时需要最终状态，无需实时同步
-      // 效果：每个 token 减少一次 Zustand set() + 对象展开，显著降低 GC 压力
-      const isHighFrequencyStreamingEvent =
-        event.type === 'token' ||
-        event.type === 'thinking' ||
-        event.type === 'assistant_message'
-
-      if (routeSessionId === currentActiveSessionId && !isHighFrequencyStreamingEvent) {
-        try {
-          const oldStore = useEventChatStore
-          const workspacePath = oldStore.getState().getWorkspaceActions?.()?.getCurrentWorkspace()?.path
-          oldHandleAIEvent(event, oldStore.setState, oldStore.getState, workspacePath)
-        } catch (e) {
-          console.warn('[SessionStoreManager] 旧架构事件处理失败:', e)
-        }
-      }
-
-      // session_end 时同步最终消息状态到旧 store（确保历史管理可用）
-      if (event.type === 'session_end' && routeSessionId === currentActiveSessionId) {
-        try {
-          const finalState = store.getState()
-          useEventChatStore.setState({
-            messages: finalState.messages,
-            archivedMessages: finalState.archivedMessages,
-            currentMessage: finalState.currentMessage,
-            isStreaming: false,
-            progressMessage: null,
-          })
-        } catch (e) {
-          console.warn('[SessionStoreManager] session_end 状态同步失败:', e)
-        }
+      // 补发到 EventBus，确保 DeveloperPanel 等订阅者能收到事件
+      try {
+        getEventBus().emit(event)
+      } catch (e) {
+        console.warn('[SessionStoreManager] EventBus emit 失败:', e)
       }
 
       // 更新元数据状态

@@ -19,9 +19,11 @@ import { TerminalPanel } from './components/Terminal/TerminalPanel';
 const SettingsModal = lazy(() => import('./components/Settings/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const DeveloperPanel = lazy(() => import('./components/Developer/DeveloperPanel').then(m => ({ default: m.DeveloperPanel })));
 const CreateWorkspaceModal = lazy(() => import('./components/Workspace/CreateWorkspaceModal').then(m => ({ default: m.CreateWorkspaceModal })));
-import { useConfigStore, useEventChatStore, useViewStore, useWorkspaceStore, useTabStore, useIntegrationStore, useGitStore, useSessionStore, getSessionEffectiveWorkspace } from './stores';
+import { useConfigStore, useViewStore, useWorkspaceStore, useTabStore, useIntegrationStore } from './stores';
 import { sessionStoreManager } from './stores/conversationStore';
 import { useActiveSessionActions, useActiveSessionStreaming, useActiveSessionError } from './stores/conversationStore/useActiveSession';
+import { getEventRouter } from './services/eventRouter';
+import { isAIEvent } from './ai-runtime';
 import { useWindowSize } from './hooks';
 import * as tauri from './services/tauri';
 import { bootstrapEngines } from './core/engine-bootstrap';
@@ -37,16 +39,11 @@ const log = createLogger('App');
 function App() {
   const { t } = useTranslation('common');
   const { isConnecting, connectionState, loadConfig, config, updateConfig } = useConfigStore();
-  const {
-    initializeEventListeners,
-    clearMessages,
-    setDependencies,
-  } = useEventChatStore();
-  
+
   // 使用新架构的状态和操作
   const isStreaming = useActiveSessionStreaming()
   const error = useActiveSessionError()
-  const { sendMessage, interrupt: interruptChat } = useActiveSessionActions();
+  const { sendMessage, interrupt: interruptChat, clearMessages } = useActiveSessionActions();
   
   const workspaces = useWorkspaceStore(state => state.workspaces);
   const currentWorkspace = useWorkspaceStore(state => state.getCurrentWorkspace());
@@ -154,7 +151,6 @@ function App() {
         const config = useConfigStore.getState().config;
         const defaultEngine = config?.defaultEngine || 'claude-code';
 
-        // 注册 OpenAI Providers（如果有）
         // 按需初始化传统 AI Engine
         await bootstrapEngines(defaultEngine as any);
 
@@ -163,53 +159,6 @@ function App() {
 
         // 注册 AI 工具
         bootstrapTools();
-
-        // 注入外部依赖（解耦 Store 间依赖）
-        setDependencies({
-          gitActions: {
-            refreshStatusDebounced: (workspacePath) =>
-              useGitStore.getState().refreshStatusDebounced(workspacePath),
-          },
-          configActions: {
-            getConfig: () => useConfigStore.getState().config,
-          },
-          workspaceActions: {
-            getCurrentWorkspace: () => useWorkspaceStore.getState().getCurrentWorkspace(),
-            getWorkspaces: () => useWorkspaceStore.getState().workspaces,
-            getContextWorkspaces: () => useWorkspaceStore.getState().getContextWorkspaces(),
-            getCurrentWorkspaceId: () => useWorkspaceStore.getState().currentWorkspaceId,
-            getWorkspaceById: (id: string) => useWorkspaceStore.getState().workspaces.find(w => w.id === id) || null,
-          },
-          sessionSyncActions: {
-            getActiveSessionId: () => useSessionStore.getState().activeSessionId,
-            getSessionMessages: (sessionId: string) => {
-              const state = useSessionStore.getState().getSessionMessages(sessionId)
-              return state ? {
-                messages: state.messages,
-                archivedMessages: state.archivedMessages,
-                conversationId: state.conversationId,
-              } : undefined
-            },
-            setSessionMessages: (sessionId: string, state: { messages: unknown[]; archivedMessages?: unknown[]; conversationId?: string | null }) => {
-              useSessionStore.getState().setSessionMessages(sessionId, state)
-            },
-            updateSessionStatus: (sessionId: string, status: 'idle' | 'running' | 'waiting' | 'error') => {
-              useSessionStore.getState().updateSessionStatus(sessionId, status)
-            },
-            updateSessionExternalId: (sessionId: string, externalSessionId: string) => {
-              useSessionStore.getState().updateSessionExternalId(sessionId, externalSessionId)
-            },
-            getSessionEffectiveWorkspace: (sessionId: string) => {
-              const session = useSessionStore.getState().sessions.get(sessionId)
-              if (!session) return null
-              return getSessionEffectiveWorkspace(session, useWorkspaceStore.getState().currentWorkspaceId)
-            },
-            getSessionContextWorkspaceIds: (sessionId: string) => {
-              const session = useSessionStore.getState().sessions.get(sessionId)
-              return session?.contextWorkspaceIds || []
-            },
-          },
-        });
 
         // 恢复窗口透明度（初始使用大窗透明度，后续根据窗口尺寸自动切换）
         if (config?.window) {
@@ -323,9 +272,12 @@ function App() {
   useEffect(() => {
     const handleWorkspaceSwitched = () => {
       // 清除聊天相关的错误提示
-      const { error } = useEventChatStore.getState();
-      if (error) {
-        useEventChatStore.getState().setError(null);
+      const sessionId = sessionStoreManager.getState().activeSessionId
+      if (sessionId) {
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (store?.error) {
+          store.setError(null)
+        }
       }
     };
 
@@ -341,17 +293,21 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // 初始化 SessionStoreManager
+    // 初始化 SessionStoreManager 和事件路由
     sessionStoreManager.getState().initialize().then(() => {
       if (mounted) {
         console.log('[App] SessionStoreManager 初始化完成');
       }
     });
 
-    initializeEventListeners().then((cleanup) => {
-      if (mounted) {
-        eventListenerCleanupRef.current = cleanup;
-      }
+    const router = getEventRouter();
+    router.initialize().then(() => {
+      if (!mounted) return;
+      const unregister = router.register('main', (payload: unknown) => {
+        if (!isAIEvent(payload)) return
+        sessionStoreManager.getState().dispatchEvent(payload)
+      });
+      eventListenerCleanupRef.current = unregister;
     });
 
     return () => {
@@ -360,7 +316,7 @@ function App() {
       eventListenerCleanupRef.current?.();
       eventListenerCleanupRef.current = null;
     };
-  }, [initializeEventListeners]);
+  }, []);
 
     // 监听文件打开事件,创建 Editor Tab
     useEffect(() => {

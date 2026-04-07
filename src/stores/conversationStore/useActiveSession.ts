@@ -1,7 +1,7 @@
 /**
  * useActiveSession - 统一的活跃会话状态 Hook
  *
- * 封装 sessionStoreManager，提供与 useEventChatStore 兼容的接口
+ * 封装 sessionStoreManager，提供统一的活跃会话状态接口
  * 用于简化 UI 组件迁移到新架构
  *
  * 使用方法：
@@ -18,6 +18,7 @@ import {
 } from './sessionStoreManager'
 import { useWorkspaceStore } from '../workspaceStore'
 import type { ConversationStore, ConversationState, ConversationStoreInstance } from './types'
+import type { ContentBlock } from '../../types'
 
 /**
  * 订阅活跃会话的特定状态
@@ -329,6 +330,20 @@ export function useActiveSessionActions() {
         if (!store) return
         return store.clearInputDraft()
       },
+      clearMessages: () => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.clearMessages()
+      },
+      loadMoreArchivedMessages: (count = 20) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.loadMoreArchivedMessages(count)
+      },
       // Manager actions
       switchSession: sessionStoreManager.getState().switchSession,
       deleteSession: sessionStoreManager.getState().deleteSession,
@@ -341,7 +356,7 @@ export function useActiveSessionActions() {
 /**
  * 获取当前活跃会话的状态和操作方法
  *
- * 返回与 useEventChatStore 兼容的接口
+ * 返回统一的活跃会话状态和操作接口
  */
 export function useActiveSessionChat(): ConversationStore | null {
   const sessionId = useActiveSessionId()
@@ -448,4 +463,39 @@ export function useSessionError(sessionId: string | null) {
     useCallback((state: ConversationState) => state.error, []),
     null
   )
+}
+
+// ========================================
+// 派生状态 Hooks
+// ========================================
+
+/** 是否有待回答的问题 */
+export function useHasPendingQuestion(): boolean {
+  const { questionBlockMap } = useActiveSessionBlockMaps()
+  const { currentMessage } = useActiveSessionMessages()
+  return useMemo(() => {
+    if (!currentMessage || !questionBlockMap.size) return false
+    for (const blockIndex of questionBlockMap.values()) {
+      const block = currentMessage.blocks[blockIndex]
+      if (block?.type === 'question' && (block as ContentBlock & { status: string }).status === 'pending') return true
+    }
+    return false
+  }, [currentMessage, questionBlockMap])
+}
+
+/** 是否有活跃的计划（等待审批） */
+export function useHasActivePlan(): boolean {
+  const { planBlockMap, activePlanId } = useActiveSessionBlockMaps()
+  const { currentMessage } = useActiveSessionMessages()
+  return useMemo(() => {
+    if (!activePlanId || !currentMessage) return false
+    const planBlockIndex = planBlockMap.get(activePlanId)
+    if (planBlockIndex === undefined) return false
+    const block = currentMessage.blocks[planBlockIndex]
+    if (block?.type === 'plan_mode') {
+      const status = (block as ContentBlock & { status: string }).status
+      return status === 'pending_approval' || status === 'drafting'
+    }
+    return false
+  }, [planBlockMap, activePlanId, currentMessage])
 }

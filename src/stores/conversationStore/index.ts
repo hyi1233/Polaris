@@ -25,7 +25,11 @@ export {
   useActiveSessionChat,
   useActiveSessionMessages,
   useActiveSessionStreaming,
+  useActiveSessionError,
   useActiveSessionActions,
+  useActiveSessionBlockMaps,
+  useHasPendingQuestion,
+  useHasActivePlan,
   // 指定会话的 hooks（用于多窗口场景）
   useSessionMessages,
   useSessionStreaming,
