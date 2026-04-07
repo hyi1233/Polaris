@@ -44,7 +44,7 @@ export function TriggerConfig({
 
   // 初始化间隔值
   useEffect(() => {
-    if (triggerType === 'interval') {
+    if (triggerType === 'interval' || triggerType === 'after_completion') {
       const parsed = parseIntervalValue(triggerValue);
       if (parsed) {
         setIntervalNum(parsed.num);
@@ -86,8 +86,8 @@ export function TriggerConfig({
           ))}
         </select>
 
-        {/* 间隔执行 */}
-        {triggerType === 'interval' && (
+        {/* 间隔执行 / 完成后间隔 */}
+        {(triggerType === 'interval' || triggerType === 'after_completion') && (
           <div className="flex gap-2 flex-1">
             <input
               type="number"
@@ -133,7 +133,7 @@ export function TriggerConfig({
       </div>
 
       {/* 间隔预设快捷选项 */}
-      {triggerType === 'interval' && (
+      {(triggerType === 'interval' || triggerType === 'after_completion') && (
         <div className="flex flex-wrap gap-2">
           {INTERVAL_PRESETS.map((preset) => (
             <button

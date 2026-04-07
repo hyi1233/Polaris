@@ -256,7 +256,7 @@ impl LocalFileStorage {
 /// Validate trigger value based on trigger type
 fn validate_trigger_value(trigger_type: &TriggerType, value: &str) -> Result<()> {
     match trigger_type {
-        TriggerType::Interval => {
+        TriggerType::Interval | TriggerType::AfterCompletion => {
             // Validate interval format (e.g., "1h", "30m", "1d")
             let value = value.trim();
             if value.is_empty() {
@@ -549,7 +549,14 @@ impl TaskStorage for LocalFileStorage {
         let now = Utc::now().timestamp();
         task.last_run_at = Some(now);
         task.last_run_status = Some(status);
-        task.next_run_at = task.trigger_type.calculate_next_run(&task.trigger_value, now);
+
+        // AfterCompletion 模式：仅在任务完成（非 Running）时才重算 next_run_at
+        // Running 状态时不重算，保持 None，防止在执行期间被再次触发
+        if task.trigger_type == TriggerType::AfterCompletion && status == TaskStatus::Running {
+            task.next_run_at = None;
+        } else {
+            task.next_run_at = task.trigger_type.calculate_next_run(&task.trigger_value, now);
+        }
 
         let result = task.clone();
         self.write_tasks_file(&data)?;

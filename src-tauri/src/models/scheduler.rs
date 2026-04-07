@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 /// 触发类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum TriggerType {
     /// 单次执行
     Once,
@@ -22,6 +22,8 @@ pub enum TriggerType {
     /// 间隔执行（支持 s/m/h/d）
     #[default]
     Interval,
+    /// 完成后间隔：上次任务完成后等待指定时间再触发下一次
+    AfterCompletion,
 }
 
 /// 任务状态
@@ -530,7 +532,7 @@ impl TriggerType {
                             .map(|dt| dt.timestamp())
                     })
             }
-            TriggerType::Interval => {
+            TriggerType::Interval | TriggerType::AfterCompletion => {
                 // 解析间隔表达式 (30s, 5m, 2h, 1d)
                 parse_interval(trigger_value)
                     .map(|interval_secs| now + interval_secs)

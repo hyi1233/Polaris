@@ -5,7 +5,7 @@
 // ============ 基础类型 ============
 
 /** 触发类型 */
-export type TriggerType = 'once' | 'cron' | 'interval';
+export type TriggerType = 'once' | 'cron' | 'interval' | 'after_completion';
 
 /** 任务执行状态 */
 export type TaskStatus = 'running' | 'success' | 'failed';
@@ -421,6 +421,7 @@ export const TRIGGER_TYPE_LABELS: Record<TriggerType, string> = {
   once: '单次执行',
   cron: 'Cron 表达式',
   interval: '间隔执行',
+  after_completion: '完成后间隔',
 };
 
 /** 间隔单位标签 */

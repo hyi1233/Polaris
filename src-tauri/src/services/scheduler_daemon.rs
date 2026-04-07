@@ -18,7 +18,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
 
 use crate::error::Result;
-use crate::models::scheduler::ScheduledTask;
+use crate::models::scheduler::{ScheduledTask, TriggerType};
 use crate::services::scheduler::TaskUpdateParams;
 use crate::services::unified_scheduler_repository::UnifiedSchedulerRepository;
 
@@ -218,8 +218,13 @@ fn update_next_run_time(
 ) -> Result<()> {
     let now = chrono::Utc::now().timestamp();
 
-    // 计算下次执行时间
-    let next_run_at = task.trigger_type.calculate_next_run(&task.trigger_value, now);
+    // AfterCompletion 模式：触发后不重算 next_run_at，等待任务完成后再计算
+    // 设为 None 防止守护进程在任务执行期间重复触发
+    let next_run_at = if task.trigger_type == TriggerType::AfterCompletion {
+        None
+    } else {
+        task.trigger_type.calculate_next_run(&task.trigger_value, now)
+    };
 
     // 更新任务
     repository.update_task(&task.id, TaskUpdateParams {

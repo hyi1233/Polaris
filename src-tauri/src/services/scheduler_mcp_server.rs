@@ -499,6 +499,7 @@ fn parse_trigger_type(value: &str) -> Result<TriggerType> {
         "once" => Ok(TriggerType::Once),
         "cron" => Ok(TriggerType::Cron),
         "interval" => Ok(TriggerType::Interval),
+        "after_completion" => Ok(TriggerType::AfterCompletion),
         _ => Err(AppError::ValidationError(format!("无效的 triggerType: {}", value))),
     }
 }
