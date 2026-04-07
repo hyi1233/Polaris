@@ -344,6 +344,13 @@ export function useActiveSessionActions() {
         if (!store) return
         return store.loadMoreArchivedMessages(count)
       },
+      onVisibleRangeChange: (start: number, end: number) => {
+        const sessionId = sessionStoreManager.getState().activeSessionId
+        if (!sessionId) return
+        const store = sessionStoreManager.getState().stores.get(sessionId)?.getState()
+        if (!store) return
+        return store.onVisibleRangeChange(start, end)
+      },
       // Manager actions
       switchSession: sessionStoreManager.getState().switchSession,
       deleteSession: sessionStoreManager.getState().deleteSession,

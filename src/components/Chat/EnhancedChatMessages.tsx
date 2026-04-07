@@ -1763,7 +1763,7 @@ export function EnhancedChatMessages({ sessionId, compact = false }: EnhancedCha
   const { messages, archivedMessages, currentMessage } = sessionId ? sessionData : activeSessionData;
   const isStreaming = sessionId ? sessionIsStreaming : activeIsStreaming;
 
-  const { loadMoreArchivedMessages } = useActiveSessionActions();
+  const { loadMoreArchivedMessages, onVisibleRangeChange } = useActiveSessionActions();
 
   // 性能优化：流式阶段合并 currentMessage 到消息列表
   // 这样就不需要频繁更新 messages 数组，避免整个列表重渲染
@@ -1888,9 +1888,13 @@ export function EnhancedChatMessages({ sessionId, compact = false }: EnhancedCha
     setAutoScroll(atBottom);
   }, []);
 
-  // 监听可见范围变化，更新当前轮次索引
+  // 监听可见范围变化，更新当前轮次索引 + 驱动消息压缩
   const handleRangeChange = useCallback((range: { startIndex: number; endIndex: number }) => {
     const { startIndex, endIndex } = range;
+
+    // 驱动消息压缩：通知 store 哪些消息可见
+    onVisibleRangeChange(startIndex, endIndex);
+
     // 使用可见区域中心来找到最相关的轮次
     const centerIndex = Math.floor((startIndex + endIndex) / 2);
 
@@ -1909,7 +1913,7 @@ export function EnhancedChatMessages({ sessionId, compact = false }: EnhancedCha
     if (targetRound >= 0) {
       setCurrentRoundIndex(targetRound);
     }
-  }, [conversationRounds]);
+  }, [conversationRounds, onVisibleRangeChange]);
 
   // 滚动到指定轮次
   const scrollToRound = useCallback((roundIndex: number) => {
