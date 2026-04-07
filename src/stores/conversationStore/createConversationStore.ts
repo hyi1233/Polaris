@@ -12,6 +12,7 @@ import { handleAIEvent } from './eventHandler'
 import { toAppError, ErrorSource } from '../../types/errors'
 import { sessionStoreManager } from './sessionStoreManager'
 import { parseWorkspaceReferences, buildWorkspaceSystemPrompt, getUserSystemPrompt } from '../../services/workspaceReference'
+import { MessageCompactor, isCompacted } from '../../utils/messageCompactor'
 
 /**
  * 从用户消息生成标题
@@ -71,6 +72,9 @@ function createInitialState(sessionId: string): ConversationState {
     // 工作区关联
     workspaceId: null,
 
+    // 可见区域追踪
+    visibleRange: null,
+
     // 元数据
     sessionId,
   }
@@ -102,6 +106,11 @@ export function createConversationStore(
   let _textBuffer = ''
   let _paragraphTimer: ReturnType<typeof setTimeout> | null = null
   const PARAGRAPH_TIMEOUT = 200 // ms，超时保护
+
+  // ===== 消息压缩器 =====
+  // 模块级实例，管理消息快照的 LRU 缓存
+  // 不放入 Zustand state（内部可变状态，不需要触发渲染）
+  const compactor = new MessageCompactor()
 
   const store = create<ConversationStore>()(
     subscribeWithSelector((set, get) => ({
@@ -1023,6 +1032,48 @@ export function createConversationStore(
         })
       },
 
+      // ===== 消息压缩 =====
+      onVisibleRangeChange: (start, end) => {
+        const { messages } = get()
+        if (messages.length === 0) return
+
+        // 更新可见范围
+        set({ visibleRange: { start, end } })
+
+        // 计算需要压缩和恢复的索引
+        const { toCompact, toHydrate } = compactor.computeRangeActions(messages.length, start, end)
+
+        const newMessages = [...messages]
+        let changed = false
+
+        // 恢复进入可见区域的消息
+        for (const idx of toHydrate) {
+          if (idx < 0 || idx >= newMessages.length) continue
+          const msg = newMessages[idx]
+          if (isCompacted(msg)) {
+            const hydrated = compactor.hydrateMessage(msg)
+            if (hydrated !== msg) {
+              newMessages[idx] = hydrated
+              changed = true
+            }
+          }
+        }
+
+        // 压缩离开可见区域的消息
+        for (const idx of toCompact) {
+          if (idx < 0 || idx >= newMessages.length) continue
+          const msg = newMessages[idx]
+          if (!isCompacted(msg)) {
+            newMessages[idx] = compactor.compactMessage(msg)
+            changed = true
+          }
+        }
+
+        if (changed) {
+          set({ messages: newMessages })
+        }
+      },
+
       // ===== 资源清理 =====
       dispose: () => {
         // 清理缓冲定时器
@@ -1031,6 +1082,9 @@ export function createConversationStore(
           _paragraphTimer = null
         }
         _textBuffer = ''
+
+        // 清理压缩器快照
+        compactor.clearSnapshots()
 
         const state = get()
         // 重置状态

@@ -125,6 +125,9 @@ export interface ConversationState {
 
   // ===== 工作区关联 =====
   workspaceId: string | null
+
+  // ===== 可见区域追踪（消息压缩） =====
+  visibleRange: { start: number; end: number } | null
 }
 
 // ============================================================================
@@ -206,6 +209,10 @@ export interface ConversationActions {
   editAndResend: (userMessageId: string, newContent: string) => Promise<void>
   /** 从归档中加载更多消息 */
   loadMoreArchivedMessages: (count?: number) => void
+
+  // ===== 消息压缩 =====
+  /** 当可见区域变化时触发压缩/恢复 */
+  onVisibleRangeChange: (start: number, end: number) => void
 
   // ===== 资源清理 =====
   dispose: () => void
