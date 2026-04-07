@@ -34,8 +34,8 @@ export const NewSessionButton = memo(function NewSessionButton() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // 最多 4 个会话
-  const canAdd = multiSessionIds.length < 4;
+  // 最多 16 个会话（与 viewStore 上限一致）
+  const canAdd = multiSessionIds.length < 16;
 
   // 点击外部关闭
   useEffect(() => {
