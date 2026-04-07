@@ -1306,11 +1306,11 @@ const AssistantBubble = memo(function AssistantBubble({
 
   return (
     <>
-      <div className="flex gap-3 my-2" onContextMenu={handleContextMenu}>
+      <div className="flex gap-2 my-2" onContextMenu={handleContextMenu}>
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary-600
-                        flex items-center justify-center shadow-glow shrink-0">
-          <span className="text-sm font-bold text-white">P</span>
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary-600
+                        flex items-center justify-center shrink-0 mt-0.5">
+          <span className="text-[10px] font-bold text-white">P</span>
         </div>
 
         {/* 内容 */}
