@@ -20,9 +20,11 @@ interface ActivityBarProps {
   onToggleRightPanel?: () => void
   /** 右侧面板是否折叠 */
   rightPanelCollapsed?: boolean
+  /** 强制折叠模式（如小屏模式），忽略 activityBarCollapsed 状态，始终显示半球触发器 */
+  forceCollapsed?: boolean
 }
 
-export function ActivityBar({ className, onOpenSettings, onToggleRightPanel, rightPanelCollapsed }: ActivityBarProps) {
+export function ActivityBar({ className, onOpenSettings, onToggleRightPanel, rightPanelCollapsed, forceCollapsed }: ActivityBarProps) {
   const { t } = useTranslation('common')
   const leftPanelType = useViewStore((state) => state.leftPanelType)
   const toggleLeftPanel = useViewStore((state) => state.toggleLeftPanel)
@@ -114,8 +116,8 @@ export function ActivityBar({ className, onOpenSettings, onToggleRightPanel, rig
     },
   ]
 
-  // 折叠状态下的渲染：显示贴边半圆悬浮球 + 扇形菜单
-  if (activityBarCollapsed) {
+  // 折叠状态下的渲染（或强制折叠模式）：显示贴边半圆悬浮球 + 扇形菜单
+  if (activityBarCollapsed || forceCollapsed) {
     return (
       <>
         {/* 贴边半圆悬浮触发器 */}

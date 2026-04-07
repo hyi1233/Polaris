@@ -389,14 +389,13 @@ function App() {
 
       {/* 主内容区域 - 正常模式和小窗模式统一布局 */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Activity Bar - 仅正常模式显示 */}
-        {!isCompact && (
-          <ActivityBar
-            onOpenSettings={() => setShowSettings(true)}
-            onToggleRightPanel={toggleRightPanel}
-            rightPanelCollapsed={rightPanelCollapsed}
-          />
-        )}
+        {/* Activity Bar - 始终显示，紧凑模式下强制折叠为半球触发器 */}
+        <ActivityBar
+          onOpenSettings={() => setShowSettings(true)}
+          onToggleRightPanel={toggleRightPanel}
+          rightPanelCollapsed={rightPanelCollapsed}
+          forceCollapsed={isCompact}
+        />
 
         {/* 左侧可切换面板 - 仅正常模式显示 */}
         {!isCompact && hasLeftPanel && (
