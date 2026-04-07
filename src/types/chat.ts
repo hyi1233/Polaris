@@ -103,8 +103,6 @@ export interface ToolCallBlock {
     /** AI 修改前的完整文件内容（用于精确撤销） */
     fullOldContent?: string;
   };
-  /** 完整内容（用于工具调用的详细输出） */
-  fullContent?: string;
 }
 
 /** 问题选项 */

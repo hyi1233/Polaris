@@ -399,18 +399,6 @@ export function createConversationStore(
         }
       },
 
-      updateToolCallBlockFullContent: (toolId, fullContent) => {
-        const { currentMessage, toolBlockMap } = get()
-        if (!currentMessage) return
-        const idx = toolBlockMap.get(toolId)
-        if (idx === undefined) return
-        const blocks = [...currentMessage.blocks]
-        if (blocks[idx]?.type === 'tool_call') {
-          const block = blocks[idx] as import('../../types/chat').ToolCallBlock
-          blocks[idx] = { ...block, fullContent }
-          set({ currentMessage: { ...currentMessage, blocks } })
-        }
-      },
 
       updateCurrentAssistantMessage: (blocks) => {
         const { currentMessage } = get()

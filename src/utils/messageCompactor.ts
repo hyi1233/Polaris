@@ -280,13 +280,12 @@ export class MessageCompactor {
 
   /**
    * 压缩 ToolCallBlock — 最大的内存消耗者
-   * 清除 output/fullContent/diffData.fullOldContent，保留 name/status/error/summary
+   * 清除 output/diffData.fullOldContent，保留 name/status/error/summary
    */
   private compactToolCallBlock(block: ToolCallBlock): ToolCallBlock {
     const compacted: ToolCallBlock = {
       ...block,
       output: undefined,
-      fullContent: undefined,
       input: {},
     }
 
