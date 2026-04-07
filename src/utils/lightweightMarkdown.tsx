@@ -239,12 +239,26 @@ export const LightweightMarkdown = memo(function LightweightMarkdown({
 });
 
 /**
- * 检测内容是否包含代码块标记
- * 用于流式阶段判断是否需要特殊处理
+ * 检测内容是否包含未闭合的代码块
+ * 按行处理：仅当行首出现 ``` 时切换开关状态
+ * 同行内的 ``` 对（如 ```code```）视为行内代码，跳过
+ * 这样可以正确处理代码块内容中出现的 ```
  */
 export function hasOpenCodeBlock(content: string): boolean {
-  const codeBlockCount = (content.match(/```/g) || []).length;
-  return codeBlockCount % 2 !== 0;
+  let inCodeBlock = false;
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('```')) {
+      // 同行内如果出现两对 ```（如 ```code```），视为行内代码，跳过
+      const afterFirst = trimmed.slice(3);
+      if (afterFirst.includes('```')) {
+        continue;
+      }
+      inCodeBlock = !inCodeBlock;
+    }
+  }
+  return inCodeBlock;
 }
 
 /**

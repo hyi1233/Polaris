@@ -354,16 +354,14 @@ export function createConversationStore(
       },
 
       updateToolCallBlockFullContent: (toolId, fullContent) => {
-        // Note: fullContent is stored at runtime but not in ToolCallBlock type
         const { currentMessage, toolBlockMap } = get()
         if (!currentMessage) return
         const idx = toolBlockMap.get(toolId)
         if (idx === undefined) return
         const blocks = [...currentMessage.blocks]
         if (blocks[idx]?.type === 'tool_call') {
-          // Use type assertion to bypass TypeScript - fullContent is used at runtime
-          const block = blocks[idx] as unknown as Record<string, unknown>
-          block.fullContent = fullContent
+          const block = blocks[idx] as import('../../types/chat').ToolCallBlock
+          blocks[idx] = { ...block, fullContent }
           set({ currentMessage: { ...currentMessage, blocks } })
         }
       },
