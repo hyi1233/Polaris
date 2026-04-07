@@ -1,7 +1,6 @@
 /*! 引擎注册表
  *
  * 管理所有注册的 AI 引擎，提供统一的访问接口。
- * 支持 OpenAI 引擎的模糊匹配（provider_id 匹配）。
  */
 
 use std::collections::HashMap;
@@ -55,59 +54,18 @@ impl EngineRegistry {
 
     /// 获取引擎
     pub fn get(&self, id: &EngineId) -> Option<&(dyn AIEngine + '_)> {
-        // 先尝试精确匹配
-        if let Some(engine) = self.engines.get(id) {
-            return Some(engine.as_ref());
-        }
-
-        // 对于 OpenAI 引擎，尝试模糊匹配
-        if id.is_openai() {
-            // 尝试使用通用的 OpenAI 引擎
-            let generic_id = EngineId::OpenAI { provider_id: None };
-            if let Some(engine) = self.engines.get(&generic_id) {
-                return Some(engine.as_ref());
-            }
-        }
-
-        None
+        self.engines.get(id).map(|e| e.as_ref())
     }
 
     /// 获取可变引擎
     pub fn get_mut(&mut self, id: &EngineId) -> Option<&mut (dyn AIEngine + '_)> {
-        // 对于 OpenAI 引擎，先尝试精确匹配，再尝试模糊匹配
-        if id.is_openai() {
-            // 先尝试精确匹配
-            if self.engines.contains_key(id) {
-                let engine = self.engines.get_mut(id)?;
-                return Some(engine.as_mut());
-            }
-            // 尝试使用通用的 OpenAI 引擎
-            let generic_id = EngineId::OpenAI { provider_id: None };
-            if self.engines.contains_key(&generic_id) {
-                let engine = self.engines.get_mut(&generic_id)?;
-                return Some(engine.as_mut());
-            }
-            return None;
-        }
-
-        // 非 OpenAI 引擎直接精确匹配
         let engine = self.engines.get_mut(id)?;
         Some(engine.as_mut())
     }
 
     /// 检查引擎是否存在
     pub fn contains(&self, id: &EngineId) -> bool {
-        if self.engines.contains_key(id) {
-            return true;
-        }
-
-        // 对于 OpenAI 引擎，检查通用引擎是否存在
-        if id.is_openai() {
-            let generic_id = EngineId::OpenAI { provider_id: None };
-            return self.engines.contains_key(&generic_id);
-        }
-
-        false
+        self.engines.contains_key(id)
     }
 
     /// 检查引擎是否可用
@@ -137,7 +95,7 @@ impl EngineRegistry {
         &mut self,
         engine_id: Option<EngineId>,
         message: &str,
-        mut options: SessionOptions,
+        options: SessionOptions,
     ) -> Result<String> {
         let id = engine_id.unwrap_or_else(|| self.default_engine.clone());
 
@@ -159,7 +117,7 @@ impl EngineRegistry {
         engine_id: EngineId,
         session_id: &str,
         message: &str,
-        mut options: SessionOptions,
+        options: SessionOptions,
     ) -> Result<()> {
         let engine = self.get_mut(&engine_id)
             .ok_or_else(|| AppError::ValidationError(format!("引擎 {} 未注册", engine_id)))?;

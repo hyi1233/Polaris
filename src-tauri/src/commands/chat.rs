@@ -15,12 +15,6 @@ use crate::services::mcp_config_service::WorkspaceMcpConfigService;
 use tauri::{Emitter, Manager, State, Window};
 use tauri_plugin_notification::NotificationExt;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
-/// Windows 进程创建标志：不创建新窗口
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // ============================================================================
 // 附件相关结构体
@@ -391,18 +385,7 @@ pub async fn interrupt_chat(
 ) -> Result<()> {
     tracing::info!("[interrupt_chat] 中断会话: {}", session_id);
 
-    // 1. 先检查 OpenAI Proxy 任务
-    {
-        let mut tasks = state.openai_tasks.lock()
-            .map_err(|e| AppError::Unknown(e.to_string()))?;
-        if let Some(token) = tasks.remove(&session_id) {
-            token.cancel();
-            tracing::info!("[interrupt_chat] OpenAI Proxy 会话已中断: {}", session_id);
-            return Ok(());
-        }
-    }
-
-    // 2. 检查 EngineRegistry 中的引擎
+    // 检查 EngineRegistry 中的引擎
     let engine = engine_id.as_ref().and_then(|id| EngineId::from_str(id));
 
     let mut registry = state.engine_registry.lock().await;

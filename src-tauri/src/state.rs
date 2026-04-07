@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as AsyncMutex;
-use tokio_util::sync::CancellationToken;
 
 use crate::ai::EngineRegistry;
 use crate::commands::context::ContextMemoryStore;
@@ -103,8 +102,6 @@ pub struct AppState {
     /// 保存会话 ID 到进程 PID 的映射（保留向后兼容）
     /// 使用 PID 而不是 Child，因为 Child 会在读取输出时被消费
     pub sessions: Arc<Mutex<HashMap<String, u32>>>,
-    /// OpenAIProxy 任务的取消控制
-    pub openai_tasks: Arc<Mutex<HashMap<String, CancellationToken>>>,
     /// 上下文存储
     pub context_store: Arc<Mutex<ContextMemoryStore>>,
     /// 集成管理器 (使用 tokio::sync::Mutex 支持异步操作)
@@ -132,7 +129,6 @@ pub fn create_app_state(
     AppState {
         config_store: Mutex::new(config_store),
         sessions: Arc::new(Mutex::new(HashMap::new())),
-        openai_tasks: Arc::new(Mutex::new(HashMap::new())),
         context_store: Arc::new(Mutex::new(ContextMemoryStore::new())),
         integration_manager: AsyncMutex::new(integration_manager),
         engine_registry,

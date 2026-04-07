@@ -11,11 +11,6 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EngineId {
     ClaudeCode,
-    /// OpenAI 兼容引擎，可选指定具体的 provider_id
-    OpenAI {
-        /// Provider ID，None 表示使用激活的 provider
-        provider_id: Option<String>,
-    },
 }
 
 impl EngineId {
@@ -23,24 +18,11 @@ impl EngineId {
     ///
     /// 支持格式：
     /// - "claude", "claude-code", "claudecode" → ClaudeCode
-    /// - "openai" → OpenAI { provider_id: None }
-    /// - "provider-xxx" → OpenAI { provider_id: Some("xxx") }
     pub fn from_str(s: &str) -> Option<Self> {
         let lower = s.to_lowercase();
         match lower.as_str() {
             "claude" | "claude-code" | "claudecode" => Some(Self::ClaudeCode),
-            "openai" => Some(Self::OpenAI { provider_id: None }),
-            _ => {
-                // 尝试解析 provider-xxx 格式
-                if lower.starts_with("provider-") {
-                    let provider_id = lower.strip_prefix("provider-").unwrap();
-                    Some(Self::OpenAI {
-                        provider_id: Some(provider_id.to_string()),
-                    })
-                } else {
-                    None
-                }
-            }
+            _ => None,
         }
     }
 
@@ -48,8 +30,6 @@ impl EngineId {
     pub fn as_str(&self) -> String {
         match self {
             Self::ClaudeCode => "claude".to_string(),
-            Self::OpenAI { provider_id: None } => "openai".to_string(),
-            Self::OpenAI { provider_id: Some(id) } => format!("provider-{}", id),
         }
     }
 
@@ -57,20 +37,6 @@ impl EngineId {
     pub fn display_name(&self) -> &'static str {
         match self {
             Self::ClaudeCode => "Claude Code",
-            Self::OpenAI { .. } => "OpenAI",
-        }
-    }
-
-    /// 是否是 OpenAI 引擎
-    pub fn is_openai(&self) -> bool {
-        matches!(self, Self::OpenAI { .. })
-    }
-
-    /// 获取 OpenAI provider_id（如果是 OpenAI 引擎）
-    pub fn provider_id(&self) -> Option<&str> {
-        match self {
-            Self::OpenAI { provider_id } => provider_id.as_deref(),
-            _ => None,
         }
     }
 }

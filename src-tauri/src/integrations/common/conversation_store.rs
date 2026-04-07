@@ -88,25 +88,6 @@ impl ConversationStore {
         }
     }
 
-    /// 添加用户消息到历史
-    pub fn add_user_message(&mut self, conversation_id: &str, content: &str) {
-        if let Some(state) = self.states.get_mut(conversation_id) {
-            state.add_user_message(content);
-        }
-    }
-
-    /// 添加助手回复到历史
-    pub fn add_assistant_message(&mut self, conversation_id: &str, content: &str) {
-        if let Some(state) = self.states.get_mut(conversation_id) {
-            state.add_assistant_message(content);
-        }
-    }
-
-    /// 获取消息历史
-    pub fn get_message_history(&self, conversation_id: &str) -> Option<&[super::super::commands::HistoryMessage]> {
-        self.states.get(conversation_id).map(|s| s.get_message_history())
-    }
-
     /// 重置会话状态
     pub fn reset(&mut self, conversation_id: &str) {
         if let Some(state) = self.states.get_mut(conversation_id) {
@@ -166,9 +147,9 @@ mod tests {
         assert_eq!(state.engine_id, "claude");
 
         // 设置引擎
-        store.set_engine("conv1", EngineId::OpenAI { provider_id: Some("test-provider".to_string()) });
+        store.set_engine("conv1", EngineId::ClaudeCode);
         let state = store.get("conv1").unwrap();
-        assert_eq!(state.engine_id, "provider-test-provider");
+        assert_eq!(state.engine_id, "claude");
 
         // 设置工作目录
         store.set_work_dir("conv1", "/home/user".to_string());

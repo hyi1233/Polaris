@@ -1,7 +1,7 @@
 /*! IM 机器人命令解析和处理
  *
  * 支持的命令：
- * - 模型切换: /claude, /openai, /agent
+ * - 模型切换: /claude, /agent
  * - 提示词预设: /preset <preset_id>, /preset list, /preset default
  * - 中断对话: /stop, /end, /停止
  * - 状态查询: /status, /状态
@@ -86,15 +86,6 @@ impl CommandParser {
                 let (custom_prompt, replace_mode) = Self::parse_switch_args(&parts[1..]);
                 Some(BotCommand::SwitchProvider {
                     provider: EngineId::ClaudeCode,
-                    custom_prompt,
-                    replace_mode,
-                })
-            }
-            "openai" => {
-                // 解析参数：支持 /openai [provider_id] [-r] [自定义提示词]
-                let (provider_id, custom_prompt, replace_mode) = Self::parse_openai_args(&parts[1..]);
-                Some(BotCommand::SwitchProvider {
-                    provider: EngineId::OpenAI { provider_id },
                     custom_prompt,
                     replace_mode,
                 })
@@ -184,69 +175,6 @@ impl CommandParser {
         (custom_prompt, replace_mode)
     }
 
-    /// 解析 OpenAI 切换命令的参数
-    /// 格式: [provider_id] [-r] [自定义提示词]
-    ///
-    /// 示例:
-    /// - `/openai` → (None, None, false) 使用激活的 provider
-    /// - `/openai qwen` → (Some("qwen"), None, false) 使用 id 包含 "qwen" 的 provider
-    /// - `/openai qwen -r 你是专家` → (Some("qwen"), Some("你是专家"), true)
-    fn parse_openai_args(parts: &[&str]) -> (Option<String>, Option<String>, bool) {
-        let mut replace_mode = false;
-        let mut provider_id: Option<String> = None;
-        let mut prompt_parts = Vec::new();
-
-        for part in parts {
-            if *part == "-r" {
-                replace_mode = true;
-            } else if provider_id.is_none() && !part.starts_with('-') {
-                // 第一个非 -r 参数视为 provider_id
-                provider_id = Some(part.to_string());
-            } else {
-                prompt_parts.push(*part);
-            }
-        }
-
-        let custom_prompt = if prompt_parts.is_empty() {
-            None
-        } else {
-            Some(prompt_parts.join(" "))
-        };
-
-        (provider_id, custom_prompt, replace_mode)
-    }
-}
-
-/// 历史消息（用于 OpenAI 等无状态引擎的上下文）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HistoryMessage {
-    /// 角色：user 或 assistant
-    pub role: String,
-    /// 消息内容
-    pub content: String,
-    /// 时间戳
-    pub timestamp: i64,
-}
-
-impl HistoryMessage {
-    pub fn user(content: impl Into<String>) -> Self {
-        use chrono::Utc;
-        Self {
-            role: "user".to_string(),
-            content: content.into(),
-            timestamp: Utc::now().timestamp_millis(),
-        }
-    }
-
-    pub fn assistant(content: impl Into<String>) -> Self {
-        use chrono::Utc;
-        Self {
-            role: "assistant".to_string(),
-            content: content.into(),
-            timestamp: Utc::now().timestamp_millis(),
-        }
-    }
 }
 
 /// 会话状态
@@ -272,16 +200,6 @@ pub struct ConversationState {
     pub last_activity: i64,
     /// 消息计数
     pub message_count: u32,
-    /// 消息历史（用于 OpenAI 等无状态引擎）
-    #[serde(default)]
-    pub message_history: Vec<HistoryMessage>,
-    /// 最大历史条数
-    #[serde(default = "default_max_history")]
-    pub max_history: usize,
-}
-
-fn default_max_history() -> usize {
-    20
 }
 
 #[allow(dead_code)]
@@ -300,8 +218,6 @@ impl ConversationState {
             prompt_mode: PromptMode::default(),
             last_activity: Utc::now().timestamp_millis(),
             message_count: 0,
-            message_history: Vec::new(),
-            max_history: default_max_history(),
         }
     }
 
@@ -319,7 +235,6 @@ impl ConversationState {
         self.custom_prompt = None;
         self.prompt_mode = PromptMode::default();
         self.message_count = 0;
-        self.message_history.clear();
         use chrono::Utc;
         self.last_activity = Utc::now().timestamp_millis();
     }
@@ -332,37 +247,6 @@ impl ConversationState {
     /// 设置引擎
     pub fn set_engine(&mut self, engine_id: &EngineId) {
         self.engine_id = engine_id.as_str();
-    }
-
-    /// 添加用户消息到历史
-    pub fn add_user_message(&mut self, content: impl Into<String>) {
-        self.message_history.push(HistoryMessage::user(content));
-        self.trim_history();
-    }
-
-    /// 添加助手回复到历史
-    pub fn add_assistant_message(&mut self, content: impl Into<String>) {
-        self.message_history.push(HistoryMessage::assistant(content));
-        self.trim_history();
-    }
-
-    /// 裁剪历史，保持在 max_history 限制内
-    fn trim_history(&mut self) {
-        if self.message_history.len() > self.max_history {
-            // 保留最近的 N 条消息
-            let keep = self.max_history;
-            self.message_history.drain(0..self.message_history.len() - keep);
-        }
-    }
-
-    /// 获取消息历史
-    pub fn get_message_history(&self) -> &[HistoryMessage] {
-        &self.message_history
-    }
-
-    /// 清空消息历史
-    pub fn clear_history(&mut self) {
-        self.message_history.clear();
     }
 }
 
@@ -378,12 +262,9 @@ pub fn get_help_text() -> String {
 
 **模型切换**
 `/claude [提示词]` - 切换到 Claude
-`/openai [provider_id] [提示词]` - 切换到 OpenAI
 `/agent [提示词]` - 切换到 Agent
-• OpenAI 支持 provider_id 参数指定具体模型
 • 添加 `-r` 参数替换默认提示词
 • 示例: `/claude 你是Python专家`
-• 示例: `/openai qwen 你是专家`
 
 **提示词预设**
 `/preset <预设名>` - 切换提示词预设
@@ -428,28 +309,6 @@ mod tests {
             Some(BotCommand::SwitchProvider {
                 provider: EngineId::ClaudeCode,
                 custom_prompt: Some(_),
-                replace_mode: false
-            })
-        ));
-
-        // 替换模式
-        let cmd = CommandParser::parse("/openai -r 你是专家");
-        assert!(matches!(
-            cmd,
-            Some(BotCommand::SwitchProvider {
-                provider: EngineId::OpenAI { provider_id: None },
-                custom_prompt: Some(_),
-                replace_mode: true
-            })
-        ));
-
-        // OpenAI 带 provider_id
-        let cmd = CommandParser::parse("/openai qwen");
-        assert!(matches!(
-            cmd,
-            Some(BotCommand::SwitchProvider {
-                provider: EngineId::OpenAI { provider_id: Some(_) },
-                custom_prompt: None,
                 replace_mode: false
             })
         ));
