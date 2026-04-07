@@ -71,7 +71,7 @@ export class NamespacedEventBus {
 
   constructor(config: EventBusConfig = {}) {
     this.config = {
-      maxHistory: config.maxHistory ?? 100,
+      maxHistory: config.maxHistory ?? 20,
       debug: config.debug ?? false,
     }
   }
@@ -243,7 +243,7 @@ export class EventBus {
 
   private constructor(config: EventBusConfig = {}) {
     this.config = {
-      maxHistory: config.maxHistory ?? 100,
+      maxHistory: config.maxHistory ?? 20,
       debug: config.debug ?? false,
     }
     this.bus = new NamespacedEventBus(config)
