@@ -176,7 +176,11 @@ export function extractTodoInfo(input: Record<string, unknown> | undefined): str
   const inProgress = todos.filter(t => t.status === 'in_progress').length;
 
   if (completed === total) return `${total}个已完成`;
-  if (inProgress > 0) return `${inProgress}/${total} 进行中`;
+  if (completed > 0) {
+    const percent = Math.round((completed / total) * 100);
+    return `${completed}/${total} (${percent}%)`;
+  }
+  if (inProgress > 0) return `${total}个任务 · 进行中`;
   return `${total}个任务`;
 }
 
