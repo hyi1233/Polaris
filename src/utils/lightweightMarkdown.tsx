@@ -248,53 +248,77 @@ export function hasOpenCodeBlock(content: string): boolean {
 
 /**
  * 分割内容：将代码块和普通文本分开
- * 返回片段数组，每段标记是否在代码块内
+ *
+ * 返回片段数组，标记每段是否已完成（不会再变化）：
+ * - 代码块之前的文本：completed = true
+ * - 最后一个已关闭代码块之后的文本：completed = false（可能还会追加）
+ * - 已关闭的代码块：completed = true
+ * - 未闭合的代码块标记：completed = false
  */
 export function splitByCodeBlocks(content: string): Array<{
   type: 'text' | 'code-block';
   content: string;
   language?: string;
+  completed: boolean;
 }> {
-  const parts: Array<{ type: 'text' | 'code-block'; content: string; language?: string }> = [];
+  const parts: Array<{ type: 'text' | 'code-block'; content: string; language?: string; completed: boolean }> = [];
 
-  // 匹配代码块：```lang\ncode\n```
+  // 匹配已关闭的代码块：```lang\ncode\n```
   const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
-    // 添加代码块之前的文本
+    // 添加代码块之前的文本（已完成的）
     if (match.index > lastIndex) {
       parts.push({
         type: 'text',
         content: content.slice(lastIndex, match.index),
+        completed: true,
       });
     }
 
-    // 添加代码块
+    // 添加已关闭的代码块
     parts.push({
       type: 'code-block',
       content: match[2],
       language: match[1] || undefined,
+      completed: true,
     });
 
     lastIndex = match.index + match[0].length;
   }
 
-  // 检查是否有未闭合的代码块
-  const openBlockMatch = content.slice(lastIndex).match(/```(\w*)\n?([\s\S]*)$/);
-  if (openBlockMatch) {
-    // 有未闭合的代码块
-    parts.push({
-      type: 'text',
-      content: content.slice(lastIndex),
-    });
-  } else if (lastIndex < content.length) {
-    // 添加剩余文本
-    parts.push({
-      type: 'text',
-      content: content.slice(lastIndex),
-    });
+  // 处理最后一个已关闭代码块之后的内容
+  const remaining = content.slice(lastIndex);
+  if (remaining) {
+    // 检查是否有未闭合的代码块
+    const openBlockMatch = remaining.match(/```(\w*)\n?([\s\S]*)$/);
+    if (openBlockMatch) {
+      // 有未闭合的代码块
+      // 代码块标记之前的文本是已完成的
+      const beforeOpen = remaining.slice(0, remaining.indexOf('```'));
+      if (beforeOpen) {
+        parts.push({
+          type: 'text',
+          content: beforeOpen,
+          completed: true,
+        });
+      }
+      // 未闭合的代码块部分作为未完成的文本
+      parts.push({
+        type: 'text',
+        content: remaining.slice(remaining.indexOf('```')),
+        completed: false,
+      });
+    } else {
+      // 没有未闭合的代码块，但这段文本可能是未完成的（流式还在追加）
+      parts.push({
+        type: 'text',
+        content: remaining,
+        completed: false,
+      });
+    }
   }
 
   return parts;
@@ -368,17 +392,67 @@ const CompletedParagraph = memo(function CompletedParagraph({
 });
 
 /**
+ * 渲染已完成的文本段落（使用段落分割 + 完整 Markdown）
+ * 用于代码块之前或已关闭代码块之间的文本
+ */
+const CompletedTextBlock = memo(function CompletedTextBlock({
+  content,
+  blockIndex,
+}: {
+  content: string;
+  blockIndex: number;
+}) {
+  const rendered = useMemo(() => {
+    if (!content.trim()) return null;
+
+    // 按空行分割段落
+    const paragraphs = content.split(/\n\n+/);
+
+    if (paragraphs.length <= 1) {
+      // 单段落，直接完整渲染
+      const raw = marked.parse(content) as string;
+      const html = DOMPurify.sanitize(raw, {
+        ALLOWED_TAGS: [
+          'p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote',
+          'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'a', 'span', 'div', 'mark', 'table', 'thead', 'tbody',
+          'tr', 'td', 'th', 'hr', 'dl', 'dt', 'dd',
+        ],
+        ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+      });
+      return <div className="break-words" dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+
+    return (
+      <span className="whitespace-pre-wrap break-words">
+        {paragraphs.map((para, i) => (
+          <CompletedParagraph
+            key={`cb-${blockIndex}-p-${i}`}
+            content={para + '\n\n'}
+            index={i}
+          />
+        ))}
+      </span>
+    );
+  }, [content, blockIndex]);
+
+  return rendered;
+});
+
+/**
  * 渐进式流式 Markdown 渲染器
  *
  * 核心思路：
  * 1. 按 \n\n（空行）分割段落
  * 2. 已完成的段落（非最后一段）：使用完整 Markdown 渲染（marked + DOMPurify）
  * 3. 最后一段（可能未完成）：使用轻量 Markdown 渲染
+ * 4. 代码块场景：已关闭代码块之前的文本视为已完成，使用完整渲染
  *
  * 性能优势：
  * - 已完成的段落只渲染一次（React.memo + content 稳定）
  * - 只有最后一段会随流式更新重新渲染
  * - 标题、列表、表格等块级元素在段落完成后立即可见
+ * - 代码块场景不再降级为纯行内渲染
  */
 export const ProgressiveStreamingMarkdown = memo(function ProgressiveStreamingMarkdown({
   content,
@@ -411,10 +485,8 @@ export const ProgressiveStreamingMarkdown = memo(function ProgressiveStreamingMa
           {paragraphs.map((para, i) => {
             const isLast = i === paragraphs.length - 1;
             if (isLast) {
-              // 最后一段：可能未完成，用轻量渲染
               return <LightweightMarkdown key={`last-${i}`} content={para} />;
             }
-            // 已完成段落：用完整 markdown 渲染
             return (
               <CompletedParagraph
                 key={`complete-${i}`}
@@ -427,9 +499,8 @@ export const ProgressiveStreamingMarkdown = memo(function ProgressiveStreamingMa
       );
     }
 
-    // 有代码块，使用原有分割逻辑
+    // 有代码块，使用增强分割逻辑
     const parts = splitByCodeBlocks(content);
-    const hasOpenBlock = hasOpenCodeBlock(content);
 
     return (
       <span className="whitespace-pre-wrap break-words">
@@ -442,19 +513,44 @@ export const ProgressiveStreamingMarkdown = memo(function ProgressiveStreamingMa
                 language={part.language}
               />
             );
-          } else {
-            return <LightweightMarkdown key={`text-${index}`} content={part.content} />;
           }
-        })}
-        {hasOpenBlock && (
-          <span className="inline-flex ml-1">
-            <span className="flex gap-0.5 items-end h-4">
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1 h-1 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+
+          // 文本部分：根据 completed 标记决定渲染策略
+          if (part.completed) {
+            // 已完成的文本（代码块之前），使用完整 Markdown
+            return (
+              <CompletedTextBlock
+                key={`ctext-${index}`}
+                content={part.content}
+                blockIndex={index}
+              />
+            );
+          }
+
+          // 未完成的文本（最后一个已关闭代码块之后），使用段落级渐进渲染
+          const paragraphs = part.content.split(/\n\n+/);
+          if (paragraphs.length <= 1) {
+            return <LightweightMarkdown key={`ltext-${index}`} content={part.content} />;
+          }
+
+          return (
+            <span key={`streaming-${index}`}>
+              {paragraphs.map((para, i) => {
+                const isLast = i === paragraphs.length - 1;
+                if (isLast) {
+                  return <LightweightMarkdown key={`s-last-${i}`} content={para} />;
+                }
+                return (
+                  <CompletedParagraph
+                    key={`s-complete-${i}`}
+                    content={para + '\n\n'}
+                    index={i}
+                  />
+                );
+              })}
             </span>
-          </span>
-        )}
+          );
+        })}
       </span>
     );
   }, [content]);

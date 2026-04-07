@@ -281,70 +281,85 @@ describe('hasOpenCodeBlock', () => {
 });
 
 describe('splitByCodeBlocks', () => {
-  it('should return text part for no code blocks', () => {
+  it('should return text part for no code blocks (incomplete)', () => {
     const result = splitByCodeBlocks('plain text');
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'text', content: 'plain text' });
+    expect(result[0]).toEqual({ type: 'text', content: 'plain text', completed: false });
   });
 
   it('should split code block correctly', () => {
     const result = splitByCodeBlocks('before```\ncode\n```after');
     expect(result).toHaveLength(3);
-    expect(result[0]).toEqual({ type: 'text', content: 'before' });
-    expect(result[1]).toEqual({ type: 'code-block', content: 'code\n', language: undefined });
-    expect(result[2]).toEqual({ type: 'text', content: 'after' });
+    expect(result[0]).toEqual({ type: 'text', content: 'before', completed: true });
+    expect(result[1]).toEqual({ type: 'code-block', content: 'code\n', language: undefined, completed: true });
+    expect(result[2]).toEqual({ type: 'text', content: 'after', completed: false });
   });
 
   it('should extract language from code block', () => {
     const result = splitByCodeBlocks('```typescript\ncode\n```');
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'code-block', content: 'code\n', language: 'typescript' });
+    expect(result[0]).toEqual({ type: 'code-block', content: 'code\n', language: 'typescript', completed: true });
   });
 
   it('should handle multiple code blocks', () => {
     const result = splitByCodeBlocks('```js\none\n```\n```\ntwo\n```');
     expect(result).toHaveLength(3);
-    expect(result[0]).toEqual({ type: 'code-block', content: 'one\n', language: 'js' });
-    expect(result[1]).toEqual({ type: 'text', content: '\n' });
-    expect(result[2]).toEqual({ type: 'code-block', content: 'two\n', language: undefined });
+    expect(result[0]).toEqual({ type: 'code-block', content: 'one\n', language: 'js', completed: true });
+    expect(result[1]).toEqual({ type: 'text', content: '\n', completed: true });
+    expect(result[2]).toEqual({ type: 'code-block', content: 'two\n', language: undefined, completed: true });
   });
 
   it('should handle open code block', () => {
     const result = splitByCodeBlocks('```\nunclosed code');
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'text', content: '```\nunclosed code' });
+    expect(result[0]).toEqual({ type: 'text', content: '```\nunclosed code', completed: false });
   });
 
   it('should handle code block with language at end', () => {
     const result = splitByCodeBlocks('text```python\ncode\n```');
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ type: 'text', content: 'text' });
-    expect(result[1]).toEqual({ type: 'code-block', content: 'code\n', language: 'python' });
+    expect(result[0]).toEqual({ type: 'text', content: 'text', completed: true });
+    expect(result[1]).toEqual({ type: 'code-block', content: 'code\n', language: 'python', completed: true });
   });
 
   it('should handle empty code block', () => {
     const result = splitByCodeBlocks('```\n```');
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'code-block', content: '', language: undefined });
+    expect(result[0]).toEqual({ type: 'code-block', content: '', language: undefined, completed: true });
   });
 
   it('should handle code block with complex content', () => {
     const code = 'function test() {\n  return "hello";\n}';
     const result = splitByCodeBlocks(`\`\`\`javascript\n${code}\n\`\`\``);
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'code-block', content: `${code}\n`, language: 'javascript' });
+    expect(result[0]).toEqual({ type: 'code-block', content: `${code}\n`, language: 'javascript', completed: true });
   });
 
-  it('should handle text only', () => {
+  it('should handle text only (incomplete)', () => {
     const result = splitByCodeBlocks('Hello **world** and `code`');
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ type: 'text', content: 'Hello **world** and `code`' });
+    expect(result[0]).toEqual({ type: 'text', content: 'Hello **world** and `code`', completed: false });
   });
 
-  it('should handle code block followed by text', () => {
+  it('should handle code block followed by text (incomplete)', () => {
     const result = splitByCodeBlocks('```js\ncode\n```end');
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ type: 'code-block', content: 'code\n', language: 'js' });
-    expect(result[1]).toEqual({ type: 'text', content: 'end' });
+    expect(result[0]).toEqual({ type: 'code-block', content: 'code\n', language: 'js', completed: true });
+    expect(result[1]).toEqual({ type: 'text', content: 'end', completed: false });
+  });
+
+  it('should handle text before open code block', () => {
+    const result = splitByCodeBlocks('intro text\n```python\nprint("hello")');
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ type: 'text', content: 'intro text\n', completed: true });
+    expect(result[1]).toEqual({ type: 'text', content: '```python\nprint("hello")', completed: false });
+  });
+
+  it('should handle closed then open code block', () => {
+    const result = splitByCodeBlocks('```js\none\n```\nbetween\n```py\ntwo');
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ type: 'code-block', content: 'one\n', language: 'js', completed: true });
+    expect(result[1]).toEqual({ type: 'text', content: '\nbetween\n', completed: true });
+    expect(result[2]).toEqual({ type: 'text', content: '```py\ntwo', completed: false });
   });
 });
