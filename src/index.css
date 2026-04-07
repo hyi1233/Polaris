@@ -99,8 +99,8 @@ body {
   --tw-prose-td-borders: rgba(255, 255, 255, 0.15);
 }
 
-/* Markdown 代码块样式 */
-.prose pre {
+/* Markdown 代码块样式（排除组件自带样式的代码块） */
+.prose pre:not(.code-block-pre) {
   background-color: #25252B;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0 0 12px 12px;

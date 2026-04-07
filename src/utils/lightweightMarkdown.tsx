@@ -9,7 +9,7 @@
  * - 使用简单的字符串匹配，避免复杂的正则
  */
 
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { DeferredMermaidDiagram } from '../components/Chat/DeferredMermaidDiagram';
@@ -406,14 +406,28 @@ export const StreamingCodeBlock = memo(function StreamingCodeBlock({
   content: string;
   language?: string;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [content]);
+
   return (
-    <div className="my-2 rounded-lg overflow-hidden bg-background-base border border-border-subtle">
-      {language && (
-        <div className="px-3 py-1.5 bg-background-elevated border-b border-border-subtle">
-          <span className="text-xs text-text-tertiary font-mono">{language}</span>
-        </div>
-      )}
-      <pre className="p-3 overflow-x-auto">
+    <div className="my-2 rounded-lg overflow-hidden bg-background-base border border-border-subtle group relative">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-background-elevated border-b border-border-subtle">
+        <span className="text-xs text-text-tertiary font-mono">{language || ''}</span>
+        <button
+          onClick={handleCopy}
+          className="text-xs text-text-tertiary hover:text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+          title="复制"
+        >
+          {copied ? '已复制' : '复制'}
+        </button>
+      </div>
+      <pre className="code-block-pre p-3 overflow-x-auto">
         <code className="text-sm text-text-secondary font-mono whitespace-pre">
           {content}
         </code>
