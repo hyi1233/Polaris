@@ -13,7 +13,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { DeferredMermaidDiagram } from '../components/Chat/DeferredMermaidDiagram';
-import { MarkdownRenderCache } from './cache';
+import { MarkdownRenderCache, MARKDOWN_ALLOWED_TAGS, MARKDOWN_ALLOWED_ATTR } from './cache';
 
 /** 渲染片段类型 */
 interface RenderPart {
@@ -447,15 +447,10 @@ export default LightweightMarkdown;
 // 渐进式流式 Markdown 渲染器
 // ============================================================================
 
-/** DOMPurify 安全配置 */
+/** DOMPurify 安全配置（复用共享常量，含 GFM 任务列表支持） */
 const SANITIZE_CONFIG = {
-  ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote',
-    'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'a', 'span', 'div', 'mark', 'table', 'thead', 'tbody',
-    'tr', 'td', 'th', 'hr', 'dl', 'dt', 'dd',
-  ],
-  ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
+  ALLOWED_TAGS: MARKDOWN_ALLOWED_TAGS,
+  ALLOWED_ATTR: MARKDOWN_ALLOWED_ATTR,
 };
 
 /** 将 <table> 包裹在可横向滚动的容器中，防止宽表格撑开父布局 */

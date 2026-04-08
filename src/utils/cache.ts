@@ -275,20 +275,25 @@ function wrapTables(html: string): string {
   );
 }
 
+/** 聊天消息 Markdown 渲染允许的 HTML 标签（含 GFM 任务列表 input） */
+export const MARKDOWN_ALLOWED_TAGS = [
+  'p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote',
+  'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'a', 'span', 'div', 'mark', 'table', 'thead', 'tbody',
+  'tr', 'td', 'th', 'hr', 'dl', 'dt', 'dd', 'input',
+];
+
+/** 聊天消息 Markdown 渲染允许的 HTML 属性 */
+export const MARKDOWN_ALLOWED_ATTR = ['class', 'href', 'target', 'rel', 'type', 'checked', 'disabled'];
+
 export class MarkdownRenderCache {
   private cache: LRUCache<MarkdownCacheEntry>;
   private lastContent: string = '';
   private lastHtml: string = '';
   private lastRenderedLength: number = 0;
 
-  // 允许的 HTML 标签和属性（与原 EnhancedChatMessages 一致）
-  private readonly ALLOWED_TAGS = [
-    'p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote',
-    'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'a', 'span', 'div', 'mark', 'table', 'thead', 'tbody',
-    'tr', 'td', 'th', 'hr', 'dl', 'dt', 'dd', 'input'
-  ];
-  private readonly ALLOWED_ATTR = ['class', 'href', 'target', 'rel', 'type', 'checked', 'disabled'];
+  private readonly ALLOWED_TAGS = MARKDOWN_ALLOWED_TAGS;
+  private readonly ALLOWED_ATTR = MARKDOWN_ALLOWED_ATTR;
 
   constructor(maxSize: number = 100) {
     this.cache = new LRUCache<MarkdownCacheEntry>(maxSize, 60000); // 1 分钟 TTL
