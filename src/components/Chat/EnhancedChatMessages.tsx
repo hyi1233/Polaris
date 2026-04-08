@@ -65,7 +65,7 @@ const TOOL_COLLAPSE_CONFIG = {
 };
 
 /** Virtuoso 视口扩展常量（避免每次渲染创建新对象） */
-const VIEWPORT_EXTENSION = { top: 100, bottom: 300 };
+const VIEWPORT_EXTENSION = { top: 100, bottom: 150 };
 
 /** Virtuoso 底部间距 */
 const FOOTER_SPACER_STYLE = { height: '120px' } as const;
