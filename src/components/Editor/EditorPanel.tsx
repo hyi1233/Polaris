@@ -6,6 +6,7 @@ import { useFileEditorStore } from '../../stores';
 import { CodeMirrorEditor } from './Editor';
 import { EditorHeader } from './EditorHeader';
 import { MarkdownEditor } from './MarkdownEditor';
+import { StatusBar } from './StatusBar';
 
 interface EditorPanelProps {
   className?: string;
@@ -67,6 +68,7 @@ export function EditorPanel({ className = '', filePath: _filePath }: EditorPanel
           />
         )}
       </div>
+      <StatusBar />
     </div>
   );
 }
