@@ -165,26 +165,18 @@ body {
 /* 列表样式 */
 .prose ul,
 .prose ol {
-  margin: 4px 0;
+  margin: 0;
   padding-left: 24px;
 }
 
 .prose li {
-  margin: 1px 0;
-}
-
-.prose li > p {
   margin: 0;
 }
 
+/* 列表内嵌套：紧跟 <p> 的子列表保留微小间距 */
 .prose li > p + ul,
 .prose li > p + ol {
   margin-top: 2px;
-}
-
-.prose li ul,
-.prose li ol {
-  margin-bottom: 0;
 }
 
 /* 引用样式 */
@@ -212,9 +204,9 @@ body {
   margin: 6px 0;
 }
 
-/* 段落样式 */
+/* 段落样式 - 聊天场景下段落间零间距，由 line-height leading 自然提供视觉换行 */
 .prose p {
-  margin: 2px 0;
+  margin: 0;
   line-height: 1.5;
 }
 
