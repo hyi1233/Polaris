@@ -17,7 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { clsx } from 'clsx';
 import type { ChatMessage, UserChatMessage, AssistantChatMessage, ContentBlock, TextBlock, ThinkingBlock, ToolCallBlock } from '../../types';
-import { useActiveSessionMessages, useActiveSessionStreaming, useActiveSessionActions, useSessionMessages, useSessionStreaming } from '../../stores/conversationStore/useActiveSession';
+import { useActiveSessionMessages, useActiveSessionStreaming, useSessionMessages, useSessionStreaming } from '../../stores/conversationStore/useActiveSession';
+import { sessionStoreManager } from '../../stores/conversationStore/sessionStoreManager';
 import { getToolConfig, extractToolKeyInfo, getToolShortName } from '../../utils/toolConfig';
 import { markdownCache } from '../../utils/cache';
 import {
@@ -1763,7 +1764,23 @@ export function EnhancedChatMessages({ sessionId, compact = false }: EnhancedCha
   const { messages, archivedMessages, currentMessage } = sessionId ? sessionData : activeSessionData;
   const isStreaming = sessionId ? sessionIsStreaming : activeIsStreaming;
 
-  const { loadMoreArchivedMessages, onVisibleRangeChange } = useActiveSessionActions();
+  // 当 sessionId prop 存在时，onVisibleRangeChange 和 loadMoreArchivedMessages
+  // 必须路由到该 session 而非 activeSessionId，否则压缩/解压会操作错误的 store
+  const onVisibleRangeChange = useCallback((start: number, end: number) => {
+    const targetId = sessionId ?? sessionStoreManager.getState().activeSessionId;
+    if (!targetId) return;
+    const store = sessionStoreManager.getState().stores.get(targetId)?.getState();
+    if (!store) return;
+    return store.onVisibleRangeChange(start, end);
+  }, [sessionId]);
+
+  const loadMoreArchivedMessages = useCallback((count = 20) => {
+    const targetId = sessionId ?? sessionStoreManager.getState().activeSessionId;
+    if (!targetId) return;
+    const store = sessionStoreManager.getState().stores.get(targetId)?.getState();
+    if (!store) return;
+    return store.loadMoreArchivedMessages(count);
+  }, [sessionId]);
 
   // 性能优化：流式阶段合并 currentMessage 到消息列表
   // 这样就不需要频繁更新 messages 数组，避免整个列表重渲染
