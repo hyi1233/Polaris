@@ -15,7 +15,7 @@ interface EditorHeaderProps {
 
 export function EditorHeader({ className = '' }: EditorHeaderProps) {
   const { t } = useTranslation('fileExplorer');
-  const { currentFile, saveFile, closeFile, status } = useFileEditorStore();
+  const { currentFile, saveFile, closeFile, status, isConflicted, reloadFromDisk, setConflicted } = useFileEditorStore();
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -79,6 +79,28 @@ export function EditorHeader({ className = '' }: EditorHeaderProps) {
 
   return (
     <div className={`flex items-center justify-end px-3 py-1.5 bg-background-elevated border-b border-border-subtle ${className}`}>
+      {/* 文件外部修改冲突提示 */}
+      {isConflicted && (
+        <div className="flex items-center gap-2 mr-auto px-2 py-0.5 rounded bg-warning/10 border border-warning/30 text-warning text-xs">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <span>文件已被外部修改</span>
+          <button
+            onClick={() => reloadFromDisk()}
+            className="px-1.5 py-0.5 rounded hover:bg-warning/20 font-medium transition-colors"
+          >
+            重新加载
+          </button>
+          <button
+            onClick={() => setConflicted(false)}
+            className="px-1.5 py-0.5 rounded hover:bg-warning/20 transition-colors"
+          >
+            保留当前
+          </button>
+        </div>
+      )}
+
       {/* 操作按钮 */}
       <div className="flex items-center gap-1 shrink-0">
         {isModified && (

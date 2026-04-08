@@ -11,6 +11,7 @@ export { useFileEditorStore } from './fileEditorStore';
 export { useViewStore } from './viewStore';
 export { useGitStore } from './gitStore';
 export { useTabStore } from './tabStore';
+export { useEditorBufferStore } from './editorBufferStore';
 export { useTranslateStore } from './translateStore';
 export {
   useIntegrationStore,

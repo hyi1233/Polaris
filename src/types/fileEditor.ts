@@ -31,11 +31,13 @@ export interface FileEditorState {
   status: EditorStatus;
   /** 错误信息 */
   error: string | null;
+  /** 文件是否被外部修改（与磁盘版本冲突） */
+  isConflicted: boolean;
 }
 
 /** 文件编辑器操作 */
 export interface FileEditorActions {
-  /** 打开文件 */
+  /** 打开文件（从磁盘或缓冲区） */
   openFile: (path: string, name: string) => Promise<void>;
   /** 关闭文件（发送 editor:closed 事件） */
   closeFile: () => Promise<void>;
@@ -47,6 +49,12 @@ export interface FileEditorActions {
   setError: (error: string | null) => void;
   /** 切换编辑器开关 */
   setOpen: (open: boolean) => void;
+  /** 设置文件冲突状态 */
+  setConflicted: (conflicted: boolean) => void;
+  /** 从磁盘重新加载文件内容 */
+  reloadFromDisk: () => Promise<void>;
+  /** 切换到已缓冲的文件（Tab 切换时使用，优先从缓冲区恢复） */
+  switchToFile: (path: string, name: string) => Promise<void>;
 }
 
 /** 文件编辑器 Store */

@@ -4,7 +4,7 @@
  * 包含 TabBar 和 TabContent,支持 Editor 和 DiffViewer 切换
  */
 
-import { ReactNode, useCallback, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, FileDiff, FileText, Image as ImageIcon } from 'lucide-react'
 import { useTabStore, Tab } from '@/stores/tabStore'
@@ -295,6 +295,15 @@ interface TabContentProps {
 export function TabContent({ className = '' }: TabContentProps) {
   const { t } = useTranslation('common')
   const activeTab = useTabStore((state) => state.getActiveTab())
+  const switchToFile = useFileEditorStore((state) => state.switchToFile)
+
+  // Tab 切换时确保 fileEditorStore 加载正确的文件
+  useEffect(() => {
+    if (activeTab?.type === 'editor' && activeTab.filePath) {
+      const name = activeTab.title || activeTab.filePath.split('/').pop() || ''
+      switchToFile(activeTab.filePath, name)
+    }
+  }, [activeTab?.id, activeTab?.type, activeTab?.filePath, switchToFile])
 
   if (!activeTab) {
     return (

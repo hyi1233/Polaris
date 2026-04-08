@@ -20,6 +20,7 @@ const SettingsModal = lazy(() => import('./components/Settings/SettingsModal').t
 const DeveloperPanel = lazy(() => import('./components/Developer/DeveloperPanel').then(m => ({ default: m.DeveloperPanel })));
 const CreateWorkspaceModal = lazy(() => import('./components/Workspace/CreateWorkspaceModal').then(m => ({ default: m.CreateWorkspaceModal })));
 import { useConfigStore, useViewStore, useWorkspaceStore, useTabStore, useIntegrationStore } from './stores';
+import { initEditorFileChangeListener } from './stores/fileEditorStore';
 import { sessionStoreManager } from './stores/conversationStore';
 import { useActiveSessionActions, useActiveSessionStreaming, useActiveSessionError } from './stores/conversationStore/useActiveSession';
 import { getEventRouter } from './services/eventRouter';
@@ -355,6 +356,12 @@ function App() {
       return () => {
         unlistenPromise.then(unlisten => unlisten());
       };
+    }, []);
+
+    // 监听文件系统变更，检测编辑器打开的文件是否被外部修改
+    useEffect(() => {
+      const cleanup = initEditorFileChangeListener();
+      return cleanup;
     }, []);
 
   // F12 快捷键 - 切换 DevTools

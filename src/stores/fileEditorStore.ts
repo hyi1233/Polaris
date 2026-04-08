@@ -5,8 +5,10 @@
 import { create } from 'zustand';
 import type { FileEditorStore } from '../types';
 import * as tauri from '../services/tauri';
-import { emit } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { createLogger } from '../utils/logger';
+import type { FsChangeEvent } from '../types/fileExplorer';
+import { useEditorBufferStore } from './editorBufferStore';
 
 const log = createLogger('Editor');
 
@@ -58,17 +60,39 @@ function isImagePath(path: string): boolean {
   return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '');
 }
 
+/** 将当前文件状态保存到缓冲区 */
+function saveCurrentToBuffer() {
+  const { currentFile } = useFileEditorStore.getState();
+  if (!currentFile) return;
+  useEditorBufferStore.getState().saveBuffer(currentFile.path, {
+    name: currentFile.name,
+    language: currentFile.language,
+    content: currentFile.content,
+    originalContent: currentFile.originalContent,
+    isModified: currentFile.isModified,
+  });
+}
+
 export const useFileEditorStore = create<FileEditorStore>((set, get) => ({
   // 初始状态
   isOpen: false,
   currentFile: null,
   status: 'idle',
   error: null,
+  isConflicted: false,
 
   // 打开文件
   openFile: async (path: string, name: string) => {
     log.debug('打开文件', { path, name });
-    set({ isOpen: true, status: 'loading', error: null });
+    const { currentFile } = get();
+
+    // 相同文件不重复加载
+    if (currentFile?.path === path) return;
+
+    // 保存当前文件到缓冲区
+    saveCurrentToBuffer();
+
+    set({ isOpen: true, status: 'loading', error: null, isConflicted: false });
 
     try {
       if (isImagePath(path)) {
@@ -138,13 +162,16 @@ export const useFileEditorStore = create<FileEditorStore>((set, get) => ({
     const { currentFile } = get();
     if (!currentFile) return;
 
-    set({
-      currentFile: {
-        ...currentFile,
-        content,
-        isModified: content !== currentFile.originalContent,
-      },
-    });
+    const updated = {
+      ...currentFile,
+      content,
+      isModified: content !== currentFile.originalContent,
+    };
+
+    set({ currentFile: updated });
+
+    // 同步更新缓冲区
+    useEditorBufferStore.getState().updateContent(currentFile.path, content);
   },
 
   // 保存文件
@@ -159,14 +186,25 @@ export const useFileEditorStore = create<FileEditorStore>((set, get) => ({
       await tauri.createFile(currentFile.path, currentFile.content);
 
       // 更新状态
+      const saved = {
+        ...currentFile,
+        originalContent: currentFile.content,
+        isModified: false,
+      };
       set({
-        currentFile: {
-          ...currentFile,
-          originalContent: currentFile.content,
-          isModified: false,
-        },
+        currentFile: saved,
         status: 'idle',
         error: null,
+        isConflicted: false,
+      });
+
+      // 同步更新缓冲区
+      useEditorBufferStore.getState().saveBuffer(currentFile.path, {
+        name: saved.name,
+        language: saved.language,
+        content: saved.content,
+        originalContent: saved.content,
+        isModified: false,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '保存文件失败';
@@ -187,4 +225,119 @@ export const useFileEditorStore = create<FileEditorStore>((set, get) => ({
   setOpen: (open: boolean) => {
     set({ isOpen: open });
   },
+
+  // 设置文件冲突状态
+  setConflicted: (conflicted: boolean) => {
+    set({ isConflicted: conflicted });
+  },
+
+  // 从磁盘重新加载文件内容
+  reloadFromDisk: async () => {
+    const { currentFile } = get();
+    if (!currentFile) return;
+
+    try {
+      const diskContent = await tauri.getFileContent(currentFile.path) as string;
+      set({
+        currentFile: {
+          ...currentFile,
+          content: diskContent,
+          originalContent: diskContent,
+          isModified: false,
+        },
+        isConflicted: false,
+      });
+    } catch (error) {
+      log.error('从磁盘重新加载失败', error instanceof Error ? error : new Error(String(error)));
+    }
+  },
+
+  // 切换到已缓冲的文件（Tab 切换时使用，优先从缓冲区恢复，避免磁盘读取）
+  switchToFile: async (path: string, name: string) => {
+    const { currentFile } = get();
+
+    // 相同文件不重复切换
+    if (currentFile?.path === path) return;
+
+    // 保存当前文件到缓冲区
+    saveCurrentToBuffer();
+
+    // 检查缓冲区
+    const buffer = useEditorBufferStore.getState().loadBuffer(path);
+    if (buffer) {
+      log.debug('从缓冲区恢复文件', { path });
+      set({
+        isOpen: true,
+        currentFile: {
+          path,
+          name: buffer.name,
+          content: buffer.content,
+          originalContent: buffer.originalContent,
+          isModified: buffer.isModified,
+          language: buffer.language,
+        },
+        status: 'idle',
+        error: null,
+        isConflicted: false,
+      });
+      return;
+    }
+
+    // 缓冲区未命中，回退到正常 openFile（从磁盘读取）
+    await get().openFile(path, name);
+  },
 }));
+
+/**
+ * 初始化编辑器文件变更监听器
+ * 监听 file-system-change 事件，检测当前打开的文件是否被外部修改
+ * @returns cleanup 函数
+ */
+export function initEditorFileChangeListener(): () => void {
+  let disposed = false;
+  let unlistenFn: (() => void) | null = null;
+
+  listen<FsChangeEvent>('file-system-change', async (event) => {
+    if (disposed) return;
+    const store = useFileEditorStore.getState();
+    const { currentFile, isConflicted } = store;
+    if (!currentFile || isConflicted) return;
+
+    const filePath = currentFile.path.replace(/\\/g, '/');
+    const fileDir = filePath.includes('/')
+      ? filePath.substring(0, filePath.lastIndexOf('/'))
+      : '';
+
+    const affectedDirs = event.payload.affectedDirs;
+    const isAffected = affectedDirs.some(dir => {
+      const normalizedDir = dir.replace(/\\/g, '/');
+      return fileDir === normalizedDir || fileDir.startsWith(normalizedDir + '/');
+    });
+
+    if (!isAffected) return;
+
+    // 读取磁盘内容并与 originalContent 比较
+    try {
+      const diskContent = await tauri.getFileContent(currentFile.path) as string;
+      if (diskContent !== currentFile.originalContent) {
+        useFileEditorStore.getState().setConflicted(true);
+        log.info('文件被外部修改', { path: currentFile.path });
+      }
+    } catch {
+      // 文件可能已被删除，也标记为冲突
+      useFileEditorStore.getState().setConflicted(true);
+      log.warn('无法读取外部修改的文件', { path: currentFile.path });
+    }
+  }).then(unlisten => {
+    if (disposed) {
+      unlisten();
+    } else {
+      unlistenFn = unlisten;
+    }
+  });
+
+  return () => {
+    disposed = true;
+    unlistenFn?.();
+  };
+}
