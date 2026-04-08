@@ -41,6 +41,7 @@ interface ViewState {
   multiSessionRows: 1 | 2;       // 行数配置：1 行或 2 行
   multiSessionCellWidth: number; // 每个格子的统一宽度（像素）
   expandSessionId: string | null; // 展开的会话 ID（全屏显示）
+  pendingScrollToId: string | null; // 待滚动的会话 ID（一次性信号）
 }
 
 /** 视图操作 */
@@ -80,6 +81,9 @@ interface ViewActions {
   // 展开操作
   setExpandSessionId: (sessionId: string | null) => void;
   toggleExpandSession: (sessionId: string) => void;
+  // 滚动信号
+  requestScrollToSession: (sessionId: string) => void;
+  clearScrollRequest: () => void;
 }
 
 /** 完整的 View Store 类型 */
@@ -117,6 +121,7 @@ export const useViewStore = create<ViewStore>()(
       multiSessionRows: 1,          // 默认 1 行
       multiSessionCellWidth: 350,   // 默认格子宽度 350px
       expandSessionId: null,        // 默认无展开会话
+      pendingScrollToId: null,      // 默认无待滚动会话
 
       // 切换侧边栏
       toggleSidebar: () => set((state) => ({ showSidebar: !state.showSidebar })),
@@ -254,9 +259,17 @@ export const useViewStore = create<ViewStore>()(
       toggleExpandSession: (sessionId: string) => set((state) => ({
         expandSessionId: state.expandSessionId === sessionId ? null : sessionId
       })),
+
+      // 请求滚动到指定会话（一次性信号，由 MultiSessionGrid 消费后清空）
+      requestScrollToSession: (sessionId: string) => set({ pendingScrollToId: sessionId }),
+      clearScrollRequest: () => set({ pendingScrollToId: null }),
     }),
     {
       name: 'view-store',
+      partialize: (state) => {
+        const { pendingScrollToId, ...rest } = state;
+        return rest;
+      },
     }
   )
 );

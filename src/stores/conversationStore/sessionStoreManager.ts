@@ -361,6 +361,13 @@ function createSessionManagerStore() {
       // 如果新会话在后台运行列表中，移出（用户主动切换回来了）
       get().removeFromBackground(sessionId)
 
+      // 多窗口模式协调：确保目标会话在网格中，并请求滚动
+      const viewState = useViewStore.getState()
+      if (viewState.multiSessionMode) {
+        viewState.addToMultiView(sessionId)
+        viewState.requestScrollToSession(sessionId)
+      }
+
       console.log('[SessionStoreManager] 切换会话:', sessionId)
     },
 

@@ -29,6 +29,13 @@ interface MultiSessionGridProps {
   ref?: React.Ref<MultiSessionGridRef>;
 }
 
+/** 内部滚动辅助函数 */
+function scrollRowTo(rowRef: React.RefObject<HTMLDivElement | null>, index: number, cellWidth: number) {
+  if (rowRef.current) {
+    rowRef.current.scrollTo({ left: index * cellWidth, behavior: 'smooth' });
+  }
+}
+
 /**
  * MultiSessionGrid 组件
  */
@@ -41,6 +48,8 @@ export const MultiSessionGrid = memo(forwardRef<MultiSessionGridRef, MultiSessio
     const expandSessionId = useViewStore(state => state.expandSessionId);
     const setExpandSessionId = useViewStore(state => state.setExpandSessionId);
     const activeSessionId = useActiveSessionId();
+    const pendingScrollToId = useViewStore(state => state.pendingScrollToId);
+    const clearScrollRequest = useViewStore(state => state.clearScrollRequest);
 
     // 滚动容器 ref
     const row1Ref = useRef<HTMLDivElement>(null);
@@ -70,31 +79,36 @@ export const MultiSessionGrid = memo(forwardRef<MultiSessionGridRef, MultiSessio
       }
     }, [displaySessions, multiSessionRows]);
 
+    // 内部滚动实现
+    const scrollToIndex = useCallback((index: number) => {
+      if (multiSessionRows === 1) {
+        scrollRowTo(row1Ref, index, multiSessionCellWidth);
+      } else {
+        const inRow1 = index < row1Sessions.length;
+        const targetRef = inRow1 ? row1Ref : row2Ref;
+        const targetIndex = inRow1 ? index : index - row1Sessions.length;
+        scrollRowTo(targetRef, targetIndex, multiSessionCellWidth);
+      }
+    }, [multiSessionRows, multiSessionCellWidth, row1Sessions.length]);
+
     // 暴露滚动方法
     useImperativeHandle(ref, () => ({
       scrollToSession: (sessionId: string) => {
         const index = displaySessions.findIndex(s => s.id === sessionId);
         if (index === -1) return;
-
-        if (multiSessionRows === 1) {
-          // 1 行模式：滚动到对应位置
-          if (row1Ref.current) {
-            const scrollLeft = index * multiSessionCellWidth;
-            row1Ref.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-          }
-        } else {
-          // 2 行模式：确定在哪一行并滚动
-          const inRow1 = index < row1Sessions.length;
-          const targetRef = inRow1 ? row1Ref : row2Ref;
-          const targetIndex = inRow1 ? index : index - row1Sessions.length;
-
-          if (targetRef.current) {
-            const scrollLeft = targetIndex * multiSessionCellWidth;
-            targetRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-          }
-        }
+        scrollToIndex(index);
       },
-    }), [displaySessions, multiSessionRows, multiSessionCellWidth, row1Sessions.length]);
+    }), [displaySessions, scrollToIndex]);
+
+    // 消费滚动信号
+    useEffect(() => {
+      if (!pendingScrollToId) return;
+      const index = displaySessions.findIndex(s => s.id === pendingScrollToId);
+      if (index !== -1) {
+        scrollToIndex(index);
+        clearScrollRequest();
+      }
+    }, [pendingScrollToId, displaySessions, scrollToIndex, clearScrollRequest]);
 
     // 展开切换回调
     const handleToggleExpand = useCallback((sessionId: string) => {
