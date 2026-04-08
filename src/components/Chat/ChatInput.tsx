@@ -8,7 +8,7 @@
  * - 文件引用 (@/path)
  */
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconSend, IconStop, IconPaperclip } from '../Common/Icons'
 import { useWorkspaceStore, useChatInputStore } from '../../stores'
@@ -123,22 +123,19 @@ export function ChatInput({
   // 检查是否有活跃的计划（等待审批）
   const hasActivePlan = useHasActivePlan()
 
-  // 获取待回答问题列表 & 管理已关闭的问题
+  // 获取待回答问题列表 & 管理浮窗可见性
   const pendingQuestions = usePendingQuestions()
-  const [dismissedQuestionIds, setDismissedQuestionIds] = useState<Set<string>>(new Set())
-  const visibleQuestions = useMemo(
-    () => pendingQuestions.filter(q => !dismissedQuestionIds.has(q.id)),
-    [pendingQuestions, dismissedQuestionIds]
-  )
+  const [questionPanelHidden, setQuestionPanelHidden] = useState(false)
 
-  // 新的 pending 问题到来时重置 dismissed 集合
-  const prevPendingCountRef = useRef(0)
+  // 新的 pending 问题到来时重置隐藏状态
+  const prevPendingIdsRef = useRef('')
   useEffect(() => {
-    if (pendingQuestions.length > prevPendingCountRef.current) {
-      setDismissedQuestionIds(new Set())
+    const ids = pendingQuestions.map(q => q.id).join(',')
+    if (ids !== prevPendingIdsRef.current) {
+      setQuestionPanelHidden(false)
+      prevPendingIdsRef.current = ids
     }
-    prevPendingCountRef.current = pendingQuestions.length
-  }, [pendingQuestions.length])
+  }, [pendingQuestions])
 
   // 同步状态到 store
   useEffect(() => {
@@ -483,19 +480,22 @@ export function ChatInput({
     // 清空 Store 草稿
     updateInputDraft({ text: '', attachments: [] })
     // 发送后关闭问题浮窗
-    setDismissedQuestionIds(new Set())
+    setQuestionPanelHidden(false)
   }, [value, disabled, isStreaming, attachments, onSend, updateInputDraft, cancelPersistDraft, currentWorkspace])
 
-  // 问题浮窗：选项选择 → 填入输入框
-  const handleQuestionSelectOption = useCallback((text: string, _questionId: string) => {
-    setLocalText(text)
-    debouncedPersistDraft(text, attachments)
-    textareaRef.current?.focus()
-  }, [attachments, debouncedPersistDraft])
+  // 问题浮窗：填入格式化文本并直接发送
+  const handleQuestionFillAndSend = useCallback((text: string) => {
+    cancelPersistDraft()
+    onSend(text, currentWorkspace?.path)
+    setLocalText('')
+    setLocalAttachments([])
+    updateInputDraft({ text: '', attachments: [] })
+    setQuestionPanelHidden(true)
+  }, [onSend, cancelPersistDraft, updateInputDraft, currentWorkspace])
 
-  // 问题浮窗：关闭单个问题
-  const handleQuestionDismiss = useCallback((questionId: string) => {
-    setDismissedQuestionIds(prev => new Set(prev).add(questionId))
+  // 问题浮窗：关闭
+  const handleQuestionDismiss = useCallback(() => {
+    setQuestionPanelHidden(true)
   }, [])
 
   // 处理语音命令（放在 handleSend 之后，避免变量声明顺序问题）
@@ -591,12 +591,11 @@ export function ChatInput({
   return (
     <div className="border-t border-border bg-background-elevated relative" ref={containerRef}>
       {/* 问题浮窗 - 定位在输入框上方 */}
-      {visibleQuestions.length > 0 && (
+      {pendingQuestions.length > 0 && !questionPanelHidden && (
         <div className="absolute bottom-full left-0 right-0 mb-1 px-3 z-10">
           <QuestionFloatingPanel
-            questions={visibleQuestions}
-            onSelectOption={handleQuestionSelectOption}
-            onSend={handleSend}
+            questions={pendingQuestions}
+            onFillAndSend={handleQuestionFillAndSend}
             onDismiss={handleQuestionDismiss}
           />
         </div>
