@@ -64,7 +64,7 @@ docs/claudecode/tools/
 按 `toolConfig.ts` 中的 `TOOL_SHORT_NAMES` 注册顺序：
 
 1. Read — ⚠️ 有问题
-2. Glob — 📋 待分析
+2. Glob — ✅ 已处理
 3. Grep — 📋 待分析
 4. Edit — ✅ 已处理
 5. Write — 📋 待分析

@@ -62,10 +62,15 @@ export function handleAIEvent(
 
     case 'tool_call_end': {
       const callId = event.callId || ''
+      // event.result 经 Rust IPC 传递后已是 JS string，直接使用；
+      // 仅当 result 为对象时才 JSON.stringify
+      const output = typeof event.result === 'string'
+        ? event.result
+        : (event.result ? JSON.stringify(event.result, null, 2) : undefined)
       state.updateToolCallBlock(
         callId,
         event.success ? 'completed' : 'failed',
-        event.result ? JSON.stringify(event.result, null, 2) : undefined
+        output
       )
 
       // Edit 工具：提取 diff 数据写入 block

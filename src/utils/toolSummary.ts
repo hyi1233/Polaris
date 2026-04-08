@@ -118,6 +118,14 @@ export function generateToolSummary(
       }
       return isRunning ? `${t('actions.executing')} ${friendlyName}` : friendlyName;
 
+    case 'Glob': {
+      const pattern = (input?.pattern as string) || query;
+      if (pattern) {
+        return isRunning ? `${t('actions.searching')}: ${pattern}` : `${t('actions.searched')}: ${pattern}`;
+      }
+      return isRunning ? `${t('actions.searching')} ${friendlyName}` : friendlyName;
+    }
+
     case 'SearchFiles':
     case 'search_files':
     case 'WebSearch':

@@ -409,6 +409,11 @@ export function extractToolKeyInfo(toolName: string, input: Record<string, unkno
     case 'edit':
     case 'write':
     case 'delete':
+      // Glob 工具：优先提取 pattern 而非 path（path 是搜索根目录）
+      if (toolName === 'Glob' && input?.pattern) {
+        const p = input.pattern as string;
+        return p.length > 40 ? p.slice(0, 37) + '...' : p;
+      }
       return extractFileName(input);
     case 'execute':
     case 'git':

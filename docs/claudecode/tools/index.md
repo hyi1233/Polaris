@@ -3,6 +3,7 @@
 ## ✅ 已处理
 
 - [Edit](edit.md) — diff 渲染修复完成（eventHandler diffData 提取 + 历史回填 + 折叠统计）
+- [Glob](glob.md) — generateToolSummary + keyInfo + 历史恢复 output 回填（已修复）
 
 ## ⚠️ 有问题待修
 
@@ -10,4 +11,4 @@
 
 ## 📋 待分析
 
-Write, Bash, Glob, Grep, WebSearch, WebFetch, GitCommand, TodoWrite, Task, Skill, AskUserQuestion, DeleteFile, Analyze, DatabaseQuery, ListFiles
+Write, Bash, Grep, WebSearch, WebFetch, GitCommand, TodoWrite, Task, Skill, AskUserQuestion, DeleteFile, Analyze, DatabaseQuery, ListFiles
