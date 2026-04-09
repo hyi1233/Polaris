@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, Clock, Plus, Trash2 } from 'lucide-react'
 import type { TodoItem, TodoPriority, TodoSubtask } from '@/types'
-import { isWindows } from '../../utils/path'
+import { modKey } from '../../utils/path'
 
 interface TodoFormProps {
   // 待办数据(创建时为空对象,编辑时传入现有待办)
@@ -370,7 +370,7 @@ export function TodoForm({ todo, onSubmit, onCancel, mode, tags, onAddTag, onRem
           disabled={!content.trim()}
           className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          {isEditMode ? t('form.saveButton', { shortcut: `${isWindows ? 'Ctrl' : 'Cmd'}+Enter` }) : t('form.createButton', { shortcut: `${isWindows ? 'Ctrl' : 'Cmd'}+Enter` })}
+          {isEditMode ? t('form.saveButton', { shortcut: `${modKey}+Enter` }) : t('form.createButton', { shortcut: `${modKey}+Enter` })}
         </button>
       </div>
     </div>

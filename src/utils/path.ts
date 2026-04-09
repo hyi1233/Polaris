@@ -3,8 +3,23 @@
  * 兼容 Windows 和 Unix 路径分隔符
  */
 
+export type Platform = 'windows' | 'mac' | 'linux';
+
+/** 当前操作系统平台 */
+export const platform: Platform = (() => {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('win')) return 'windows';
+  if (ua.includes('mac')) return 'mac';
+  return 'linux';
+})();
+
 /** 是否为 Windows 平台 */
-export const isWindows = navigator.platform.toLowerCase().startsWith('win');
+export const isWindows = platform === 'windows';
+/** 是否为 macOS 平台 */
+export const isMac = platform === 'mac';
+
+/** 当前平台的修饰键名称 (Ctrl / Cmd) */
+export const modKey = isMac ? 'Cmd' : 'Ctrl';
 
 /**
  * 获取父目录路径

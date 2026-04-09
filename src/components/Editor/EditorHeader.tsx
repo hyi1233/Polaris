@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFileEditorStore } from '../../stores';
 import { createLogger } from '../../utils/logger';
-import { isWindows } from '../../utils/path';
+import { modKey } from '../../utils/path';
 
 const log = createLogger('EditorHeader');
 
@@ -111,7 +111,7 @@ export function EditorHeader({ className = '' }: EditorHeaderProps) {
             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-text-primary
                      bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed
                      transition-colors"
-            title={`保存文件 (${isWindows ? 'Ctrl' : 'Cmd'}+S)`}
+            title={`保存文件 (${modKey}+S)`}
           >
             {isSaving ? (
               <>
