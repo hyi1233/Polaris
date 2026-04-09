@@ -6,6 +6,8 @@ import { create } from 'zustand';
 import { listen } from '@tauri-apps/api/event';
 import type { FileExplorerStore, FileInfo, FsChangeEvent } from '../types';
 import * as tauri from '../services/tauri';
+import { searchFiles } from '../services/fileSearch';
+import type { FileMatch } from '../services/fileSearch';
 import { createLogger } from '../utils/logger';
 import { getParentPath, joinPath, normalizePath } from '../utils/path';
 
@@ -399,57 +401,39 @@ export const useFileExplorerStore = create<FileExplorerStore>((set, get) => ({
     }
   },
 
-  // 深度搜索：递归遍历所有目录
-  deep_search: async (query: string) => {
-    const results: FileInfo[] = [];
-    const visited = new Set<string>();
+  // 深度搜索：使用 Rust 后端原生递归搜索（单次 IPC 调用）
+  deep_search: async (query: string, maxResults: number = 50): Promise<FileInfo[]> => {
     const lowerQuery = query.toLowerCase().trim();
-
     if (!lowerQuery) {
       return [];
     }
 
-    // 递归搜索函数
-    const searchDir = async (dirPath: string): Promise<void> => {
-      // 检查是否被取消
-      if (searchAbortController?.signal.aborted) {
-        throw new DOMException('搜索已取消', 'AbortError');
-      }
-
-      // 防止循环（使用规范化路径）
-      const normalizedDirPath = normalizePath(dirPath);
-      if (visited.has(normalizedDirPath)) {
-        return;
-      }
-      visited.add(normalizedDirPath);
-
-      try {
-        const files = await tauri.readDirectory(dirPath) as FileInfo[];
-
-        for (const file of files) {
-          // 检查文件名是否匹配
-          if (file.name.toLowerCase().includes(lowerQuery)) {
-            results.push(file);
-          }
-
-          // 如果是目录，递归搜索
-          if (file.is_dir) {
-            await searchDir(file.path);
-          }
-        }
-      } catch (error) {
-        // 忽略无法访问的目录
-        console.debug(`搜索目录失败: ${dirPath}`);
-      }
-    };
-
-    // 从当前工作区根目录开始搜索
-    const { current_path } = get();
-    if (current_path) {
-      await searchDir(current_path);
+    // 检查是否被取消
+    if (searchAbortController?.signal.aborted) {
+      throw new DOMException('搜索已取消', 'AbortError');
     }
 
-    return results;
+    const { current_path } = get();
+    if (!current_path) {
+      return [];
+    }
+
+    try {
+      const matches = await searchFiles(lowerQuery, current_path, maxResults);
+
+      // FileMatch → FileInfo 转换
+      return matches.map((m: FileMatch): FileInfo => ({
+        name: m.name,
+        path: m.fullPath,
+        is_dir: m.is_dir,
+        extension: m.extension,
+      }));
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        log.error('深度搜索失败', error instanceof Error ? error : new Error(String(error)));
+      }
+      return [];
+    }
   },
 
   // 取消搜索

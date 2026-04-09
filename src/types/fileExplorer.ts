@@ -101,8 +101,8 @@ export interface FileExplorerActions {
   toggle_folder: (path: string) => void;
   /** 设置搜索查询 */
   set_search_query: (query: string) => Promise<void>;
-  /** 深度搜索（递归遍历所有目录） */
-  deep_search: (query: string) => Promise<FileInfo[]>;
+  /** 深度搜索（使用 Rust 后端原生递归搜索） */
+  deep_search: (query: string, maxResults?: number) => Promise<FileInfo[]>;
   /** 取消搜索 */
   cancel_search: () => void;
   /** 创建文件 */
