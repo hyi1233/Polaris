@@ -15,7 +15,7 @@ import {
   highlightActiveLine,
   lineNumbers,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, addCursorAbove, addCursorBelow } from '@codemirror/commands';
 import { bracketMatching, indentOnInput, syntaxHighlighting, HighlightStyle, foldGutter, foldKeymap, indentUnit } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { searchKeymap, highlightSelectionMatches, gotoLine } from '@codemirror/search';
@@ -231,6 +231,10 @@ export function CodeMirrorEditor({
         keymap.of(defaultKeymap),
         keymap.of(historyKeymap),
         keymap.of(closeBracketsKeymap),
+        keymap.of([
+          { key: 'Alt-ArrowUp', run: addCursorAbove },
+          { key: 'Alt-ArrowDown', run: addCursorBelow },
+        ]),
         keymap.of(searchKeymap),
         keymap.of([{ key: 'Mod-g', run: gotoLine }]),
         zoomKeymap,
