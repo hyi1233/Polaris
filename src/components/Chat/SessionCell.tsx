@@ -8,13 +8,16 @@
  * - 支持展开/关闭操作
  */
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState, useRef } from 'react';
 import { clsx } from 'clsx';
 import { Loader2, XCircle, X, Circle, Maximize2, Minimize2, Square } from 'lucide-react';
 import { SessionMessagesView } from './SessionMessagesView';
 import { useSessionMetadataList, useSessionManagerActions } from '../../stores/conversationStore/sessionStoreManager';
 import { useSessionStreaming, useSessionHasPendingQuestion } from '../../stores/conversationStore/useActiveSession';
 import { sessionStoreManager } from '../../stores/conversationStore/sessionStoreManager';
+import { useWorkspaceStore } from '../../stores/workspaceStore';
+import { WorkspaceBadge } from '../Session/WorkspaceBadge';
+import { WorkspaceMenu } from '../Session/WorkspaceMenu';
 
 /** 状态图标映射 */
 const SESSION_STATUS_CONFIG = {
@@ -55,6 +58,20 @@ export const SessionCell = memo(function SessionCell({
   // 是否有待回答的问题
   const hasPendingQuestion = useSessionHasPendingQuestion(sessionId);
 
+  // 工作区菜单状态
+  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+
+  // 获取工作区信息
+  const workspace = useWorkspaceStore(state =>
+    sessionMetadata?.workspaceId
+      ? state.workspaces.find(w => w.id === sessionMetadata.workspaceId)
+      : null
+  );
+
+  // 获取关联工作区数量
+  const contextCount = sessionMetadata?.contextWorkspaceIds?.length || 0;
+
   // 状态配置 - 需要将 hyphen 格式转换为 underscore 格式
   const statusKey = (sessionMetadata?.status || 'idle').replace(/-/g, '_') as keyof typeof SESSION_STATUS_CONFIG;
   const statusConfig = SESSION_STATUS_CONFIG[statusKey] || SESSION_STATUS_CONFIG.idle;
@@ -87,77 +104,103 @@ export const SessionCell = memo(function SessionCell({
   }, [onToggleExpand]);
 
   return (
-    <div
-      className={clsx(
-        'flex flex-col h-full overflow-hidden rounded-lg border transition-all',
-        isActive ? 'border-primary shadow-glow' : 'border-border hover:border-border-strong'
-      )}
-      onClick={handleClick}
-    >
-      {/* 头部：标题 + 状态 + 操作按钮 */}
-      <div className={clsx(
-        'flex items-center gap-1.5 px-2 py-1 border-b shrink-0',
-        isActive ? 'bg-primary/10 border-primary/20' : 'bg-background-surface border-border'
-      )}>
-        {/* 会话标题 */}
-        <span className={clsx(
-          'text-xs font-medium truncate flex-1',
-          isActive ? 'text-primary' : 'text-text-secondary'
+    <>
+      <div
+        className={clsx(
+          'flex flex-col h-full overflow-hidden rounded-lg border transition-all',
+          isActive ? 'border-primary shadow-glow' : 'border-border hover:border-border-strong'
+        )}
+        onClick={handleClick}
+      >
+        {/* 头部：标题 + 状态 + 操作按钮 */}
+        <div className={clsx(
+          'flex items-center gap-1.5 px-2 py-1 border-b shrink-0',
+          isActive ? 'bg-primary/10 border-primary/20' : 'bg-background-surface border-border'
         )}>
-          {sessionMetadata?.title || '未命名会话'}
-        </span>
+          {/* 会话标题 */}
+          <span className={clsx(
+            'text-xs font-medium truncate',
+            isActive ? 'text-primary' : 'text-text-secondary'
+          )}>
+            {sessionMetadata?.title || '未命名会话'}
+          </span>
 
-        {/* 流式状态指示 */}
-        {isStreaming && (
-          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
-        )}
+          {/* 工作区徽章 */}
+          <WorkspaceBadge
+            ref={badgeRef}
+            workspaceId={sessionMetadata?.workspaceId || null}
+            workspaceName={workspace?.name || sessionMetadata?.workspaceName}
+            contextWorkspaceCount={contextCount}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowWorkspaceMenu(true);
+            }}
+          />
 
-        {/* 待回答问题指示 - 仅非活跃会话显示 */}
-        {hasPendingQuestion && !isActive && !isStreaming && (
-          <span className="w-1.5 h-1.5 bg-warning rounded-full shrink-0" title="有待回答的问题" />
-        )}
+          {/* 弹性空间 - 把右侧元素推到右边 */}
+          <span className="flex-1" />
 
-        {/* 状态图标 */}
-        <StatusIcon className={clsx('w-3.5 h-3.5 shrink-0', statusConfig.className)} />
-
-        {/* 中断按钮 - 仅在流式状态时显示 */}
-        {isStreaming && (
-          <button
-            onClick={handleInterrupt}
-            className="shrink-0 p-0.5 rounded bg-danger/80 text-white hover:bg-danger transition-colors"
-            title="中断"
-          >
-            <Square className="w-3 h-3" />
-          </button>
-        )}
-
-        {/* 展开/收起按钮 */}
-        <button
-          onClick={handleExpand}
-          className="shrink-0 p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-background-hover transition-colors"
-          title={isExpanded ? '收起' : '展开'}
-        >
-          {isExpanded ? (
-            <Minimize2 className="w-3 h-3" />
-          ) : (
-            <Maximize2 className="w-3 h-3" />
+          {/* 流式状态指示 */}
+          {isStreaming && (
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
           )}
-        </button>
 
-        {/* 关闭按钮 */}
-        <button
-          onClick={handleClose}
-          className="shrink-0 p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-background-hover transition-colors"
-          title="关闭"
-        >
-          <X className="w-3 h-3" />
-        </button>
+          {/* 待回答问题指示 - 仅非活跃会话显示 */}
+          {hasPendingQuestion && !isActive && !isStreaming && (
+            <span className="w-1.5 h-1.5 bg-warning rounded-full shrink-0" title="有待回答的问题" />
+          )}
+
+          {/* 状态图标 */}
+          <StatusIcon className={clsx('w-3.5 h-3.5 shrink-0', statusConfig.className)} />
+
+          {/* 中断按钮 - 仅在流式状态时显示 */}
+          {isStreaming && (
+            <button
+              onClick={handleInterrupt}
+              className="shrink-0 p-0.5 rounded bg-danger/80 text-white hover:bg-danger transition-colors"
+              title="中断"
+            >
+              <Square className="w-3 h-3" />
+            </button>
+          )}
+
+          {/* 展开/收起按钮 */}
+          <button
+            onClick={handleExpand}
+            className="shrink-0 p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-background-hover transition-colors"
+            title={isExpanded ? '收起' : '展开'}
+          >
+            {isExpanded ? (
+              <Minimize2 className="w-3 h-3" />
+            ) : (
+              <Maximize2 className="w-3 h-3" />
+            )}
+          </button>
+
+          {/* 关闭按钮 */}
+          <button
+            onClick={handleClose}
+            className="shrink-0 p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-background-hover transition-colors"
+            title="关闭"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+
+        {/* 消息区域 - 使用专门的多窗口消息组件 */}
+        <div className="flex-1 min-h-0 overflow-hidden bg-background-base">
+          <SessionMessagesView sessionId={sessionId} />
+        </div>
       </div>
 
-      {/* 消息区域 - 使用专门的多窗口消息组件 */}
-      <div className="flex-1 min-h-0 overflow-hidden bg-background-base">
-        <SessionMessagesView sessionId={sessionId} />
-      </div>
-    </div>
+      {/* 工作区菜单弹窗 */}
+      {showWorkspaceMenu && (
+        <WorkspaceMenu
+          sessionId={sessionId}
+          anchorEl={badgeRef.current}
+          onClose={() => setShowWorkspaceMenu(false)}
+        />
+      )}
+    </>
   );
 });
