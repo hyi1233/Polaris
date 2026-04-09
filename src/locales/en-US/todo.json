@@ -73,8 +73,8 @@
     "addSubtaskPlaceholder": "Add subtask...",
     "deleteSubtask": "Delete subtask",
     "closeTooltip": "Close (ESC)",
-    "createButton": "Create (Ctrl+Enter)",
-    "saveButton": "Save (Ctrl+Enter)",
+    "createButton": "Create ({{shortcut}})",
+    "saveButton": "Save ({{shortcut}})",
     "isGlobalLabel": "Create as Global Todo",
     "isGlobalHint": "Global todos are visible across all workspaces"
   },

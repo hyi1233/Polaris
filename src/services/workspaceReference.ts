@@ -8,6 +8,7 @@
 
 import i18n from 'i18next';
 import type { Workspace, WorkspaceReference, ParsedWorkspaceMessage } from '../types';
+import { joinPath } from '../utils/path';
 import { getSystemPromptConfigDirect } from './systemPromptStore';
 
 /**
@@ -152,9 +153,8 @@ export function parseWorkspaceReferences(
     }
 
     if (workspace && workspace.path) {
-      // 使用平台特定的路径分隔符
-      const pathSeparator = workspace.path.includes('\\') ? '\\' : '/';
-      const absolutePath = workspace.path + pathSeparator + relativePath;
+      // 使用跨平台路径拼接
+      const absolutePath = joinPath(workspace.path, relativePath);
 
       references.unshift({
         workspaceName: actualWorkspaceName,

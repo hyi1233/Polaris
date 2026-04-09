@@ -73,8 +73,8 @@
     "addSubtaskPlaceholder": "添加子任务...",
     "deleteSubtask": "删除子任务",
     "closeTooltip": "关闭 (ESC)",
-    "createButton": "创建 (Ctrl+Enter)",
-    "saveButton": "保存 (Ctrl+Enter)",
+    "createButton": "创建 ({{shortcut}})",
+    "saveButton": "保存 ({{shortcut}})",
     "isGlobalLabel": "创建为全局待办",
     "isGlobalHint": "全局待办在所有工作区可见"
   },

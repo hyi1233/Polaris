@@ -49,7 +49,8 @@ pub fn open_log_dir() -> Result<()> {
 
     #[cfg(not(windows))]
     {
-        std::process::Command::new("xdg-open")
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        std::process::Command::new(opener)
             .arg(&log_dir)
             .spawn()
             .map_err(|e: io::Error| AppError::Unknown(e.to_string()))?;

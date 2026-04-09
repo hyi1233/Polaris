@@ -11,37 +11,7 @@ import { InputDialog } from '../Common/InputDialog';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IconFile, IconFolder, IconEdit, IconTrash, IconExternalLink, IconOpen } from '../Common/Icons';
 import type { FileInfo } from '../../types';
-import { getParentPath, joinPath, normalizePath } from '../../utils/path';
-
-function isValidFileName(name: string): boolean {
-  if (!name || name.trim().length === 0) {
-    return false;
-  }
-
-  const trimmed = name.trim();
-
-  const invalidChars = /[<>:"|?*\\]/;
-  if (invalidChars.test(trimmed)) {
-    return false;
-  }
-
-  const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-  if (reservedNames.test(trimmed)) {
-    return false;
-  }
-
-  // 禁止 . 和 .. 这两个特殊目录名
-  if (trimmed === '.' || trimmed === '..') {
-    return false;
-  }
-
-  // 允许以 . 开头的文件（如 .env, .gitignore）
-  if (trimmed.startsWith(' ') || trimmed.endsWith(' ') || trimmed.endsWith('.')) {
-    return false;
-  }
-
-  return true;
-}
+import { getParentPath, joinPath, normalizePath, isValidFileName } from '../../utils/path';
 
 interface FileTreeNodeProps {
   file: FileInfo;

@@ -9,7 +9,7 @@ import { ContextMenu } from './ContextMenu';
 import { InputDialog } from '../Common/InputDialog';
 import { IconPlus, IconFile, IconFolder } from '../Common/Icons';
 import type { ContextMenuItem } from './ContextMenu';
-import { joinPath } from '../../utils/path';
+import { joinPath, isValidFileName } from '../../utils/path';
 
 export function FileExplorer() {
   const { t } = useTranslation('fileExplorer');
@@ -134,31 +134,7 @@ export function FileExplorer() {
     refresh_directory();
   }, [clear_error, refresh_directory]);
 
-  // 文件名验证函数
-  const isValidFileName = (name: string): boolean => {
-    if (!name || name.trim().length === 0) {
-      return false;
-    }
-    const trimmed = name.trim();
-    const invalidChars = /[<>:"|?*\\]/;
-    if (invalidChars.test(trimmed)) {
-      return false;
-    }
-    const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-    if (reservedNames.test(trimmed)) {
-      return false;
-    }
-    // 禁止 . 和 .. 这两个特殊目录名
-    if (trimmed === '.' || trimmed === '..') {
-      return false;
-    }
-    // 允许以 . 开头的文件（如 .env, .gitignore）
-    // 只禁止前后空格和以 . 结尾
-    if (trimmed.startsWith(' ') || trimmed.endsWith(' ') || trimmed.endsWith('.')) {
-      return false;
-    }
-    return true;
-  };
+  // 文件名验证函数（来自 path.ts，跨平台适配）
 
   // 处理工具栏右键菜单
   const handleToolbarContextMenu = useCallback((e: React.MouseEvent) => {

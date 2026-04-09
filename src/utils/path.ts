@@ -3,6 +3,9 @@
  * 兼容 Windows 和 Unix 路径分隔符
  */
 
+/** 是否为 Windows 平台 */
+export const isWindows = navigator.platform.toLowerCase().startsWith('win');
+
 /**
  * 获取父目录路径
  * 支持正斜杠 (/) 和反斜杠 (\) 作为路径分隔符
@@ -46,4 +49,50 @@ export function normalizePath(path: string): string {
   return path
     .replace(/\\/g, '/')  // 反斜杠转正斜杠
     .replace(/\/+/g, '/'); // 移除多余的正斜杠
+}
+
+/**
+ * 校验文件名合法性
+ * Windows 上应用 Windows 文件名限制（保留名、非法字符、尾部点号/空格）；
+ * Unix 上仅禁止 / 和空字节，以及 . 和 .. 两个特殊目录名。
+ */
+export function isValidFileName(name: string): boolean {
+  if (!name || name.trim().length === 0) {
+    return false;
+  }
+  const trimmed = name.trim();
+
+  // 所有平台通用规则：禁止 . 和 ..
+  if (trimmed === '.' || trimmed === '..') {
+    return false;
+  }
+
+  // 所有平台通用规则：禁止前后空格
+  if (trimmed.startsWith(' ') || trimmed.endsWith(' ')) {
+    return false;
+  }
+
+  if (isWindows) {
+    // Windows 保留设备名
+    const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+    if (reservedNames.test(trimmed)) {
+      return false;
+    }
+    // Windows 非法字符
+    const invalidChars = /[<>:"|?*\\]/;
+    if (invalidChars.test(trimmed)) {
+      return false;
+    }
+    // Windows 禁止以点号结尾
+    if (trimmed.endsWith('.')) {
+      return false;
+    }
+  } else {
+    // Unix: 仅禁止 / 和空字符（空字符在字符串中不可能出现）
+    if (trimmed.includes('/')) {
+      return false;
+    }
+  }
+
+  return true;
 }

@@ -107,10 +107,17 @@ impl TerminalManager {
         });
 
         // 构建命令 - 使用系统默认 shell
-        // 使用 /K 参数执行 chcp 65001 设置 UTF-8 编码，解决中文乱码问题
-        let mut cmd = CommandBuilder::new("cmd");
-        cmd.arg("/K");
-        cmd.arg("chcp 65001 >nul");
+        let mut cmd = if cfg!(windows) {
+            // Windows: 使用 cmd 并设置 UTF-8 编码解决中文乱码
+            let mut c = CommandBuilder::new("cmd");
+            c.arg("/K");
+            c.arg("chcp 65001 >nul");
+            c
+        } else {
+            // Unix (Linux/macOS): 使用用户登录 shell
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+            CommandBuilder::new(shell)
+        };
         if let Some(ref dir) = cwd {
             cmd.cwd(dir);
         }
