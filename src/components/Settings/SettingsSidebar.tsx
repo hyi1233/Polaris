@@ -46,7 +46,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },
   { id: 'qqbot', icon: <IconBot size={16} />, labelKey: 'nav.qqbot' },
   { id: 'speech', icon: <IconMic size={16} />, labelKey: 'nav.speech' },
-  { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
+  // { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
 ];
 
 export function SettingsSidebar({ activeTab, onTabChange, searchQuery, onSearchChange }: SettingsSidebarProps) {
