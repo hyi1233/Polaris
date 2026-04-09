@@ -54,15 +54,16 @@ function parseEventToLog(event: Record<string, unknown>): {
     case 'assistant':
       return { type: 'message', content: (event.content as string) || '' };
 
-    case 'tool_call_start':
+    case 'tool_call_start': {
       const toolName = (event.tool as string) || (event.toolName as string) || (event.name as string) || 'unknown';
       return {
         type: 'tool_call_start',
         content: `调用工具: ${toolName}`,
         metadata: { toolName, args: event.args },
       };
+    }
 
-    case 'tool_call_end':
+    case 'tool_call_end': {
       const endToolName = (event.tool as string) || (event.toolName as string) || (event.name as string) || 'unknown';
       const success = event.success !== false;
       return {
@@ -70,8 +71,9 @@ function parseEventToLog(event: Record<string, unknown>): {
         content: success ? `${endToolName} 完成` : `${endToolName} 失败`,
         metadata: { toolName: endToolName, success },
       };
+    }
 
-    case 'session_end':
+    case 'session_end': {
       const reason = event.reason as string | undefined;
       if (reason === 'error' || reason === 'failed') {
         return {
@@ -80,6 +82,7 @@ function parseEventToLog(event: Record<string, unknown>): {
         };
       }
       return { type: 'session_end', content: '任务执行完成', metadata: { success: true } };
+    }
 
     case 'error':
       return { type: 'error', content: (event.error as string) || (event.message as string) || '未知错误' };

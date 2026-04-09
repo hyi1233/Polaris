@@ -63,7 +63,7 @@ function matchScore(name: string, query: string): number {
   if (lower.startsWith(q)) return 3;  // 前缀匹配
   if (lower.endsWith(q)) return 2;    // 后缀匹配
   // 检查驼峰/下划线/短横线首字母匹配
-  const parts = lower.split(/[._\-]/);
+  const parts = lower.split(/[._-]/);
   if (parts.some(p => p.startsWith(q))) return 1;
   return 0;                           // 包含匹配
 }

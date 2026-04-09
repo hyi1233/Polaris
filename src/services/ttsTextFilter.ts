@@ -56,7 +56,7 @@ export function cleanTextForSpeech(text: string): string {
     // 移除引用标记 >
     .replace(/^>\s*/gm, '')
     // 移除列表标记 - * 1.
-    .replace(/^[\-\*]\s+/gm, '')
+    .replace(/^[-*]\s+/gm, '')
     .replace(/^\d+\.\s+/gm, '')
     // 移除水平线 --- *** ___
     .replace(/^[-*_]{3,}$/gm, '')

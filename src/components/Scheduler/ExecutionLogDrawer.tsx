@@ -203,7 +203,7 @@ export function ExecutionLogDrawer() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              activeTaskId && clearLogs(activeTaskId);
+              if (activeTaskId) clearLogs(activeTaskId);
             }}
             className="p-1 text-text-muted hover:text-text-primary transition-colors"
             title={t('drawer.clear')}
