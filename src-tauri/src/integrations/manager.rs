@@ -206,6 +206,11 @@ impl IntegrationManager {
         {
             let mut adapters = self.adapters.lock().await;
             if let Some(adapter) = adapters.get_mut(&platform) {
+                // 避免重复连接：如果已连接则跳过
+                if adapter.is_connected() {
+                    tracing::info!("[IntegrationManager] {} 已连接，跳过重复 connect()", platform);
+                    return Ok(());
+                }
                 adapter.connect(tx).await?;
                 tracing::info!("[IntegrationManager] {} started", platform);
             } else {
@@ -499,16 +504,18 @@ impl IntegrationManager {
             let mut states = conversation_states.lock().await;
             let state = states.get_or_create(&conversation_id);
 
-            // 构建系统提示词
-            let default_prompt = "你是一个友好的助手，通过 QQ 回复用户消息。回复简洁、有帮助。";
+            // 构建系统提示词（根据平台名称动态生成）
+            let platform_name = match platform {
+                Platform::QQBot => "QQ",
+                Platform::Feishu => "飞书",
+            };
+            let default_prompt = format!("你是一个友好的助手，通过 {} 回复用户消息。回复简洁、有帮助。", platform_name);
 
             // 优先使用预设提示词，其次使用自定义提示词
             let system_prompt = if let Some(ref preset_id) = state.prompt_preset_id {
-                // 使用预设构建提示词
                 let work_dir_path = state.work_dir.clone().unwrap_or_else(|| ".".to_string());
                 match Self::build_prompt_from_preset(preset_id, &work_dir_path) {
                     Some(preset_prompt) => {
-                        // 如果有自定义提示词，追加到预设后面
                         match &state.custom_prompt {
                             Some(custom) => {
                                 match state.prompt_mode {
@@ -520,7 +527,6 @@ impl IntegrationManager {
                         }
                     }
                     None => {
-                        // 预设不存在，使用默认逻辑
                         match &state.custom_prompt {
                             Some(custom) => {
                                 match state.prompt_mode {
@@ -528,12 +534,11 @@ impl IntegrationManager {
                                     PromptMode::Replace => custom.clone(),
                                 }
                             }
-                            None => default_prompt.to_string(),
+                            None => default_prompt,
                         }
                     }
                 }
             } else {
-                // 没有预设，使用默认逻辑
                 match &state.custom_prompt {
                     Some(custom) => {
                         match state.prompt_mode {
@@ -541,7 +546,7 @@ impl IntegrationManager {
                             PromptMode::Replace => custom.clone(),
                         }
                     }
-                    None => default_prompt.to_string(),
+                    None => default_prompt,
                 }
             };
 
@@ -569,47 +574,118 @@ impl IntegrationManager {
             }
         }
 
-        // 用于累积回复文本
+        // 发送即时确认消息
+        Self::send_reply(&adapters, platform, &conversation_id, "✅ 已接收到消息，正在处理中").await;
+
+        // 用于累积最终回复文本（仅 AssistantMessage / Token / Result）
         let accumulated_text = Arc::new(Mutex::new(String::new()));
         let accumulated_text_clone = accumulated_text.clone();
-        let conversation_id_for_callback = conversation_id.clone();
-        let app_handle_for_callback = app_handle.clone();
+
+        // 进度消息节流：记录上次发送进度消息的时间
+        let last_progress_time = Arc::new(std::sync::Mutex::new(
+            std::time::Instant::now()
+                .checked_sub(std::time::Duration::from_secs(10))
+                .unwrap_or_else(std::time::Instant::now)
+        ));
+        let last_progress_time_clone = last_progress_time.clone();
 
         // 创建 oneshot 通道等待进程完成
         let (complete_tx, complete_rx) = oneshot::channel();
         let complete_tx = Arc::new(std::sync::Mutex::new(Some(complete_tx)));
 
-        // 创建事件回调
+        let conversation_id_for_callback = conversation_id.clone();
+        let app_handle_for_callback = app_handle.clone();
+
+        // 进度消息节流间隔（毫秒）
+        const PROGRESS_THROTTLE_MS: u64 = 1500;
+
+        // 捕获当前 Tokio runtime handle，因为 callback 可能从非 Tokio 线程调用
+        let rt_handle = tokio::runtime::Handle::current();
+
+        // 创建事件回调 —— 按事件类型分条发送
+        // 提前 clone adapters 给闭包使用，避免 move 后无法再访问
+        let adapters_for_callback = adapters.clone();
         let callback = move |event: crate::models::AIEvent| {
-            // 记录事件类型
             tracing::debug!("[IntegrationManager] 收到事件: {:?}", std::mem::discriminant(&event));
 
-            // 只处理文本事件，不处理工具调用和思考事件
-            if let Some(text) = event.extract_text() {
-                // 使用字符安全的截断方式，避免在多字节 UTF-8 字符中间切割
-                let preview: String = text.chars().take(100).collect();
-                let preview = if preview.len() < text.len() { format!("{}...", preview) } else { preview };
-                tracing::info!("[IntegrationManager] AI 文本 (len={}): {}", text.len(), preview);
-
-                // 累积文本
-                if let Ok(mut accumulated) = accumulated_text_clone.try_lock() {
-                    if matches!(event, crate::models::AIEvent::Progress(_)) {
-                        if !accumulated.is_empty() && !accumulated.ends_with('\n') {
-                            accumulated.push('\n');
-                        }
-                        accumulated.push_str(&text);
-                        accumulated.push('\n');
-                    } else {
-                        accumulated.push_str(&text);
+            match &event {
+                // 思考事件：发送思考摘要
+                crate::models::AIEvent::Thinking(thinking) => {
+                    let text = &thinking.content;
+                    if !text.is_empty() {
+                        let preview: String = text.chars().take(150).collect();
+                        let preview = if preview.len() < text.len() {
+                            format!("{}...", preview)
+                        } else {
+                            preview
+                        };
+                        let msg = format!("[思考中] {}", preview);
+                        let adapters = adapters_for_callback.clone();
+                        let conv_id = conversation_id_for_callback.clone();
+                        rt_handle.spawn(async move {
+                            Self::send_reply(&adapters, platform, &conv_id, &msg).await;
+                        });
                     }
                 }
 
-                // 发送增量更新到前端
-                let _ = app_handle_for_callback.emit("integration:ai:delta", serde_json::json!({
-                    "conversationId": conversation_id_for_callback,
-                    "text": text,
-                    "isDelta": true
-                }));
+                // 工具调用开始：带节流
+                crate::models::AIEvent::ToolCallStart(tc) => {
+                    let msg = format!("[{}] 执行中...", tc.tool);
+                    let should_send = {
+                        if let Ok(mut last) = last_progress_time_clone.try_lock() {
+                            let now = std::time::Instant::now();
+                            if now.duration_since(*last) >= std::time::Duration::from_millis(PROGRESS_THROTTLE_MS) {
+                                *last = now;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    };
+                    if should_send {
+                        let adapters = adapters_for_callback.clone();
+                        let conv_id = conversation_id_for_callback.clone();
+                        rt_handle.spawn(async move {
+                            Self::send_reply(&adapters, platform, &conv_id, &msg).await;
+                        });
+                    }
+                }
+
+                // 工具调用结束：不受节流限制
+                crate::models::AIEvent::ToolCallEnd(tc) => {
+                    let status = if tc.success { "完成 ✅" } else { "失败 ❌" };
+                    let msg = format!("[{}] {}", tc.tool, status);
+                    let adapters = adapters_for_callback.clone();
+                    let conv_id = conversation_id_for_callback.clone();
+                    rt_handle.spawn(async move {
+                        Self::send_reply(&adapters, platform, &conv_id, &msg).await;
+                    });
+                }
+
+                // Progress 事件：忽略（已由 Thinking/ToolCall 覆盖）
+                crate::models::AIEvent::Progress(_) => {}
+
+                // 文本类事件：累积到最终回复
+                _ => {
+                    if let Some(text) = event.extract_text() {
+                        let preview: String = text.chars().take(100).collect();
+                        let preview = if preview.len() < text.len() { format!("{}...", preview) } else { preview };
+                        tracing::info!("[IntegrationManager] AI 文本 (len={}): {}", text.len(), preview);
+
+                        if let Ok(mut accumulated) = accumulated_text_clone.try_lock() {
+                            accumulated.push_str(&text);
+                        }
+
+                        // 发送增量更新到前端
+                        let _ = app_handle_for_callback.emit("integration:ai:delta", serde_json::json!({
+                            "conversationId": conversation_id_for_callback,
+                            "text": text,
+                            "isDelta": true
+                        }));
+                    }
+                }
             }
 
             if event.is_session_end() {
@@ -645,7 +721,6 @@ impl IntegrationManager {
         let conversation_states_for_update = conversation_states.clone();
         let session_id_update_callback = Arc::new(move |new_session_id: String| {
             tracing::info!("[IntegrationManager] 📌 Session ID 更新回调: {}", &new_session_id[..8.min(new_session_id.len())]);
-            // 注意：这里不能使用 async，需要使用 try_lock
             if let Ok(mut states) = conversation_states_for_update.try_lock() {
                 states.set_ai_session(&task_conversation_id_for_update, new_session_id);
             }
@@ -655,9 +730,7 @@ impl IntegrationManager {
             // 调用 AI 引擎（根据是否已有会话决定创建新会话还是继续会话）
             let session_id_for_response: String;
 
-            // 检查是否已有会话
             if let Some(ref existing_id) = existing_session_id {
-                // 继续已有会话
                 tracing::info!("[IntegrationManager] 🔄 继续已有会话: {}", &existing_id[..8.min(existing_id.len())]);
 
                 let result = {
@@ -686,14 +759,12 @@ impl IntegrationManager {
                         }));
                         Self::send_reply(&task_adapters, platform, &task_conversation_id, &format!("❌ AI 调用失败: {}", e)).await;
 
-                        // 从活跃会话中移除
                         let mut sessions = task_active_sessions.lock().await;
                         sessions.remove(&task_conversation_id);
                         return;
                     }
                 }
             } else {
-                // 创建新会话
                 tracing::info!("[IntegrationManager] 🆕 创建新会话");
 
                 let result = {
@@ -715,7 +786,6 @@ impl IntegrationManager {
                         tracing::info!("[IntegrationManager] AI 会话创建: session_id={}", session_id);
                         session_id_for_response = session_id.clone();
 
-                        // 保存会话 ID
                         {
                             let mut states = task_conversation_states.lock().await;
                             states.set_ai_session(&task_conversation_id, session_id);
@@ -729,7 +799,6 @@ impl IntegrationManager {
                         }));
                         Self::send_reply(&task_adapters, platform, &task_conversation_id, &format!("❌ AI 调用失败: {}", e)).await;
 
-                        // 从活跃会话中移除
                         let mut sessions = task_active_sessions.lock().await;
                         sessions.remove(&task_conversation_id);
                         return;
@@ -741,7 +810,7 @@ impl IntegrationManager {
             tracing::info!("[IntegrationManager] ⏳ 等待 AI 进程完成...");
             let _ = complete_rx.await;
 
-            // 获取完整回复文本
+            // 获取最终回复文本
             let final_text = accumulated_text.lock().await.clone();
             tracing::info!("[IntegrationManager] 📝 回复文本长度: {}", final_text.len());
 
@@ -752,7 +821,7 @@ impl IntegrationManager {
                 "text": final_text
             }));
 
-            // 发送回复到平台
+            // 发送最终回复到平台
             if !final_text.is_empty() {
                 Self::send_reply(&task_adapters, platform, &task_conversation_id, &final_text).await;
                 tracing::info!("[IntegrationManager] ✅ 回复已发送");
@@ -1039,7 +1108,7 @@ impl IntegrationManager {
     }
 
     /// 启动消息处理任务
-    fn start_message_processing_task(&mut self, platform: Platform) {
+    fn start_message_processing_task(&mut self, _platform: Platform) {
         if self.message_task.is_some() {
             tracing::debug!("[IntegrationManager] 消息处理任务已在运行");
             return;
@@ -1060,10 +1129,13 @@ impl IntegrationManager {
                 let mut rx = rx;
 
                 while let Some(msg) = rx.recv().await {
+                    // 使用消息自身携带的 platform，而不是启动时的 platform
+                    let msg_platform = msg.platform;
+
                     tracing::info!(
                         "[IntegrationManager] 📩 收到消息: id={}, platform={}, conversation={}",
                         msg.id,
-                        msg.platform,
+                        msg_platform,
                         msg.conversation_id
                     );
 
@@ -1074,11 +1146,11 @@ impl IntegrationManager {
                         tracing::info!("[IntegrationManager] ✅ 消息已发送到前端");
                     }
 
-                    // 处理消息
+                    // 处理消息（使用消息来源的平台）
                     Self::handle_message(
                         msg,
                         app_handle.clone(),
-                        platform,
+                        msg_platform,
                         adapters.clone(),
                         engine_registry.clone(),
                         conversation_states.clone(),

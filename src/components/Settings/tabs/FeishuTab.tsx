@@ -1,5 +1,5 @@
 /**
- * QQ Bot 集成配置 Tab
+ * Feishu (飞书) 集成配置 Tab
  *
  * 支持多实例管理：
  * - 实例列表（添加、删除、切换）
@@ -21,9 +21,9 @@ import {
 } from '../../../types/integration';
 import { createLogger } from '../../../utils/logger';
 
-const log = createLogger('QQBotTab');
+const log = createLogger('FeishuTab');
 
-interface QQBotTabProps {
+interface FeishuTabProps {
   config: Config;
   onConfigChange: (config: Config) => void;
   loading: boolean;
@@ -31,7 +31,7 @@ interface QQBotTabProps {
 
 /** 生成唯一 ID */
 function generateId(): string {
-  return `qqbot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `feishu-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /** 创建空实例 */
@@ -39,13 +39,13 @@ function createEmptyInstance(): PlatformInstance {
   return {
     id: generateId(),
     name: '新机器人',
-    platform: 'qqbot',
+    platform: 'feishu',
     config: {
-      type: 'qqbot',
+      type: 'feishu',
       enabled: true,
       appId: '',
       clientSecret: '',
-      sandbox: true,
+      sandbox: false,
       appSecret: '',
       verificationToken: '',
       encryptKey: '',
@@ -57,10 +57,10 @@ function createEmptyInstance(): PlatformInstance {
   };
 }
 
-export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
-  const qqbotStatus = useIntegrationStatus('qqbot');
-  const instances = useIntegrationInstances('qqbot');
-  const activeInstance = useActiveIntegrationInstance('qqbot');
+export function FeishuTab({ config, onConfigChange, loading }: FeishuTabProps) {
+  const feishuStatus = useIntegrationStatus('feishu');
+  const instances = useIntegrationInstances('feishu');
+  const activeInstance = useActiveIntegrationInstance('feishu');
   const {
     startPlatform,
     stopPlatform,
@@ -72,17 +72,15 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     switchInstance,
   } = useIntegrationStore();
 
-  const isConnected = qqbotStatus?.connected ?? false;
-  const connectionState = qqbotStatus?.connectionState ?? 'disconnected';
-  const errorMessage = qqbotStatus?.error;
-  const errorDetail = qqbotStatus?.errorDetail;
+  const isConnected = feishuStatus?.connected ?? false;
+  const connectionState = feishuStatus?.connectionState ?? 'disconnected';
+  const errorMessage = feishuStatus?.error;
+  const errorDetail = feishuStatus?.errorDetail;
 
-  // 获取连接状态显示文本
   const getStateLabel = (state: ConnectionState): string => {
     return ConnectionStateLabels[state] || state;
   };
 
-  // 获取状态徽章样式
   const getStateBadgeStyle = (state: ConnectionState): string => {
     switch (state) {
       case 'ready':
@@ -98,48 +96,39 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     }
   };
 
-  // 本地编辑状态
   const [editingInstance, setEditingInstance] = useState<PlatformInstance | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
-  // 用于跟踪是否已初始化编辑实例
   const initializedRef = useRef(false);
 
-  // 加载实例列表（只执行一次）
   useEffect(() => {
     loadInstances();
   }, [loadInstances]);
 
-  // 同步编辑状态 - 当有激活实例但未初始化编辑状态时
   useEffect(() => {
-    // 只在首次且有激活实例时设置
     if (!initializedRef.current && activeInstance && !editingInstance) {
       initializedRef.current = true;
       setEditingInstance(activeInstance);
     }
-  }, [activeInstance?.id, editingInstance?.id]); // 只比较 ID，避免对象引用变化
+  }, [activeInstance?.id, editingInstance?.id]);
 
-  // 启用/禁用 QQ Bot 集成
+  const feishuConfig = config.feishu || { enabled: false, instances: [], activeInstanceId: undefined };
+
   const handleEnabledChange = (enabled: boolean) => {
     onConfigChange({
       ...config,
-      qqbot: { ...config.qqbot, enabled }
+      feishu: { ...feishuConfig, enabled }
     });
   };
 
-  // 保存实例配置
   const handleSave = async () => {
     if (!editingInstance) return;
     setSaving(true);
     try {
-      // 检查是否是新实例（还未保存到后端）
       const existingInstance = instances.find((i) => i.id === editingInstance.id);
       if (!existingInstance) {
-        // 新实例：添加
         await addInstance(editingInstance);
       } else {
-        // 已有实例：更新
         await updateInstance(editingInstance);
       }
       setHasChanges(false);
@@ -150,14 +139,12 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     }
   };
 
-  // 添加新实例
   const handleAddInstance = () => {
     const newInstance = createEmptyInstance();
     setEditingInstance(newInstance);
     setHasChanges(true);
   };
 
-  // 删除实例
   const handleRemoveInstance = async (instanceId: string) => {
     if (!confirm('确定要删除此实例吗？')) return;
     try {
@@ -171,16 +158,13 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     }
   };
 
-  // 切换到实例
   const handleSwitchInstance = async (instanceId: string) => {
-    // 如果有未保存的更改，提示
     if (hasChanges) {
       if (!confirm('有未保存的更改，确定要切换吗？')) return;
     }
     try {
-      // 如果有连接，先断开
       if (isConnected) {
-        await stopPlatform('qqbot');
+        await stopPlatform('feishu');
       }
       await switchInstance(instanceId);
       setHasChanges(false);
@@ -189,11 +173,9 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     }
   };
 
-  // 连接
   const handleConnect = async () => {
     if (!editingInstance) return;
     try {
-      // 先保存配置
       if (hasChanges) {
         setSaving(true);
         const existingInstance = instances.find((i) => i.id === editingInstance.id);
@@ -206,20 +188,16 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
         setSaving(false);
       }
 
-      // 如果当前实例不是激活的，先切换
-      if (activeInstance?.id !== editingInstance.id) {
-        await switchInstance(editingInstance.id);
-      }
-      // 将配置转换为 QQBotConfig 格式
-      const qqbotConfig = {
+      const fConfig = {
         enabled: true,
         instances: [{
           id: editingInstance.id,
           name: editingInstance.name,
           enabled: editingInstance.enabled,
           appId: editingInstance.config.appId,
-          clientSecret: editingInstance.config.clientSecret,
-          sandbox: editingInstance.config.sandbox,
+          appSecret: editingInstance.config.appSecret || '',
+          verificationToken: '',
+          encryptKey: '',
           displayMode: editingInstance.config.displayMode,
           autoConnect: editingInstance.config.autoConnect,
           createdAt: editingInstance.createdAt,
@@ -227,24 +205,28 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
         }],
         activeInstanceId: editingInstance.id,
       };
-      await startPlatform('qqbot', qqbotConfig);
+
+      // 先初始化并启动平台（创建消息通道），再切换实例
+      await startPlatform('feishu', undefined, fConfig);
+
+      if (activeInstance?.id !== editingInstance.id) {
+        await switchInstance(editingInstance.id);
+      }
     } catch (error) {
-      console.error('Failed to connect QQ Bot:', error);
+      console.error('Failed to connect Feishu Bot:', error);
     } finally {
       setSaving(false);
     }
   };
 
-  // 断开
   const handleDisconnect = async () => {
     try {
-      await stopPlatform('qqbot');
+      await stopPlatform('feishu');
     } catch (error) {
-      console.error('Failed to disconnect QQ Bot:', error);
+      console.error('Failed to disconnect Feishu Bot:', error);
     }
   };
 
-  // 更新编辑中的实例配置
   const updateEditingConfig = (updates: Partial<PlatformInstance['config']>) => {
     if (!editingInstance) return;
     setEditingInstance({
@@ -254,14 +236,12 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     setHasChanges(true);
   };
 
-  // 更新编辑中的实例名称
   const updateEditingName = (name: string) => {
     if (!editingInstance) return;
     setEditingInstance({ ...editingInstance, name });
     setHasChanges(true);
   };
 
-  // 选择实例进行编辑
   const handleSelectInstance = (instance: PlatformInstance) => {
     if (hasChanges && editingInstance?.id !== instance.id) {
       if (!confirm('有未保存的更改，确定要切换吗？')) return;
@@ -270,7 +250,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
     setHasChanges(false);
   };
 
-  // 当前编辑的实例是否是激活的
   const isEditingActive = activeInstance?.id === editingInstance?.id;
 
   return (
@@ -279,25 +258,25 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
       <div className="p-4 bg-surface rounded-lg border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-sm font-medium text-text-primary">启用 QQ Bot 集成</div>
-            <div className="text-xs text-text-secondary">通过 QQ 机器人接收和发送消息</div>
+            <div className="text-sm font-medium text-text-primary">启用飞书集成</div>
+            <div className="text-xs text-text-secondary">通过飞书机器人接收和发送消息</div>
           </div>
           <button
             type="button"
-            onClick={() => handleEnabledChange(!config.qqbot?.enabled)}
+            onClick={() => handleEnabledChange(!feishuConfig.enabled)}
             className={`relative w-11 h-6 rounded-full transition-colors ${
-              config.qqbot?.enabled ? 'bg-primary' : 'bg-border'
+              feishuConfig.enabled ? 'bg-primary' : 'bg-border'
             }`}
           >
             <span
               className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                config.qqbot?.enabled ? 'translate-x-5' : 'translate-x-0'
+                feishuConfig.enabled ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
           </button>
         </div>
 
-        {config.qqbot?.enabled && (
+        {feishuConfig.enabled && (
           <>
             {/* 实例列表 */}
             <div className="mb-4">
@@ -329,7 +308,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {/* 状态徽章 */}
                           <div
                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               activeInstance?.id === instance.id
@@ -416,20 +394,20 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
                     type="text"
                     value={editingInstance.config.appId}
                     onChange={(e) => updateEditingConfig({ appId: e.target.value })}
-                    placeholder="QQ 开放平台应用的 App ID"
+                    placeholder="飞书开放平台应用的 App ID"
                     className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   />
                 </div>
 
-                {/* Client Secret */}
+                {/* App Secret */}
                 <div>
-                  <label className="block text-xs text-text-secondary mb-2">Client Secret</label>
+                  <label className="block text-xs text-text-secondary mb-2">App Secret</label>
                   <input
                     type="password"
-                    value={editingInstance.config.clientSecret}
-                    onChange={(e) => updateEditingConfig({ clientSecret: e.target.value })}
-                    placeholder="QQ 开放平台应用的 Client Secret"
+                    value={editingInstance.config.appSecret || ''}
+                    onChange={(e) => updateEditingConfig({ appSecret: e.target.value })}
+                    placeholder="飞书开放平台应用的 App Secret"
                     className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   />
@@ -437,17 +415,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
 
                 {/* 复选框选项 */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editingInstance.config.sandbox}
-                        onChange={(e) => updateEditingConfig({ sandbox: e.target.checked })}
-                        className="w-4 h-4"
-                      />
-                      沙箱环境
-                    </label>
-                  </div>
                   <div>
                     <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
                       <input
@@ -480,7 +447,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
 
                 {/* 操作按钮 */}
                 <div className="flex items-center gap-3 p-3 bg-surface rounded-lg">
-                  {/* 状态徽章 */}
                   <div
                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStateBadgeStyle(
                       isEditingActive ? connectionState : 'disconnected'
@@ -491,7 +457,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
 
                   <div className="flex-1" />
 
-                  {/* 保存按钮 */}
                   <button
                     onClick={handleSave}
                     disabled={!hasChanges || saving || loading}
@@ -500,7 +465,6 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
                     {saving ? '保存中...' : '保存'}
                   </button>
 
-                  {/* 连接/断开按钮 */}
                   {isEditingActive && isConnected ? (
                     <button
                       onClick={handleDisconnect}
@@ -518,7 +482,7 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
                         connectionState === 'connecting' ||
                         connectionState === 'authenticating' ||
                         !editingInstance.config.appId ||
-                        !editingInstance.config.clientSecret
+                        !editingInstance.config.appSecret
                       }
                       className="px-3 py-1.5 text-xs bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
@@ -579,10 +543,11 @@ export function QQBotTab({ config, onConfigChange, loading }: QQBotTabProps) {
                     <span className="font-medium">使用说明：</span>
                   </p>
                   <ul className="text-xs text-text-tertiary mt-1 space-y-1 list-disc list-inside">
+                    <li>在飞书开放平台创建应用并获取 App ID 和 App Secret</li>
+                    <li>启用「机器人」能力，开启 WebSocket 长连接模式</li>
                     <li>填写配置后点击「保存」保存实例</li>
                     <li>点击「连接」会自动保存并连接</li>
-                    <li>同一时间只能连接一个 QQ Bot 实例</li>
-                    <li>沙箱环境用于测试，生产环境需审核</li>
+                    <li>同一时间只能连接一个飞书机器人实例</li>
                   </ul>
                 </div>
               </div>

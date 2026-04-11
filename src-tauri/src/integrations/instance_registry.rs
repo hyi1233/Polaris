@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use crate::models::config::QQBotRuntimeConfig;
+use crate::models::config::{QQBotRuntimeConfig, FeishuRuntimeConfig};
 use super::types::Platform;
 
 /// 实例 ID
@@ -48,6 +48,19 @@ impl PlatformInstance {
         }
     }
 
+    /// 创建新的 Feishu 实例
+    pub fn new_feishu(name: impl Into<String>, config: FeishuRuntimeConfig) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.into(),
+            platform: Platform::Feishu,
+            config: InstanceConfig::Feishu(config),
+            created_at: Utc::now(),
+            last_active: None,
+            enabled: true,
+        }
+    }
+
     /// 更新最后活跃时间
     pub fn touch(&mut self) {
         self.last_active = Some(Utc::now());
@@ -59,6 +72,7 @@ impl PlatformInstance {
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum InstanceConfig {
     QQBot(QQBotRuntimeConfig),
+    Feishu(FeishuRuntimeConfig),
     // DingTalk(DingTalkConfig), // 未来扩展
 }
 
@@ -67,6 +81,7 @@ impl InstanceConfig {
     pub fn as_qqbot(&self) -> Option<&QQBotRuntimeConfig> {
         match self {
             InstanceConfig::QQBot(config) => Some(config),
+            _ => None,
         }
     }
 
@@ -74,6 +89,23 @@ impl InstanceConfig {
     pub fn as_qqbot_mut(&mut self) -> Option<&mut QQBotRuntimeConfig> {
         match self {
             InstanceConfig::QQBot(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// 获取 Feishu 配置
+    pub fn as_feishu(&self) -> Option<&FeishuRuntimeConfig> {
+        match self {
+            InstanceConfig::Feishu(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// 获取可变的 Feishu 配置
+    pub fn as_feishu_mut(&mut self) -> Option<&mut FeishuRuntimeConfig> {
+        match self {
+            InstanceConfig::Feishu(config) => Some(config),
+            _ => None,
         }
     }
 }
@@ -204,7 +236,7 @@ impl InstanceRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::config::QQBotRuntimeConfig;
+    use crate::models::config::{QQBotRuntimeConfig, FeishuRuntimeConfig};
 
     #[test]
     fn test_instance_registry() {

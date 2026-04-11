@@ -67,6 +67,42 @@ export interface QQBotConfig {
   activeInstanceId?: string;
 }
 
+/** Feishu 实例配置 */
+export interface FeishuInstanceConfig {
+  /** 实例 ID */
+  id: string;
+  /** 显示名称 */
+  name: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 应用 ID (App ID) */
+  appId: string;
+  /** 应用密钥 (App Secret) */
+  appSecret: string;
+  /** 事件验证 Token */
+  verificationToken: string;
+  /** 事件加密 Key */
+  encryptKey: string;
+  /** 消息显示模式 */
+  displayMode: IntegrationDisplayMode;
+  /** 启动时自动连接 */
+  autoConnect: boolean;
+  /** 创建时间 (ISO 8601) */
+  createdAt?: string;
+  /** 最后活跃时间 (ISO 8601) */
+  lastActive?: string;
+}
+
+/** Feishu 集成配置 */
+export interface FeishuConfig {
+  /** 是否启用飞书集成（全局开关） */
+  enabled: boolean;
+  /** 飞书实例列表 */
+  instances: FeishuInstanceConfig[];
+  /** 当前激活的实例 ID */
+  activeInstanceId?: string;
+}
+
 /** 窗口设置 */
 export interface WindowSettings {
   /** 大窗模式透明度 (0 - 100) */
@@ -96,6 +132,8 @@ export interface Config {
   baiduTranslate?: BaiduTranslateConfig;
   /** QQ Bot 集成配置 */
   qqbot: QQBotConfig;
+  /** Feishu 集成配置 */
+  feishu?: FeishuConfig;
   /** 窗口设置 */
   window?: WindowSettings;
   /** 语音输入配置 */

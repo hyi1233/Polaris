@@ -456,6 +456,12 @@ impl PlatformIntegration for QQBotAdapter {
     async fn connect(&mut self, message_tx: Sender<IntegrationMessage>) -> Result<()> {
         tracing::info!("[QQBot] 🔌 开始连接...");
 
+        // 防重入：如果已有活跃的 WebSocket 任务，先断开旧连接
+        if self.ws_task.is_some() {
+            tracing::warn!("[QQBot] ⚠️ 检测到已有连接，先断开旧连接再重连");
+            let _ = self.disconnect().await;
+        }
+
         // 重置状态
         {
             let mut state = self.inner_state.write().await;
@@ -557,8 +563,15 @@ impl PlatformIntegration for QQBotAdapter {
                     loop {
                         tokio::select! {
                             // 检查关闭信号
-                            _ = &mut shutdown_rx => {
-                                tracing::info!("[QQBot] Shutdown signal received");
+                            result = &mut shutdown_rx => {
+                                match result {
+                                    Ok(()) => {
+                                        tracing::info!("[QQBot] Shutdown signal received");
+                                    }
+                                    Err(_) => {
+                                        tracing::warn!("[QQBot] Shutdown sender dropped unexpectedly, closing connection");
+                                    }
+                                }
                                 let _ = write.send(WsMessage::Close(None)).await;
 
                                 // 更新状态为断开

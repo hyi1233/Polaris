@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     QQBot,
+    Feishu,
     // 后续扩展
     // DingTalk,
     // WeChat,
@@ -57,6 +58,7 @@ impl std::fmt::Display for Platform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Platform::QQBot => write!(f, "qqbot"),
+            Platform::Feishu => write!(f, "feishu"),
         }
     }
 }
@@ -67,6 +69,7 @@ impl std::str::FromStr for Platform {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "qqbot" | "qq" => Ok(Platform::QQBot),
+            "feishu" | "lark" => Ok(Platform::Feishu),
             _ => Err(format!("Unknown platform: {}", s)),
         }
     }

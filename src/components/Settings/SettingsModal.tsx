@@ -18,6 +18,7 @@ import { SystemPromptTab } from './tabs/SystemPromptTab';
 import { WindowTab } from './tabs/WindowTab';
 import { TranslateTab } from './tabs/TranslateTab';
 import { QQBotTab } from './tabs/QQBotTab';
+import { FeishuTab } from './tabs/FeishuTab';
 import { SpeechTab } from './tabs/SpeechTab';
 import { AdvancedTab } from './tabs/AdvancedTab';
 import { createLogger } from '../../utils/logger';
@@ -39,6 +40,7 @@ const TAB_TITLE_KEYS: Record<SettingsTabId, string> = {
   'ai-engine': 'nav.aiEngine',
   'translate': 'nav.translate',
   'qqbot': 'nav.qqbot',
+  'feishu': 'nav.feishu',
   'speech': 'nav.speech',
   'advanced': 'nav.advanced',
 };
@@ -192,6 +194,14 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
 
               {activeTab === 'qqbot' && (
                 <QQBotTab
+                  config={localConfig}
+                  onConfigChange={setLocalConfig}
+                  loading={loading}
+                />
+              )}
+
+              {activeTab === 'feishu' && (
+                <FeishuTab
                   config={localConfig}
                   onConfigChange={setLocalConfig}
                   loading={loading}

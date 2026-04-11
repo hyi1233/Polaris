@@ -8,6 +8,7 @@ pub mod types;
 pub mod traits;
 pub mod common;
 pub mod qqbot;
+pub mod feishu;
 pub mod manager;
 pub mod commands;
 pub mod instance_registry;

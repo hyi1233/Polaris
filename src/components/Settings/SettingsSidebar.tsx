@@ -21,6 +21,7 @@ export type SettingsTabId =
   | 'ai-engine'
   | 'translate'
   | 'qqbot'
+  | 'feishu'
   | 'speech'
   | 'window'
   | 'advanced';
@@ -45,6 +46,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'ai-engine', icon: <IconAIEngine size={16} />, labelKey: 'nav.aiEngine' },
   { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },
   { id: 'qqbot', icon: <IconBot size={16} />, labelKey: 'nav.qqbot' },
+  { id: 'feishu', icon: <IconBot size={16} />, labelKey: 'nav.feishu' },
   { id: 'speech', icon: <IconMic size={16} />, labelKey: 'nav.speech' },
   // { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
 ];

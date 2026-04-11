@@ -50,6 +50,7 @@ pub trait PlatformIntegration: Send + Sync {
     fn platform_name(&self) -> &'static str {
         match self.platform() {
             Platform::QQBot => "QQ Bot",
+            Platform::Feishu => "Feishu",
         }
     }
 }

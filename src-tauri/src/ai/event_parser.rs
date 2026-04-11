@@ -165,24 +165,27 @@ impl EventParser {
         subtype: Option<String>,
         extra: HashMap<String, serde_json::Value>,
     ) -> Vec<AIEvent> {
-        let message = if let Some(ref subtype) = subtype {
-            // 使用表情替代文字，更简洁直观
-            let message_map = HashMap::from([
-                ("init", "💬"),        // 初始化会话
-                ("reading", "📖"),     // 读取文件
-                ("writing", "✏️"),     // 写入文件
-                ("thinking", "🤔"),    // 思考中
-                ("searching", "🔍"),   // 搜索中
-            ]);
+        let subtype = match subtype {
+            Some(s) => s,
+            None => return vec![],
+        };
 
-            if let Some(&msg) = message_map.get(subtype.as_str()) {
-                msg.to_string()
-            } else if let Some(msg) = extra.get("message").and_then(|v| v.as_str()) {
-                msg.to_string()
-            } else {
-                subtype.clone()
-            }
+        // 已知的有意义子类型映射
+        let message_map = HashMap::from([
+            ("init", "💬"),        // 初始化会话
+            ("reading", "📖"),     // 读取文件
+            ("writing", "✏️"),     // 写入文件
+            ("thinking", "🤔"),    // 思考中
+            ("searching", "🔍"),   // 搜索中
+        ]);
+
+        let message = if let Some(&msg) = message_map.get(subtype.as_str()) {
+            msg.to_string()
+        } else if let Some(msg) = extra.get("message").and_then(|v| v.as_str()) {
+            msg.to_string()
         } else {
+            // 未识别的子类型（如 hook_started, hook_response 等）
+            // 不发出 Progress 事件，静默忽略
             return vec![];
         };
 

@@ -5,7 +5,7 @@
 import type { IntegrationDisplayMode } from './config';
 
 /** 平台类型 */
-export type Platform = 'qqbot' | 'wechat' | 'telegram';
+export type Platform = 'qqbot' | 'feishu' | 'wechat' | 'telegram';
 
 /** 实例 ID */
 export type InstanceId = string;
@@ -34,13 +34,47 @@ export interface QQBotInstanceConfigData {
   lastActive?: string;
 }
 
+/** Feishu 实例配置 */
+export interface FeishuInstanceConfigData {
+  /** 实例 ID */
+  id: InstanceId;
+  /** 显示名称 */
+  name: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 应用 ID (App ID) */
+  appId: string;
+  /** 应用密钥 (App Secret) */
+  appSecret: string;
+  /** 事件验证 Token */
+  verificationToken: string;
+  /** 事件加密 Key */
+  encryptKey: string;
+  /** 消息显示模式 */
+  displayMode: IntegrationDisplayMode;
+  /** 启动时自动连接 */
+  autoConnect: boolean;
+  /** 创建时间 (ISO 8601) */
+  createdAt?: string;
+  /** 最后活跃时间 (ISO 8601) */
+  lastActive?: string;
+}
+
 /** 实例配置枚举 */
 export interface InstanceConfig {
-  type: 'qqbot';
+  type: 'qqbot' | 'feishu';
   enabled: boolean;
   appId: string;
+  /** QQ Bot: clientSecret */
   clientSecret: string;
+  /** QQ Bot: sandbox */
   sandbox: boolean;
+  /** Feishu: appSecret */
+  appSecret: string;
+  /** Feishu: verificationToken */
+  verificationToken: string;
+  /** Feishu: encryptKey */
+  encryptKey: string;
   displayMode: IntegrationDisplayMode;
   autoConnect: boolean;
 }
@@ -172,7 +206,7 @@ export interface IntegrationSession {
 }
 
 // 从 config.ts 重新导出配置类型
-export type { QQBotConfig, IntegrationDisplayMode } from './config';
+export type { QQBotConfig, FeishuConfig, IntegrationDisplayMode } from './config';
 
 /** 判断消息内容是否为文本 */
 export function isTextContent(content: MessageContent): content is TextContent {
