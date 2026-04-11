@@ -13,6 +13,7 @@ export { ToolBubble } from './ToolBubble';
 export { ToolGroupBubble } from './ToolGroupBubble';
 
 // 多会话窗口组件
-export { MultiSessionGrid, MultiSessionToggle, MultiSessionRowsToggle, MultiSessionWidthPopover } from './MultiSessionGrid';
+export { MultiSessionGrid } from './MultiSessionGrid';
+export { MultiWindowMenu } from './MultiWindowMenu';
 export { SessionCell } from './SessionCell';
 export { NewSessionButton } from './NewSessionButton';

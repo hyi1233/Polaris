@@ -159,6 +159,7 @@ impl SchedulerLock {
 
     #[cfg(not(target_os = "windows"))]
     fn try_acquire_unix() -> io::Result<Option<Self>> {
+        use std::os::fd::AsRawFd;
         use std::os::unix::fs::OpenOptionsExt;
 
         let lock_dir = std::env::temp_dir();

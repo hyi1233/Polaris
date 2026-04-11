@@ -6,7 +6,7 @@ import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { TopMenuBar as TopMenuBarComponent } from './components/TopMenuBar';
 import { GitPanel } from './components/GitPanel';
 import { ActivityBar, LeftPanel, LeftPanelContent, CenterStage, RightPanel } from './components/Layout';
-import { EnhancedChatMessages, ChatInput, ChatStatusBar, SessionHistoryPanel, MultiSessionGrid, MultiSessionToggle, MultiSessionRowsToggle, MultiSessionWidthPopover, NewSessionButton } from './components/Chat';
+import { EnhancedChatMessages, ChatInput, ChatStatusBar, SessionHistoryPanel, MultiSessionGrid, MultiWindowMenu, NewSessionButton } from './components/Chat';
 import type { SettingsTabId } from './components/Settings/SettingsSidebar';
 import { SimpleTodoPanel } from './components/TodoPanel/SimpleTodoPanel';
 import { TranslatePanel, SelectionContextMenu } from './components/Translate';
@@ -464,12 +464,8 @@ function App() {
 
             {/* 对话状态栏 */}
             <ChatStatusBar>
-              {/* 多会话切换按钮 */}
-              <MultiSessionToggle />
-              {/* 行数切换（多窗口模式时显示） */}
-              <MultiSessionRowsToggle />
-              {/* 格子宽度设置（多窗口模式时显示） */}
-              <MultiSessionWidthPopover />
+              {/* 多窗口设置菜单 */}
+              <MultiWindowMenu />
               {/* 新建会话按钮 */}
               <NewSessionButton />
             </ChatStatusBar>

@@ -4,6 +4,8 @@
  * 支持细化的连接状态管理和实时进度反馈。
  */
 
+#![allow(dead_code)]
+
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
