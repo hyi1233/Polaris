@@ -256,6 +256,141 @@ impl Default for QQBotConfig {
     }
 }
 
+/// Feishu (飞书) 实例配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeishuInstanceConfig {
+    /// 实例 ID
+    pub id: String,
+    /// 显示名称
+    pub name: String,
+    /// 是否启用
+    #[serde(default = "default_instance_enabled")]
+    pub enabled: bool,
+    /// 应用 ID (App ID)
+    #[serde(default)]
+    pub app_id: String,
+    /// 应用密钥 (App Secret)
+    #[serde(default)]
+    pub app_secret: String,
+    /// 事件验证 Token
+    #[serde(default)]
+    pub verification_token: String,
+    /// 事件加密 Key
+    #[serde(default)]
+    pub encrypt_key: String,
+    /// 消息显示模式
+    #[serde(default)]
+    pub display_mode: IntegrationDisplayMode,
+    /// 启动时自动连接
+    #[serde(default = "default_auto_connect")]
+    pub auto_connect: bool,
+    /// 创建时间 (ISO 8601 格式)
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// 最后活跃时间 (ISO 8601 格式)
+    #[serde(default)]
+    pub last_active: Option<String>,
+}
+
+impl Default for FeishuInstanceConfig {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: "Feishu Bot".to_string(),
+            enabled: true,
+            app_id: String::new(),
+            app_secret: String::new(),
+            verification_token: String::new(),
+            encrypt_key: String::new(),
+            display_mode: IntegrationDisplayMode::default(),
+            auto_connect: true,
+            created_at: None,
+            last_active: None,
+        }
+    }
+}
+
+/// Feishu 单个实例运行时配置（用于适配器）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeishuRuntimeConfig {
+    /// 是否启用
+    #[serde(default)]
+    pub enabled: bool,
+    /// 应用 ID (App ID)
+    #[serde(default)]
+    pub app_id: String,
+    /// 应用密钥 (App Secret)
+    #[serde(default)]
+    pub app_secret: String,
+    /// 事件验证 Token
+    #[serde(default)]
+    pub verification_token: String,
+    /// 事件加密 Key
+    #[serde(default)]
+    pub encrypt_key: String,
+    /// 消息显示模式
+    #[serde(default)]
+    pub display_mode: IntegrationDisplayMode,
+    /// 启动时自动连接
+    #[serde(default = "default_auto_connect")]
+    pub auto_connect: bool,
+}
+
+impl Default for FeishuRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            app_id: String::new(),
+            app_secret: String::new(),
+            verification_token: String::new(),
+            encrypt_key: String::new(),
+            display_mode: IntegrationDisplayMode::default(),
+            auto_connect: true,
+        }
+    }
+}
+
+impl From<&FeishuInstanceConfig> for FeishuRuntimeConfig {
+    fn from(instance: &FeishuInstanceConfig) -> Self {
+        Self {
+            enabled: instance.enabled,
+            app_id: instance.app_id.clone(),
+            app_secret: instance.app_secret.clone(),
+            verification_token: instance.verification_token.clone(),
+            encrypt_key: instance.encrypt_key.clone(),
+            display_mode: instance.display_mode.clone(),
+            auto_connect: instance.auto_connect,
+        }
+    }
+}
+
+/// Feishu 集成配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeishuConfig {
+    /// 是否启用飞书集成（全局开关）
+    #[serde(default)]
+    pub enabled: bool,
+    /// 飞书实例列表
+    #[serde(default)]
+    pub instances: Vec<FeishuInstanceConfig>,
+    /// 当前激活的实例 ID
+    #[serde(default)]
+    pub active_instance_id: Option<String>,
+}
+
+impl Default for FeishuConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            instances: Vec::new(),
+            active_instance_id: None,
+        }
+    }
+}
+
 
 fn default_floating_window_enabled() -> bool {
     false
@@ -416,9 +551,9 @@ pub struct Config {
     #[serde(default)]
     pub qqbot: QQBotConfig,
 
-    /// 当前激活的 QQ Bot 实例 ID（运行时状态，不持久化）
-    #[serde(skip)]
-    pub active_qqbot_instance_id: Option<String>,
+    /// Feishu 集成配置
+    #[serde(default)]
+    pub feishu: FeishuConfig,
 
     /// 窗口设置
     #[serde(default)]
@@ -454,7 +589,7 @@ impl Default for Config {
             floating_window: FloatingWindowConfig::default(),
             baidu_translate: None,
             qqbot: QQBotConfig::default(),
-            active_qqbot_instance_id: None,
+            feishu: FeishuConfig::default(),
             window: WindowSettings::default(),
             speech: SpeechConfig::default(),
             tts: TTSConfig::default(),

@@ -12,13 +12,14 @@ use tauri::{AppHandle, Emitter};
 
 use super::common::{SessionManager, ConversationStore};
 use super::qqbot::QQBotAdapter;
+use super::feishu::FeishuAdapter;
 use super::traits::PlatformIntegration;
 use super::types::*;
 use super::commands::{BotCommand, CommandParser, get_help_text, PromptMode};
 use super::instance_registry::{InstanceRegistry, PlatformInstance, InstanceConfig, InstanceId};
 use crate::ai::{EngineRegistry, SessionOptions};
 use crate::error::Result;
-use crate::models::config::{QQBotConfig, QQBotRuntimeConfig};
+use crate::models::config::{QQBotConfig, QQBotRuntimeConfig, FeishuConfig, FeishuRuntimeConfig};
 use crate::services::prompt_store::PromptStore;
 
 /// 集成管理器
@@ -93,7 +94,7 @@ impl IntegrationManager {
     }
 
     /// 初始化
-    pub async fn init(&mut self, qqbot_config: Option<QQBotConfig>, app_handle: AppHandle) {
+    pub async fn init(&mut self, qqbot_config: Option<QQBotConfig>, feishu_config: Option<FeishuConfig>, app_handle: AppHandle) {
         self.app_handle = Some(app_handle.clone());
 
         // 创建消息通道
@@ -101,9 +102,8 @@ impl IntegrationManager {
         self.message_tx = Some(tx);
         self.message_rx = Some(rx);
 
-        // 从传入的配置中加载实例
+        // 从传入的配置中加载 QQBot 实例
         if let Some(config) = qqbot_config {
-            // 将配置中的实例转换为 InstanceRegistry 格式
             let mut registry = self.instance_registry.lock().await;
             for instance_config in &config.instances {
                 let runtime_config = QQBotRuntimeConfig::from(instance_config);
@@ -124,32 +124,65 @@ impl IntegrationManager {
                 registry.add(platform_instance);
             }
 
-            // 设置激活的实例
             if let Some(ref active_id) = config.active_instance_id {
                 registry.activate(active_id);
             }
 
             tracing::info!("[IntegrationManager] ✅ 从配置加载了 {} 个 QQ Bot 实例", registry.count());
 
-            // 如果有激活的实例，创建 adapter 并连接
             if let Some(active_instance) = registry.get_active(Platform::QQBot) {
-                let InstanceConfig::QQBot(qqbot_cfg) = &active_instance.config;
-                if qqbot_cfg.enabled && !qqbot_cfg.app_id.is_empty() && !qqbot_cfg.client_secret.is_empty() {
-                    let adapter = QQBotAdapter::new(qqbot_cfg.clone());
-                    let mut adapters = self.adapters.lock().await;
-                    adapters.insert(Platform::QQBot, Box::new(adapter));
-                    tracing::info!("[IntegrationManager] ✅ 激活实例: {}", active_instance.name);
+                if let InstanceConfig::QQBot(qqbot_cfg) = &active_instance.config {
+                    if qqbot_cfg.enabled && !qqbot_cfg.app_id.is_empty() && !qqbot_cfg.client_secret.is_empty() {
+                        let adapter = QQBotAdapter::new(qqbot_cfg.clone());
+                        let mut adapters = self.adapters.lock().await;
+                        adapters.insert(Platform::QQBot, Box::new(adapter));
+                        tracing::info!("[IntegrationManager] ✅ 激活实例: {}", active_instance.name);
+                    }
+                }
+            }
+        }
+
+        // 从传入的配置中加载 Feishu 实例
+        if let Some(config) = feishu_config {
+            let mut registry = self.instance_registry.lock().await;
+            for instance_config in &config.instances {
+                let runtime_config = FeishuRuntimeConfig::from(instance_config);
+                let platform_instance = PlatformInstance {
+                    id: instance_config.id.clone(),
+                    name: instance_config.name.clone(),
+                    platform: Platform::Feishu,
+                    config: InstanceConfig::Feishu(runtime_config),
+                    created_at: instance_config.created_at.as_ref()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(chrono::Utc::now),
+                    last_active: instance_config.last_active.as_ref()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc)),
+                    enabled: instance_config.enabled,
+                };
+                registry.add(platform_instance);
+            }
+
+            if let Some(ref active_id) = config.active_instance_id {
+                registry.activate(active_id);
+            }
+
+            tracing::info!("[IntegrationManager] ✅ 从配置加载了 {} 个 Feishu 实例", registry.count());
+
+            if let Some(active_instance) = registry.get_active(Platform::Feishu) {
+                if let InstanceConfig::Feishu(feishu_cfg) = &active_instance.config {
+                    if feishu_cfg.enabled && !feishu_cfg.app_id.is_empty() && !feishu_cfg.app_secret.is_empty() {
+                        let adapter = FeishuAdapter::new(feishu_cfg.clone());
+                        let mut adapters = self.adapters.lock().await;
+                        adapters.insert(Platform::Feishu, Box::new(adapter));
+                        tracing::info!("[IntegrationManager] ✅ 激活实例: {}", active_instance.name);
+                    }
                 }
             }
         }
     }
 
-    /// 保存实例到配置（通过回调通知 ConfigStore 保存）
-    fn save_instances_to_file(&self) {
-        // 不再使用单独的 instances.json 文件
-        // 实例数据现在存储在 config.json 中，由 ConfigStore 统一管理
-        tracing::debug!("[IntegrationManager] 实例保存已由 ConfigStore 统一管理");
-    }
 
     /// 启动指定平台
     pub async fn start(&mut self, platform: Platform) -> Result<()> {
@@ -856,9 +889,8 @@ impl IntegrationManager {
     pub async fn add_instance(&self, instance: PlatformInstance) -> InstanceId {
         let mut registry = self.instance_registry.lock().await;
         let id = registry.add(instance);
-        drop(registry); // 释放锁后再保存
-        self.save_instances_to_file();
-        tracing::info!("[IntegrationManager] ✅ 实例已添加并保存: {}", id);
+        drop(registry);
+        tracing::info!("[IntegrationManager] ✅ 实例已添加: {}", id);
         id
     }
 
@@ -866,8 +898,7 @@ impl IntegrationManager {
     pub async fn remove_instance(&self, instance_id: &str) -> Option<PlatformInstance> {
         let mut registry = self.instance_registry.lock().await;
         let removed = registry.remove(instance_id);
-        drop(registry); // 释放锁后再保存
-        self.save_instances_to_file();
+        drop(registry);
         if removed.is_some() {
             tracing::info!("[IntegrationManager] ✅ 实例已移除并保存: {}", instance_id);
         }
@@ -956,6 +987,10 @@ impl IntegrationManager {
                 tracing::info!("[IntegrationManager] 创建新的 QQBot Adapter: {}", instance.name);
                 Box::new(QQBotAdapter::new(config.clone()))
             }
+            InstanceConfig::Feishu(config) => {
+                tracing::info!("[IntegrationManager] 创建新的 Feishu Adapter: {}", instance.name);
+                Box::new(FeishuAdapter::new(config.clone()))
+            }
         };
 
         // 5. 注册新 Adapter
@@ -987,8 +1022,7 @@ impl IntegrationManager {
         tracing::info!("[IntegrationManager] switch_instance 步骤 8: 启动消息处理任务");
         self.start_message_processing_task(platform);
 
-        // 保存激活状态
-        self.save_instances_to_file();
+        // 实例切换完成
 
         tracing::info!("[IntegrationManager] ✅ 实例切换成功: {}", instance.name);
         Ok(())
@@ -1069,9 +1103,6 @@ impl IntegrationManager {
             registry.deactivate(platform);
         }
 
-        // 保存状态
-        self.save_instances_to_file();
-
         tracing::info!("[IntegrationManager] ✅ 已断开平台 {}", platform);
         Ok(())
     }
@@ -1101,9 +1132,6 @@ impl IntegrationManager {
                 )));
             }
         }
-
-        // 保存到文件
-        self.save_instances_to_file();
 
         // 如果是当前激活的实例，需要重新创建 Adapter
         {

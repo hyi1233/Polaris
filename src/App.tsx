@@ -172,26 +172,40 @@ function App() {
           }
         }
 
-        // 初始化集成管理器并自动连接 QQ Bot（如果配置了）
-        const qqbotConfig = config?.qqbot;
-        if (qqbotConfig?.enabled && qqbotConfig.instances.length > 0) {
-          log.info('QQ Bot 已启用，开始初始化...');
+        // 初始化集成管理器（始终加载实例到注册表，不依赖 enabled 状态）
+        const qqbotConfig = config?.qqbot ?? null;
+        const feishuConfig = config?.feishu ?? null;
+
+        if (qqbotConfig || feishuConfig) {
           try {
             const { initialize, startPlatform } = useIntegrationStore.getState();
-            await initialize(qqbotConfig);
+            await initialize(qqbotConfig, feishuConfig);
 
-            // 查找激活实例或第一个启用的实例
-            const activeInstance = qqbotConfig.activeInstanceId
-              ? qqbotConfig.instances.find(i => i.id === qqbotConfig.activeInstanceId)
-              : qqbotConfig.instances.find(i => i.enabled);
+            // 自动连接 QQ Bot（如果配置了）
+            if (qqbotConfig?.enabled && qqbotConfig.instances.length > 0) {
+              const activeInstance = qqbotConfig.activeInstanceId
+                ? qqbotConfig.instances.find(i => i.id === qqbotConfig.activeInstanceId)
+                : qqbotConfig.instances.find(i => i.enabled);
 
-            // 如果实例配置了自动连接，则启动连接
-            if (activeInstance && activeInstance.autoConnect !== false) {
-              log.info('自动连接 QQ Bot...');
-              await startPlatform('qqbot');
+              if (activeInstance && activeInstance.autoConnect !== false) {
+                log.info('自动连接 QQ Bot...');
+                await startPlatform('qqbot');
+              }
+            }
+
+            // 自动连接 Feishu（如果配置了）
+            if (feishuConfig?.enabled && feishuConfig.instances.length > 0) {
+              const activeInstance = feishuConfig.activeInstanceId
+                ? feishuConfig.instances.find(i => i.id === feishuConfig.activeInstanceId)
+                : feishuConfig.instances.find(i => i.enabled);
+
+              if (activeInstance && activeInstance.autoConnect !== false) {
+                log.info('自动连接 Feishu...');
+                await startPlatform('feishu');
+              }
             }
           } catch (error) {
-            log.error('QQ Bot 初始化失败', error as Error);
+            log.error('集成管理器初始化失败', error as Error);
           }
         }
       } catch (error) {

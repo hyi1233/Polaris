@@ -442,7 +442,7 @@ impl OldConfig {
                 cli_path: self.claude_cmd,
             },
             qqbot: Default::default(),
-            active_qqbot_instance_id: None,
+            feishu: Default::default(),
             work_dir: self.work_dir,
             session_dir: self.session_dir,
             git_bin_path: self.git_bin_path,
