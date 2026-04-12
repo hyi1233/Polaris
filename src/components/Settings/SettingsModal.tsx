@@ -22,6 +22,7 @@ import { QQBotTab } from './tabs/QQBotTab';
 import { FeishuTab } from './tabs/FeishuTab';
 import { SpeechTab } from './tabs/SpeechTab';
 import { AdvancedTab } from './tabs/AdvancedTab';
+import { AssistantTab } from './tabs/AssistantTab';
 import { createLogger } from '../../utils/logger';
 import type { Config } from '../../types';
 
@@ -44,6 +45,7 @@ const TAB_TITLE_KEYS: Record<SettingsTabId, string> = {
   'qqbot': 'nav.qqbot',
   'feishu': 'nav.feishu',
   'speech': 'nav.speech',
+  'assistant': 'nav.assistant',
   'advanced': 'nav.advanced',
 };
 
@@ -216,6 +218,10 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
                   onConfigChange={setLocalConfig}
                   loading={loading}
                 />
+              )}
+
+              {activeTab === 'assistant' && (
+                <AssistantTab />
               )}
 
               {activeTab === 'advanced' && (
