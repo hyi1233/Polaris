@@ -1,24 +1,51 @@
 import { useEffect } from 'react'
 import { useAssistantStore } from '../store/assistantStore'
+import { useConfigStore } from '../../stores/configStore'
+import { getAssistantEngine, resetAssistantEngine } from '../core/AssistantEngine'
 import { AssistantChat } from './AssistantChat'
 import { AssistantInput } from './AssistantInput'
 import { ClaudeCodeSessionPanel } from './ClaudeCodeSessionPanel'
+import { DEFAULT_ASSISTANT_CONFIG } from '../types'
 
 /**
  * 助手面板 - 主界面
  */
 export function AssistantPanel() {
   const { claudeCodeSessions, initialize } = useAssistantStore()
+  const { config } = useConfigStore()
 
   // 初始化
   useEffect(() => {
     initialize()
   }, [initialize])
 
+  // 初始化引擎
+  useEffect(() => {
+    const assistantConfig = config?.assistant || DEFAULT_ASSISTANT_CONFIG
+
+    if (assistantConfig.enabled && assistantConfig.llm.apiKey) {
+      const engine = getAssistantEngine()
+      engine.initialize({
+        baseUrl: assistantConfig.llm.baseUrl,
+        apiKey: assistantConfig.llm.apiKey,
+        model: assistantConfig.llm.model,
+        maxTokens: assistantConfig.llm.maxTokens,
+        temperature: assistantConfig.llm.temperature,
+      })
+
+      return () => {
+        resetAssistantEngine()
+      }
+    }
+  }, [config?.assistant])
+
   const sessionCount = claudeCodeSessions.size
   const runningCount = Array.from(claudeCodeSessions.values()).filter(
     (s) => s.status === 'running'
   ).length
+
+  const assistantConfig = config?.assistant || DEFAULT_ASSISTANT_CONFIG
+  const isConfigured = assistantConfig.enabled && !!assistantConfig.llm.apiKey
 
   return (
     <div className="flex flex-col h-full bg-background-elevated">
@@ -39,16 +66,30 @@ export function AssistantPanel() {
         </div>
       </div>
 
+      {/* 未配置提示 */}
+      {!isConfigured && (
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center text-text-muted">
+            <p className="mb-2">AI 助手未配置</p>
+            <p className="text-xs text-text-tertiary">
+              请在设置中启用 AI 助手并配置 API Key
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 对话消息流 */}
-      <div className="flex-1 overflow-hidden">
-        <AssistantChat />
-      </div>
+      {isConfigured && (
+        <div className="flex-1 overflow-hidden">
+          <AssistantChat />
+        </div>
+      )}
 
       {/* Claude Code 多会话面板 */}
-      <ClaudeCodeSessionPanel />
+      {isConfigured && <ClaudeCodeSessionPanel />}
 
       {/* 输入框 */}
-      <AssistantInput />
+      {isConfigured && <AssistantInput />}
     </div>
   )
 }
