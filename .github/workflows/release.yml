@@ -66,6 +66,7 @@ jobs:
             touch src-tauri/target/release/polaris-todo-mcp
             touch src-tauri/target/release/polaris-requirements-mcp
             touch src-tauri/target/release/polaris-scheduler-mcp
+            chmod +x src-tauri/target/release/polaris-*
           fi
 
       - name: Build MCP binaries
