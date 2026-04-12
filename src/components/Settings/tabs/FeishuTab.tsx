@@ -51,6 +51,7 @@ function createEmptyInstance(): PlatformInstance {
       encryptKey: '',
       displayMode: 'chat',
       autoConnect: false,
+      workDir: '',
     },
     createdAt: new Date().toISOString(),
     enabled: true,
@@ -200,6 +201,7 @@ export function FeishuTab({ config, onConfigChange, loading }: FeishuTabProps) {
           encryptKey: '',
           displayMode: editingInstance.config.displayMode,
           autoConnect: editingInstance.config.autoConnect,
+          workDir: editingInstance.config.workDir || undefined,
           createdAt: editingInstance.createdAt,
           lastActive: editingInstance.lastActive,
         }],
@@ -408,6 +410,19 @@ export function FeishuTab({ config, onConfigChange, loading }: FeishuTabProps) {
                     value={editingInstance.config.appSecret || ''}
                     onChange={(e) => updateEditingConfig({ appSecret: e.target.value })}
                     placeholder="飞书开放平台应用的 App Secret"
+                    className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* 默认工作区 */}
+                <div>
+                  <label className="block text-xs text-text-secondary mb-2">默认工作区</label>
+                  <input
+                    type="text"
+                    value={editingInstance.config.workDir || ''}
+                    onChange={(e) => updateEditingConfig({ workDir: e.target.value })}
+                    placeholder="新会话自动使用此目录（可选，留空则使用应用默认目录）"
                     className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     disabled={loading}
                   />

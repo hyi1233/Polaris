@@ -249,6 +249,7 @@ impl IntegrationManager {
         engine_registry: Option<Arc<Mutex<EngineRegistry>>>,
         conversation_states: Arc<Mutex<ConversationStore>>,
         active_sessions: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
+        instance_registry: Arc<Mutex<InstanceRegistry>>,
     ) {
         let text = match msg.content.as_text() {
             Some(t) => t,
@@ -259,6 +260,18 @@ impl IntegrationManager {
         };
 
         let conversation_id = msg.conversation_id.clone();
+
+        // 注入默认工作区（从当前激活实例配置中读取）
+        {
+            let mut states = conversation_states.lock().await;
+            let state = states.get_or_create(&conversation_id);
+            if state.work_dir.is_none() {
+                if let Some(work_dir) = Self::get_instance_work_dir(&instance_registry, platform).await {
+                    tracing::info!("[IntegrationManager] 📂 注入默认工作区: conversation={}, work_dir={}", conversation_id, work_dir);
+                    state.work_dir = Some(work_dir);
+                }
+            }
+        }
 
         // 1. 解析命令
         if let Some(cmd) = CommandParser::parse(text) {
@@ -296,6 +309,20 @@ impl IntegrationManager {
             tracing::warn!("[IntegrationManager] ⚠️ engine_registry 未设置，无法调用 AI");
             Self::send_reply(&adapters, platform, &conversation_id, "⚠️ AI 服务未初始化").await;
         }
+    }
+
+    /// 获取当前平台激活实例的默认工作目录
+    async fn get_instance_work_dir(
+        instance_registry: &Arc<Mutex<InstanceRegistry>>,
+        platform: Platform,
+    ) -> Option<String> {
+        let registry = instance_registry.lock().await;
+        registry.get_active(platform)
+            .and_then(|inst| match &inst.config {
+                InstanceConfig::QQBot(cfg) => cfg.work_dir.clone(),
+                InstanceConfig::Feishu(cfg) => cfg.work_dir.clone(),
+            })
+            .filter(|dir| !dir.is_empty())
     }
 
     /// 处理命令
@@ -1506,6 +1533,7 @@ impl IntegrationManager {
         let conversation_states = self.conversation_states.clone();
         let active_sessions = self.active_sessions.clone();
         let conversation_queues = self.conversation_queues.clone();
+        let instance_registry = self.instance_registry.clone();
 
         if let (Some(rx), Some(app_handle)) = (rx, app_handle) {
             tracing::info!("[IntegrationManager] 🚀 启动消息处理任务");
@@ -1546,6 +1574,7 @@ impl IntegrationManager {
                     let task_conversation_states = conversation_states.clone();
                     let task_active_sessions = active_sessions.clone();
                     let task_conversation_queues = conversation_queues.clone();
+                    let task_instance_registry = instance_registry.clone();
 
                     // spawn 处理任务：同一会话串行，不同会话并行
                     tokio::spawn(async move {
@@ -1560,6 +1589,7 @@ impl IntegrationManager {
                             task_engine_registry,
                             task_conversation_states,
                             task_active_sessions,
+                            task_instance_registry,
                         ).await;
 
                         // 尝试清理空闲的队列条目，避免内存泄漏

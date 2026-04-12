@@ -55,6 +55,8 @@ export interface QQBotInstanceConfig {
   createdAt?: string;
   /** 最后活跃时间 (ISO 8601) */
   lastActive?: string;
+  /** 默认工作目录（新会话自动使用） */
+  workDir?: string;
 }
 
 /** QQ Bot 集成配置 */
@@ -91,6 +93,8 @@ export interface FeishuInstanceConfig {
   createdAt?: string;
   /** 最后活跃时间 (ISO 8601) */
   lastActive?: string;
+  /** 默认工作目录（新会话自动使用） */
+  workDir?: string;
 }
 
 /** Feishu 集成配置 */

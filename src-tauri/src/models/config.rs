@@ -144,6 +144,9 @@ pub struct QQBotInstanceConfig {
     /// 最后活跃时间 (ISO 8601 格式)
     #[serde(default)]
     pub last_active: Option<String>,
+    /// 默认工作目录（新会话自动使用）
+    #[serde(default)]
+    pub work_dir: Option<String>,
 }
 
 fn default_instance_enabled() -> bool { true }
@@ -162,6 +165,7 @@ impl Default for QQBotInstanceConfig {
             auto_connect: true,
             created_at: None,
             last_active: None,
+            work_dir: None,
         }
     }
 }
@@ -188,6 +192,9 @@ pub struct QQBotRuntimeConfig {
     /// 启动时自动连接
     #[serde(default = "default_auto_connect")]
     pub auto_connect: bool,
+    /// 默认工作目录
+    #[serde(default)]
+    pub work_dir: Option<String>,
 }
 
 impl Default for QQBotRuntimeConfig {
@@ -199,6 +206,7 @@ impl Default for QQBotRuntimeConfig {
             sandbox: false,
             display_mode: IntegrationDisplayMode::default(),
             auto_connect: true,
+            work_dir: None,
         }
     }
 }
@@ -212,6 +220,7 @@ impl From<&QQBotInstanceConfig> for QQBotRuntimeConfig {
             sandbox: instance.sandbox,
             display_mode: instance.display_mode.clone(),
             auto_connect: instance.auto_connect,
+            work_dir: instance.work_dir.clone(),
         }
     }
 }
@@ -291,6 +300,9 @@ pub struct FeishuInstanceConfig {
     /// 最后活跃时间 (ISO 8601 格式)
     #[serde(default)]
     pub last_active: Option<String>,
+    /// 默认工作目录（新会话自动使用）
+    #[serde(default)]
+    pub work_dir: Option<String>,
 }
 
 impl Default for FeishuInstanceConfig {
@@ -307,6 +319,7 @@ impl Default for FeishuInstanceConfig {
             auto_connect: true,
             created_at: None,
             last_active: None,
+            work_dir: None,
         }
     }
 }
@@ -336,6 +349,9 @@ pub struct FeishuRuntimeConfig {
     /// 启动时自动连接
     #[serde(default = "default_auto_connect")]
     pub auto_connect: bool,
+    /// 默认工作目录
+    #[serde(default)]
+    pub work_dir: Option<String>,
 }
 
 impl Default for FeishuRuntimeConfig {
@@ -348,6 +364,7 @@ impl Default for FeishuRuntimeConfig {
             encrypt_key: String::new(),
             display_mode: IntegrationDisplayMode::default(),
             auto_connect: true,
+            work_dir: None,
         }
     }
 }
@@ -362,6 +379,7 @@ impl From<&FeishuInstanceConfig> for FeishuRuntimeConfig {
             encrypt_key: instance.encrypt_key.clone(),
             display_mode: instance.display_mode.clone(),
             auto_connect: instance.auto_connect,
+            work_dir: instance.work_dir.clone(),
         }
     }
 }

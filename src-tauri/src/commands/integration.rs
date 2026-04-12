@@ -285,6 +285,7 @@ fn platform_instance_to_qqbot(instance: &PlatformInstance) -> Option<QQBotInstan
         auto_connect: cfg.auto_connect,
         created_at: Some(instance.created_at.to_rfc3339()),
         last_active: instance.last_active.map(|dt| dt.to_rfc3339()),
+        work_dir: cfg.work_dir.clone(),
     })
 }
 
@@ -303,5 +304,6 @@ fn platform_instance_to_feishu(instance: &PlatformInstance) -> Option<FeishuInst
         auto_connect: cfg.auto_connect,
         created_at: Some(instance.created_at.to_rfc3339()),
         last_active: instance.last_active.map(|dt| dt.to_rfc3339()),
+        work_dir: cfg.work_dir.clone(),
     })
 }

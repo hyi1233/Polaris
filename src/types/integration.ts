@@ -77,6 +77,8 @@ export interface InstanceConfig {
   encryptKey: string;
   displayMode: IntegrationDisplayMode;
   autoConnect: boolean;
+  /** 默认工作目录 */
+  workDir?: string;
 }
 
 /** 平台实例 */
