@@ -1,0 +1,55 @@
+{
+  "title": "快捷片段",
+  "description": "自定义 prompt 模板，在聊天中通过 / 快速调用",
+  "empty": "暂无片段，点击上方按钮创建",
+  "create": "新建片段",
+  "edit": "编辑",
+  "delete": "删除",
+  "deleteConfirm": "确定删除片段「{{name}}」吗？",
+  "save": "保存",
+  "cancel": "取消",
+  "form": {
+    "name": "片段名称",
+    "namePlaceholder": "例如：code-review",
+    "nameHint": "用于 /name 快捷调用，不可重复",
+    "description": "描述",
+    "descriptionPlaceholder": "片段用途简述",
+    "content": "模板内容",
+    "contentPlaceholder": "请审查以下代码，重点关注 {{focus}}：\n\n{{code}}",
+    "contentHint": "使用 {{变量名}} 定义变量占位符",
+    "enabled": "启用"
+  },
+  "variables": {
+    "title": "模板变量",
+    "add": "添加变量",
+    "extractFromContent": "从模板提取",
+    "key": "变量名",
+    "keyPlaceholder": "focus",
+    "label": "显示标签",
+    "labelPlaceholder": "关注点",
+    "type": "类型",
+    "typeText": "单行文本",
+    "typeTextarea": "多行文本",
+    "required": "必填",
+    "defaultValue": "默认值",
+    "placeholderHint": "占位提示",
+    "remove": "移除",
+    "autoVars": "自动变量（无需定义，可直接在模板中使用）",
+    "autoVarDate": "{{date}} — 当前日期",
+    "autoVarTime": "{{time}} — 当前时间",
+    "autoVarWorkspace": "{{workspaceName}} — 工作区名称",
+    "autoVarPath": "{{workspacePath}} — 工作区路径"
+  },
+  "chat": {
+    "groupLabel": "快捷片段",
+    "triggerHint": "输入片段名称继续筛选",
+    "fillParams": "填写变量",
+    "expand": "展开"
+  },
+  "toast": {
+    "created": "片段「{{name}}」创建成功",
+    "updated": "片段「{{name}}」更新成功",
+    "deleted": "片段已删除",
+    "nameDuplicate": "片段名称已存在"
+  }
+}

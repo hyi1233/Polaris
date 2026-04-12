@@ -1,0 +1,55 @@
+{
+  "title": "Prompt Snippets",
+  "description": "Custom prompt templates, quickly invoked with / in chat",
+  "empty": "No snippets yet. Click the button above to create one.",
+  "create": "New Snippet",
+  "edit": "Edit",
+  "delete": "Delete",
+  "deleteConfirm": "Delete snippet \"{{name}}\"?",
+  "save": "Save",
+  "cancel": "Cancel",
+  "form": {
+    "name": "Name",
+    "namePlaceholder": "e.g. code-review",
+    "nameHint": "Used as /name for quick invocation, must be unique",
+    "description": "Description",
+    "descriptionPlaceholder": "Brief description of this snippet",
+    "content": "Template Content",
+    "contentPlaceholder": "Review the following code, focusing on {{focus}}:\n\n{{code}}",
+    "contentHint": "Use {{variableName}} to define variable placeholders",
+    "enabled": "Enabled"
+  },
+  "variables": {
+    "title": "Template Variables",
+    "add": "Add Variable",
+    "extractFromContent": "Extract from template",
+    "key": "Variable Key",
+    "keyPlaceholder": "focus",
+    "label": "Display Label",
+    "labelPlaceholder": "Focus area",
+    "type": "Type",
+    "typeText": "Text",
+    "typeTextarea": "Textarea",
+    "required": "Required",
+    "defaultValue": "Default Value",
+    "placeholderHint": "Placeholder Hint",
+    "remove": "Remove",
+    "autoVars": "Auto Variables (available without definition)",
+    "autoVarDate": "{{date}} — Current date",
+    "autoVarTime": "{{time}} — Current time",
+    "autoVarWorkspace": "{{workspaceName}} — Workspace name",
+    "autoVarPath": "{{workspacePath}} — Workspace path"
+  },
+  "chat": {
+    "groupLabel": "Snippets",
+    "triggerHint": "Type snippet name to filter",
+    "fillParams": "Fill Variables",
+    "expand": "Expand"
+  },
+  "toast": {
+    "created": "Snippet \"{{name}}\" created",
+    "updated": "Snippet \"{{name}}\" updated",
+    "deleted": "Snippet deleted",
+    "nameDuplicate": "Snippet name already exists"
+  }
+}
