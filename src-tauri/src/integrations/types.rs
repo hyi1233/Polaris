@@ -93,6 +93,9 @@ pub struct IntegrationMessage {
     pub content: MessageContent,
     /// 时间戳 (毫秒)
     pub timestamp: i64,
+    /// 平台原始消息 ID（飞书 om_xxx，QQ Bot msg_id），用于下载媒体资源
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform_message_id: Option<String>,
     /// 原始消息 (平台特定)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw: Option<serde_json::Value>,
@@ -115,6 +118,7 @@ impl IntegrationMessage {
             sender_name,
             content,
             timestamp: chrono::Utc::now().timestamp_millis(),
+            platform_message_id: None,
             raw: None,
         }
     }
@@ -122,6 +126,12 @@ impl IntegrationMessage {
     /// 设置原始消息
     pub fn with_raw(mut self, raw: serde_json::Value) -> Self {
         self.raw = Some(raw);
+        self
+    }
+
+    /// 设置平台原始消息 ID
+    pub fn with_platform_message_id(mut self, id: impl Into<String>) -> Self {
+        self.platform_message_id = Some(id.into());
         self
     }
 }
@@ -134,11 +144,15 @@ pub enum MessageContent {
     Image {
         url: String,
         #[serde(skip_serializing_if = "Option::is_none")]
+        file_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         local_path: Option<String>,
     },
     File { name: String, url: String, size: u64 },
     Audio {
         url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        file_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         transcript: Option<String>,
     },
@@ -168,6 +182,17 @@ impl MessageContent {
             MessageContent::Text { text } => text.is_empty(),
             MessageContent::Mixed { items } => items.is_empty(),
             _ => false,
+        }
+    }
+
+    /// 是否包含媒体内容（非纯文本）
+    pub fn has_media(&self) -> bool {
+        match self {
+            MessageContent::Text { .. } => false,
+            MessageContent::Image { .. } => true,
+            MessageContent::File { .. } => true,
+            MessageContent::Audio { .. } => true,
+            MessageContent::Mixed { items } => items.iter().any(|i| i.has_media()),
         }
     }
 }
@@ -312,4 +337,13 @@ impl IntegrationSession {
         self.updated_at = chrono::Utc::now().timestamp_millis();
         self.message_count += 1;
     }
+}
+
+/// 媒体下载结果
+#[derive(Debug, Clone)]
+pub struct MediaDownload {
+    /// 媒体描述，如 "图片「photo.png」", "文件「报告.pdf」(2.3MB)"
+    pub label: String,
+    /// 本地保存路径（下载失败时为 None）
+    pub local_path: Option<String>,
 }
