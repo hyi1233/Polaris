@@ -79,7 +79,8 @@ export const createRemoteSlice: RemoteSlice = (set, get) => ({
     branchName: string,
     remoteName = 'origin',
     force = false,
-    setUpstream = false
+    setUpstream = false,
+    remoteBranchName?: string
   ): Promise<GitPushResult> {
     set({ isLoading: true, error: null })
 
@@ -94,6 +95,7 @@ export const createRemoteSlice: RemoteSlice = (set, get) => ({
           workspacePath,
           branchName,
           remoteName,
+          remoteBranchName: remoteBranchName || null,
         })
       } else {
         // 普通推送
@@ -102,6 +104,7 @@ export const createRemoteSlice: RemoteSlice = (set, get) => ({
           branchName,
           remoteName,
           force,
+          remoteBranchName: remoteBranchName || null,
         })
       }
 

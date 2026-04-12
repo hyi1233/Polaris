@@ -88,12 +88,21 @@ pub fn push_branch(
     branch_name: &str,
     remote_name: &str,
     force: bool,
+    remote_branch_name: Option<&str>,
 ) -> Result<(), GitServiceError> {
+    // 构建 refspec：local:remote 或 local（如果相同）
+    let refspec = match remote_branch_name {
+        Some(remote_branch) if remote_branch != branch_name => {
+            format!("{}:{}", branch_name, remote_branch)
+        }
+        _ => branch_name.to_string(),
+    };
+
     #[cfg(windows)]
     let output = std::process::Command::new("git")
         .arg("push")
         .arg(remote_name)
-        .arg(branch_name)
+        .arg(&refspec)
         .arg(if force { "--force" } else { "--force-with-lease" })
         .current_dir(path)
         .creation_flags(CREATE_NO_WINDOW)
@@ -103,7 +112,7 @@ pub fn push_branch(
     let output = std::process::Command::new("git")
         .arg("push")
         .arg(remote_name)
-        .arg(branch_name)
+        .arg(&refspec)
         .arg(if force { "--force" } else { "--force-with-lease" })
         .current_dir(path)
         .output()?;
@@ -121,13 +130,22 @@ pub fn push_set_upstream(
     path: &Path,
     branch_name: &str,
     remote_name: &str,
+    remote_branch_name: Option<&str>,
 ) -> Result<(), GitServiceError> {
+    // 构建 refspec：local:remote 或 local（如果相同）
+    let refspec = match remote_branch_name {
+        Some(remote_branch) if remote_branch != branch_name => {
+            format!("{}:{}", branch_name, remote_branch)
+        }
+        _ => branch_name.to_string(),
+    };
+
     #[cfg(windows)]
     let output = std::process::Command::new("git")
         .arg("push")
         .arg("-u")
         .arg(remote_name)
-        .arg(branch_name)
+        .arg(&refspec)
         .current_dir(path)
         .creation_flags(CREATE_NO_WINDOW)
         .output()?;
@@ -137,7 +155,7 @@ pub fn push_set_upstream(
         .arg("push")
         .arg("-u")
         .arg(remote_name)
-        .arg(branch_name)
+        .arg(&refspec)
         .current_dir(path)
         .output()?;
 

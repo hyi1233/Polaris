@@ -354,9 +354,10 @@ pub fn git_push_branch(
     branchName: String,
     remoteName: String,
     force: bool,
+    remoteBranchName: Option<String>,
 ) -> Result<(), GitError> {
     let path = PathBuf::from(workspacePath);
-    GitService::push_branch(&path, &branchName, &remoteName, force).map_err(GitError::from)
+    GitService::push_branch(&path, &branchName, &remoteName, force, remoteBranchName.as_deref()).map_err(GitError::from)
 }
 
 /// 推送分支并设置上游
@@ -365,9 +366,10 @@ pub fn git_push_set_upstream(
     workspacePath: String,
     branchName: String,
     remoteName: String,
+    remoteBranchName: Option<String>,
 ) -> Result<(), GitError> {
     let path = PathBuf::from(workspacePath);
-    GitService::push_set_upstream(&path, &branchName, &remoteName).map_err(GitError::from)
+    GitService::push_set_upstream(&path, &branchName, &remoteName, remoteBranchName.as_deref()).map_err(GitError::from)
 }
 
 /// 拉取远程更新

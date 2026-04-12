@@ -287,8 +287,9 @@ impl GitService {
         branch_name: &str,
         remote_name: &str,
         force: bool,
+        remote_branch_name: Option<&str>,
     ) -> Result<(), GitServiceError> {
-        push_branch(path, branch_name, remote_name, force)
+        push_branch(path, branch_name, remote_name, force, remote_branch_name)
     }
 
     /// 推送分支并设置上游
@@ -296,8 +297,9 @@ impl GitService {
         path: &Path,
         branch_name: &str,
         remote_name: &str,
+        remote_branch_name: Option<&str>,
     ) -> Result<(), GitServiceError> {
-        push_set_upstream(path, branch_name, remote_name)
+        push_set_upstream(path, branch_name, remote_name, remote_branch_name)
     }
 
     /// 创建 Pull Request

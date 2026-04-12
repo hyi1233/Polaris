@@ -163,7 +163,7 @@ export interface RemoteActions {
   getRemotes: (workspacePath: string) => Promise<void>
   addRemote: (workspacePath: string, name: string, url: string) => Promise<GitRemote>
   removeRemote: (workspacePath: string, name: string) => Promise<void>
-  push: (workspacePath: string, branchName: string, remoteName?: string, force?: boolean, setUpstream?: boolean) => Promise<GitPushResult>
+  push: (workspacePath: string, branchName: string, remoteName?: string, force?: boolean, setUpstream?: boolean, remoteBranchName?: string) => Promise<GitPushResult>
   pull: (workspacePath: string, remoteName?: string, branchName?: string) => Promise<GitPullResult>
   detectHostAsync: (remoteUrl: string) => Promise<GitHostType>
 }
