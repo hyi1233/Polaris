@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { ChevronUp, ChevronDown, Loader2, CheckCircle, XCircle, Bell, FileText, Code, Wrench, Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { ChevronUp, ChevronDown, Loader2, CheckCircle, XCircle, Bell, FileText, Code, Wrench, Trash2, ChevronRight, ChevronLeft, Layers } from 'lucide-react'
 import { useAssistantStore } from '../store/assistantStore'
 import { useAssistant } from '../hooks/useAssistant'
 import { SessionTab } from './SessionTab'
 import { cn } from '../../utils'
 import { getEventBus } from '../../ai-runtime'
 import { ResizeHandle } from '../../components/Common'
-import type { ClaudeCodeExecutionEvent, CompletionNotification } from '../types'
+import type { ClaudeCodeExecutionEvent, CompletionNotification, ClaudeCodeSessionState } from '../types'
 
 /**
  * 格式化执行用时
@@ -25,6 +25,54 @@ const MIN_PANEL_HEIGHT = 96
 const MAX_PANEL_HEIGHT = 400
 
 /**
+ * 会话状态统计组件
+ */
+function SessionStatusSummary({ sessions }: { sessions: ClaudeCodeSessionState[] }) {
+  const runningCount = sessions.filter((s) => s.status === 'running').length
+  const completedCount = sessions.filter((s) => s.status === 'completed').length
+  const errorCount = sessions.filter((s) => s.status === 'error').length
+  const idleCount = sessions.filter((s) => s.status === 'idle').length
+
+  // 计算运行中任务的总耗时
+  const runningSessions = sessions.filter((s) => s.status === 'running')
+  const totalDuration = runningSessions.reduce((acc, s) => {
+    return acc + Math.floor((Date.now() - s.createdAt) / 1000)
+  }, 0)
+
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      {runningCount > 0 && (
+        <span className="flex items-center gap-1 text-primary">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          {runningCount} 运行中
+          {totalDuration > 0 && (
+            <span className="text-text-tertiary">({formatDuration(Date.now() - totalDuration * 1000)})</span>
+          )}
+        </span>
+      )}
+      {completedCount > 0 && (
+        <span className="flex items-center gap-1 text-success">
+          <CheckCircle className="w-3 h-3" />
+          {completedCount} 已完成
+        </span>
+      )}
+      {errorCount > 0 && (
+        <span className="flex items-center gap-1 text-danger">
+          <XCircle className="w-3 h-3" />
+          {errorCount} 出错
+        </span>
+      )}
+      {idleCount > 0 && (
+        <span className="flex items-center gap-1 text-text-tertiary">
+          <Code className="w-3 h-3" />
+          {idleCount} 空闲
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
  * Claude Code 多会话面板
  */
 export function ClaudeCodeSessionPanel() {
@@ -40,7 +88,6 @@ export function ClaudeCodeSessionPanel() {
   } = useAssistantStore()
 
   const sessions = Array.from(claudeCodeSessions.values())
-  const runningSessions = sessions.filter((s) => s.status === 'running')
 
   // 自动滚动到底部
   useEffect(() => {
@@ -88,14 +135,8 @@ export function ClaudeCodeSessionPanel() {
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="flex items-center gap-2">
-          {runningSessions.length > 0 && (
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          )}
-          <span className="text-sm text-text-muted">
-            {runningSessions.length > 0
-              ? `${runningSessions.length} 个会话运行中`
-              : 'Claude Code 会话'}
-          </span>
+          <Layers className="w-4 h-4 text-text-muted" />
+          <SessionStatusSummary sessions={sessions} />
         </div>
         <div className="flex items-center gap-2">
           {!isCollapsed && executionPanelSessionId && (
