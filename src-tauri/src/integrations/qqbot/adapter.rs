@@ -280,23 +280,45 @@ impl QQBotAdapter {
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
 
+                    let url = att
+                        .get("url")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let filename = att
+                        .get("filename")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
                     if content_type.starts_with("image/") {
                         items.push(MessageContent::Image {
-                            url: att
-                                .get("url")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
+                            url,
+                            file_name: filename,
                             local_path: None,
                         });
                     } else if content_type.starts_with("audio/") {
                         items.push(MessageContent::Audio {
-                            url: att
-                                .get("url")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
+                            url,
+                            file_name: filename,
                             transcript: None,
+                        });
+                    } else if content_type.starts_with("video/") {
+                        let name = filename.unwrap_or_else(|| "video.mp4".to_string());
+                        let size = att.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+                        items.push(MessageContent::File {
+                            name,
+                            url,
+                            size,
+                        });
+                    } else {
+                        // 其他附件类型按文件处理
+                        let name = filename.unwrap_or_else(|| "file".to_string());
+                        let size = att.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+                        items.push(MessageContent::File {
+                            name,
+                            url,
+                            size,
                         });
                     }
                 }
@@ -422,6 +444,7 @@ impl QQBotAdapter {
                 sender_name,
                 Self::parse_content(event_data),
             )
+            .with_platform_message_id(message_id)
             .with_raw(event_data.clone()),
         )
     }
@@ -444,6 +467,30 @@ impl QQBotAdapter {
             4013 => ("Intents 超出白名单范围".to_string(), "请申请相应的 intents 权限".to_string()),
             _ => (format!("连接关闭: {}", code), reason.to_string()),
         }
+    }
+
+    /// 从 MessageContent 提取所有媒体项
+    fn collect_media_urls(content: &MessageContent) -> Vec<(String, String, u64)> {
+        // 返回 (url, filename, size)
+        let mut items = Vec::new();
+        match content {
+            MessageContent::Image { url, file_name, .. } => {
+                items.push((url.clone(), file_name.clone().unwrap_or_else(|| "image.png".to_string()), 0));
+            }
+            MessageContent::Audio { url, file_name, .. } => {
+                items.push((url.clone(), file_name.clone().unwrap_or_else(|| "audio.silk".to_string()), 0));
+            }
+            MessageContent::File { name, url, size } => {
+                items.push((url.clone(), name.clone(), *size));
+            }
+            MessageContent::Mixed { items: inner } => {
+                for item in inner {
+                    items.extend(Self::collect_media_urls(item));
+                }
+            }
+            _ => {}
+        }
+        items
     }
 }
 
@@ -921,6 +968,74 @@ impl PlatformIntegration for QQBotAdapter {
 
         tracing::info!("[QQBot] ✅ 已断开连接");
         Ok(())
+    }
+
+    async fn download_media(
+        &mut self,
+        msg: &IntegrationMessage,
+        save_dir: &std::path::Path,
+    ) -> Vec<MediaDownload> {
+        let media_items = Self::collect_media_urls(&msg.content);
+        let mut results = Vec::new();
+
+        for (url, filename, size) in media_items {
+            let label = if filename.starts_with("image") || filename.ends_with(".png") || filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
+                "图片".to_string()
+            } else if filename.starts_with("audio") || filename.ends_with(".silk") {
+                "语音".to_string()
+            } else {
+                let size_str = if size > 0 {
+                    format!("({:.1}KB)", size as f64 / 1024.0)
+                } else {
+                    String::new()
+                };
+                format!("文件「{}」{}", filename, size_str)
+            };
+
+            tracing::info!("[QQBot] 📥 下载媒体: {}", filename);
+
+            let client = reqwest::Client::new();
+            match client.get(&url).send().await {
+                Ok(response) if response.status().is_success() => {
+                    match response.bytes().await {
+                        Ok(bytes) => {
+                            let timestamp = chrono::Utc::now().timestamp();
+                            let safe_name = filename.replace(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_', "_");
+                            let file_name = format!("{}_{}", timestamp, safe_name);
+                            let file_path = save_dir.join(&file_name);
+
+                            match tokio::fs::write(&file_path, &bytes).await {
+                                Ok(_) => {
+                                    tracing::info!("[QQBot] ✅ 媒体已保存: {}", file_path.display());
+                                    results.push(MediaDownload {
+                                        label,
+                                        local_path: Some(file_path.to_string_lossy().to_string()),
+                                    });
+                                }
+                                Err(e) => {
+                                    tracing::error!("[QQBot] ❌ 写入文件失败: {}", e);
+                                    results.push(MediaDownload { label, local_path: None });
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("[QQBot] ❌ 读取响应体失败: {}", e);
+                            results.push(MediaDownload { label, local_path: None });
+                        }
+                    }
+                }
+                Ok(response) => {
+                    tracing::error!("[QQBot] ❌ 下载失败: HTTP {}", response.status());
+                    results.push(MediaDownload { label, local_path: None });
+                }
+                Err(e) => {
+                    tracing::error!("[QQBot] ❌ 下载请求失败: {}", e);
+                    results.push(MediaDownload { label, local_path: None });
+                }
+            }
+        }
+
+        results
     }
 
     async fn send(&mut self, target: SendTarget, content: MessageContent) -> Result<()> {
