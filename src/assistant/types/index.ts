@@ -49,7 +49,7 @@ export interface InvokeClaudeCodeParams {
   /** 执行模式 */
   mode: 'continue' | 'new' | 'interrupt'
   reason?: string
-  /** 是否后台执行 */
+  /** 是否后台执行，默认 true */
   background?: boolean
 }
 

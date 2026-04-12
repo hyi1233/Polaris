@@ -50,7 +50,7 @@ export const INVOKE_CLAUDE_CODE_TOOL: OpenAITool = {
         },
         background: {
           type: 'boolean',
-          description: '是否在后台执行（不阻塞用户对话）',
+          description: '是否在后台执行（不阻塞用户对话）。默认 true，保持用户对话连续性。设为 false 仅在必须立即获得结果时使用。',
         },
       },
       required: ['prompt', 'reason'],
@@ -75,7 +75,8 @@ export function parseToolCallArgs(argsString: string): InvokeClaudeCodeParams {
     sessionId: parsed.sessionId,
     mode: parsed.mode || 'continue',
     reason: parsed.reason,
-    background: parsed.background || false,
+    // 默认后台执行，保持用户对话连续性
+    background: parsed.background !== false,
   }
 }
 

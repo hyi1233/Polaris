@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronUp, ChevronDown, Loader2, CheckCircle, XCircle, Bell, FileText, Code, Wrench } from 'lucide-react'
 import { useAssistantStore } from '../store/assistantStore'
 import { useAssistant } from '../hooks/useAssistant'
 import { SessionTab } from './SessionTab'
 import { cn } from '../../utils'
+import { getEventBus } from '../../ai-runtime'
 import type { ClaudeCodeExecutionEvent, CompletionNotification } from '../types'
 
 /**
@@ -168,6 +169,18 @@ export function CompletionNotificationPanel() {
   const { completionNotifications, hasUnreadNotifications } = useAssistantStore()
   const { handleNotification, retryNotification } = useAssistant()
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // 监听后台任务完成事件，自动展开面板
+  useEffect(() => {
+    const eventBus = getEventBus()
+    const unsubscribe = eventBus.onAny((event) => {
+      if ((event as any).type === 'assistant_notification') {
+        // 有新通知时自动展开
+        setIsExpanded(true)
+      }
+    })
+    return unsubscribe
+  }, [])
 
   const pendingNotifications = completionNotifications.filter((n) => !n.handled)
 

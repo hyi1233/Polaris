@@ -224,7 +224,7 @@ ${historyParts.join('\n\n')}
     yield { type: 'tool_call', toolCall: { ...toolCall, status: 'running', claudeCodeSessionId: sessionId } }
 
     // 后台执行模式：不等待完成，直接返回
-    if (params.background) {
+    if (params.background !== false) {
       this.executeClaudeCodeBackground(sessionId, params, toolCall.id)
       yield { type: 'tool_call', toolCall: { ...toolCall, status: 'running', claudeCodeSessionId: sessionId } }
       return
@@ -289,6 +289,12 @@ ${historyParts.join('\n\n')}
           handled: false,
         }
         useAssistantStore.getState().addCompletionNotification(notification)
+
+        // 发出事件通知 UI
+        this.eventBus.emit({
+          type: 'assistant_notification' as any,
+          notification,
+        } as any)
       }
 
       if (event.type === 'error') {
@@ -303,6 +309,12 @@ ${historyParts.join('\n\n')}
           handled: false,
         }
         useAssistantStore.getState().addCompletionNotification(notification)
+
+        // 发出事件通知 UI
+        this.eventBus.emit({
+          type: 'assistant_notification' as any,
+          notification,
+        } as any)
       }
     })
 
