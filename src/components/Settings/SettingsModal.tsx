@@ -221,7 +221,11 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
               )}
 
               {activeTab === 'assistant' && (
-                <AssistantTab />
+                <AssistantTab
+                  config={localConfig}
+                  onConfigChange={setLocalConfig}
+                  loading={loading}
+                />
               )}
 
               {activeTab === 'advanced' && (
