@@ -74,6 +74,7 @@
     "toolPanel": "Tool Panel",
     "developerPanel": "Developer",
     "integrationPanel": "Bots",
+    "assistantPanel": "AI Assistant",
     "newChat": "New Chat",
     "exportChat": "Export Chat",
     "sessionHistory": "Session History"

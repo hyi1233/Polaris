@@ -15,6 +15,7 @@
     "feishu": "Feishu",
     "scheduler": "Scheduler",
     "speech": "Speech Input",
+    "assistant": "AI Assistant",
     "advanced": "Advanced"
   },
   "messages": {
