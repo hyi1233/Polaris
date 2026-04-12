@@ -312,10 +312,61 @@ impl FeishuAdapter {
                         .unwrap_or("");
                     MessageContent::Image {
                         url: image_key.to_string(),
+                        file_name: None,
                         local_path: None,
                     }
                 } else {
                     MessageContent::text("[图片]")
+                }
+            }
+            "audio" => {
+                if let Ok(content_json) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    let file_key = content_json
+                        .get("file_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    MessageContent::Audio {
+                        url: file_key.to_string(),
+                        file_name: None,
+                        transcript: None,
+                    }
+                } else {
+                    MessageContent::text("[语音]")
+                }
+            }
+            "file" => {
+                if let Ok(content_json) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    let file_key = content_json
+                        .get("file_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let file_name = content_json
+                        .get("file_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown_file")
+                        .to_string();
+                    MessageContent::File {
+                        name: file_name,
+                        url: file_key.to_string(),
+                        size: 0,
+                    }
+                } else {
+                    MessageContent::text("[文件]")
+                }
+            }
+            "video" => {
+                if let Ok(content_json) = serde_json::from_str::<serde_json::Value>(content_str) {
+                    let file_key = content_json
+                        .get("file_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    MessageContent::File {
+                        name: "video.mp4".to_string(),
+                        url: file_key.to_string(),
+                        size: 0,
+                    }
+                } else {
+                    MessageContent::text("[视频]")
                 }
             }
             _ => MessageContent::text(format!("[{}消息]", msg_type)),
@@ -328,6 +379,11 @@ impl FeishuAdapter {
             msg_type
         );
 
+        let platform_msg_id = message
+            .get("message_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Some(
             IntegrationMessage::new(
                 Platform::Feishu,
@@ -336,6 +392,7 @@ impl FeishuAdapter {
                 sender_name,
                 content,
             )
+            .with_platform_message_id(platform_msg_id.unwrap_or_default())
             .with_raw(event.clone()),
         )
     }
@@ -345,6 +402,72 @@ impl FeishuAdapter {
         // 飞书 @mentions 格式: @_user_1 内容
         let re = regex::Regex::new(r"@_\w+\s*").unwrap();
         re.replace(text, "").trim().to_string()
+    }
+
+    /// 下载飞书消息中的媒体资源
+    ///
+    /// 飞书 API: GET /open-apis/im/v1/messages/{message_id}/resources/{key}?type={image|file}
+    async fn download_resource(
+        &self,
+        message_id: &str,
+        resource_key: &str,
+        resource_type: &str, // "image" 或 "file"
+    ) -> Result<Vec<u8>> {
+        let client = reqwest::Client::new();
+        let token = self.access_token.as_ref()
+            .ok_or_else(|| AppError::AuthError("未获取 access token".to_string()))?;
+
+        let url = format!(
+            "{}/open-apis/im/v1/messages/{}/resources/{}?type={}",
+            FEISHU_API_BASE, message_id, resource_key, resource_type
+        );
+
+        tracing::info!("[Feishu] 📥 下载资源: type={}, key={}", resource_type, resource_key);
+
+        let response = client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::ApiError(format!(
+                "下载资源失败: HTTP {}, body={}", status, body
+            )));
+        }
+
+        let bytes = response.bytes().await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+
+        tracing::info!("[Feishu] ✅ 资源下载完成: {} bytes", bytes.len());
+        Ok(bytes.to_vec())
+    }
+
+    /// 从 MessageContent 提取媒体项
+    fn collect_media_items(content: &MessageContent) -> Vec<(String, String, String)> {
+        // 返回 (key, type_param, fallback_name)
+        let mut items = Vec::new();
+        match content {
+            MessageContent::Image { url, .. } => {
+                items.push((url.clone(), "image".to_string(), "image.png".to_string()));
+            }
+            MessageContent::Audio { url, .. } => {
+                items.push((url.clone(), "file".to_string(), "audio.ogg".to_string()));
+            }
+            MessageContent::File { name, url, .. } => {
+                items.push((url.clone(), "file".to_string(), name.clone()));
+            }
+            MessageContent::Mixed { items: inner } => {
+                for item in inner {
+                    items.extend(Self::collect_media_items(item));
+                }
+            }
+            _ => {}
+        }
+        items
     }
 
     /// 发送消息到飞书
@@ -824,6 +947,75 @@ impl PlatformIntegration for FeishuAdapter {
 
         tracing::info!("[Feishu] ✅ 已断开连接");
         Ok(())
+    }
+
+    async fn download_media(
+        &mut self,
+        msg: &IntegrationMessage,
+        save_dir: &std::path::Path,
+    ) -> Vec<MediaDownload> {
+        let message_id = match &msg.platform_message_id {
+            Some(id) if !id.is_empty() => id.as_str(),
+            _ => {
+                tracing::warn!("[Feishu] ⚠️ 缺少 message_id，无法下载媒体");
+                return vec![MediaDownload {
+                    label: "媒体文件".to_string(),
+                    local_path: None,
+                }];
+            }
+        };
+
+        // 确保 token 有效
+        if let Err(e) = self.ensure_valid_token().await {
+            tracing::error!("[Feishu] ❌ Token 刷新失败: {}", e);
+            return vec![MediaDownload {
+                label: "媒体文件".to_string(),
+                local_path: None,
+            }];
+        }
+
+        let media_items = Self::collect_media_items(&msg.content);
+        let mut results = Vec::new();
+
+        for (key, type_param, fallback_name) in media_items {
+            let label = if fallback_name.starts_with("image") || fallback_name.starts_with("audio") {
+                match type_param.as_str() {
+                    "image" => "图片".to_string(),
+                    _ => "语音".to_string(),
+                }
+            } else {
+                format!("文件「{}」", fallback_name)
+            };
+
+            match self.download_resource(message_id, &key, &type_param).await {
+                Ok(bytes) => {
+                    let timestamp = chrono::Utc::now().timestamp();
+                    let safe_name = fallback_name.replace(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_', "_");
+                    let file_name = format!("{}_{}", timestamp, safe_name);
+                    let file_path = save_dir.join(&file_name);
+
+                    match tokio::fs::write(&file_path, &bytes).await {
+                        Ok(_) => {
+                            tracing::info!("[Feishu] ✅ 媒体已保存: {}", file_path.display());
+                            results.push(MediaDownload {
+                                label,
+                                local_path: Some(file_path.to_string_lossy().to_string()),
+                            });
+                        }
+                        Err(e) => {
+                            tracing::error!("[Feishu] ❌ 写入文件失败: {}", e);
+                            results.push(MediaDownload { label, local_path: None });
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("[Feishu] ❌ 下载资源失败: {}", e);
+                    results.push(MediaDownload { label, local_path: None });
+                }
+            }
+        }
+
+        results
     }
 
     async fn send(&mut self, target: SendTarget, content: MessageContent) -> Result<()> {
