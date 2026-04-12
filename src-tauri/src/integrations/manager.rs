@@ -1138,6 +1138,9 @@ impl IntegrationManager {
             }
         });
 
+        // 创建内部任务完成信号，确保 per-conversation 锁覆盖完整 AI 处理周期
+        let (inner_done_tx, inner_done_rx) = tokio::sync::oneshot::channel();
+
         let task = tokio::spawn(async move {
             // 调用 AI 引擎（根据是否已有会话决定创建新会话还是继续会话）
             let session_id_for_response: String;
@@ -1249,6 +1252,9 @@ impl IntegrationManager {
             // 从活跃会话中移除
             let mut sessions = task_active_sessions.lock().await;
             sessions.remove(&task_conversation_id);
+
+            // 通知外部任务已完成
+            let _ = inner_done_tx.send(());
         });
 
         // 记录活跃会话
@@ -1256,6 +1262,11 @@ impl IntegrationManager {
             let mut sessions = active_sessions.lock().await;
             sessions.insert(conversation_id.clone(), task);
         }
+
+        // 等待内部 AI 处理任务完成，确保 per-conversation 锁覆盖完整 AI 处理周期
+        // 这样第二条消息必须等第一条消息的 AI 处理完全结束后才能获取锁
+        // 当 /interrupt 中断任务时，inner_done_tx 被 drop，inner_done_rx.await 返回 Err，函数正常退出
+        let _ = inner_done_rx.await;
     }
 
     /// 停止指定平台
