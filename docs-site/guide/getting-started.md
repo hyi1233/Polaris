@@ -1,5 +1,7 @@
 # 安装与启动
 
+Polaris 是 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI 的图形化桌面客户端。它将 Claude Code 的终端交互转化为直观的可视化界面，提供多会话管理、文件编辑、工具调用可视化、平台集成等能力。
+
 ## 系统要求
 
 | 项目 | 要求 |

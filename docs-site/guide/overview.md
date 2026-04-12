@@ -1,6 +1,6 @@
 # 界面总览
 
-Polaris 采用类似 VS Code 的三栏布局。所有导航通过 Zustand 状态驱动，无需 URL 路由。
+Polaris 是 Claude Code CLI 的图形化客户端，采用类似 VS Code 的三栏布局。所有导航通过 Zustand 状态驱动，无需 URL 路由。
 
 <div class="ui-mock">
   <div class="ui-mock-label">

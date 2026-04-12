@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'Polaris',
-  description: '智能桌面助手使用指南',
+  description: 'Claude Code 可视化平台使用指南',
 
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }],
@@ -65,7 +65,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Polaris 智能桌面助手',
+      message: 'Polaris — Claude Code 可视化平台',
     },
   },
 })
