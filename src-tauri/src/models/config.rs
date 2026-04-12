@@ -530,6 +530,100 @@ impl Default for TTSConfig {
     }
 }
 
+/// 助手 LLM 配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantLLMConfig {
+    /// API Base URL
+    #[serde(default = "default_llm_base_url")]
+    pub base_url: String,
+
+    /// API Key
+    #[serde(default)]
+    pub api_key: String,
+
+    /// 模型 ID
+    #[serde(default = "default_llm_model")]
+    pub model: String,
+
+    /// 最大 Token
+    #[serde(default = "default_llm_max_tokens")]
+    pub max_tokens: u32,
+
+    /// 温度
+    #[serde(default = "default_llm_temperature")]
+    pub temperature: f32,
+}
+
+fn default_llm_base_url() -> String { "https://api.openai.com/v1".to_string() }
+fn default_llm_model() -> String { "gpt-4o".to_string() }
+fn default_llm_max_tokens() -> u32 { 4096 }
+fn default_llm_temperature() -> f32 { 0.7 }
+
+impl Default for AssistantLLMConfig {
+    fn default() -> Self {
+        Self {
+            base_url: default_llm_base_url(),
+            api_key: String::new(),
+            model: default_llm_model(),
+            max_tokens: default_llm_max_tokens(),
+            temperature: default_llm_temperature(),
+        }
+    }
+}
+
+/// Claude Code 调用配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantClaudeCodeConfig {
+    /// 默认执行模式
+    #[serde(default = "default_claude_code_mode")]
+    pub default_mode: String,
+
+    /// 超时时间（毫秒）
+    #[serde(default = "default_claude_code_timeout")]
+    pub timeout: u64,
+}
+
+fn default_claude_code_mode() -> String { "continue".to_string() }
+fn default_claude_code_timeout() -> u64 { 300000 }
+
+impl Default for AssistantClaudeCodeConfig {
+    fn default() -> Self {
+        Self {
+            default_mode: default_claude_code_mode(),
+            timeout: default_claude_code_timeout(),
+        }
+    }
+}
+
+/// AI 助手配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantConfig {
+    /// 是否启用助手模块
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// LLM 配置
+    #[serde(default)]
+    pub llm: AssistantLLMConfig,
+
+    /// Claude Code 调用配置
+    #[serde(default)]
+    pub claude_code: AssistantClaudeCodeConfig,
+}
+
+impl Default for AssistantConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            llm: AssistantLLMConfig::default(),
+            claude_code: AssistantClaudeCodeConfig::default(),
+        }
+    }
+}
+
 /// 应用配置（新版本）
 ///
 /// 使用嵌套结构，支持多个 AI 引擎
@@ -585,6 +679,10 @@ pub struct Config {
     #[serde(default)]
     pub tts: TTSConfig,
 
+    /// AI 助手配置
+    #[serde(default)]
+    pub assistant: AssistantConfig,
+
     // === 旧字段，保持向后兼容 ===
     /// @deprecated 请使用 claude_code.cli_path
     #[serde(default)]
@@ -611,6 +709,7 @@ impl Default for Config {
             window: WindowSettings::default(),
             speech: SpeechConfig::default(),
             tts: TTSConfig::default(),
+            assistant: AssistantConfig::default(),
             claude_cmd: None,
         }
     }
