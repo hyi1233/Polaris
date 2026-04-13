@@ -98,16 +98,16 @@ export function AssistantChat() {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [autoScroll, setAutoScroll] = useState(true)
 
-  // 自动滚动：流式输出时跟随到底部
+  // 自动滚动：流式输出时强制跟随到底部（忽略 autoScroll 状态）
   useEffect(() => {
-    if (autoScroll && streamingMessageId && virtuosoRef.current) {
+    if (streamingMessageId && virtuosoRef.current) {
       virtuosoRef.current.scrollToIndex({
         index: messages.length - 1,
         behavior: 'smooth',
         align: 'end',
       })
     }
-  }, [messages.length, streamingMessageId, autoScroll])
+  }, [messages.length, streamingMessageId])
 
   // 底部状态变化
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
@@ -141,10 +141,15 @@ export function AssistantChat() {
             />
           </div>
         )}
-        followOutput={autoScroll ? (streamingMessageId ? true : 'smooth') : false}
+        components={{
+          EmptyPlaceholder: () => null,
+          // 底部留白，确保最后一条消息不被下方面板遮挡
+          Footer: () => <div style={{ height: '120px' }} />,
+        }}
+        followOutput={streamingMessageId ? true : (autoScroll ? 'smooth' : false)}
         atBottomStateChange={handleAtBottomStateChange}
         atBottomThreshold={100}
-        increaseViewportBy={VIEWPORT_EXTENSION}
+        increaseViewportBy={{ top: 50, bottom: 100 }}
         initialTopMostItemIndex={messages.length - 1}
       />
     </div>
