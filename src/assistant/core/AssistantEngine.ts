@@ -281,6 +281,8 @@ ${historyParts.join('\n\n')}
       // 会话结束，创建通知
       if (event.type === 'session_end') {
         unsubscribe()
+        // 更新会话状态为已完成
+        useAssistantStore.getState().updateSessionStatus(sessionId, 'completed')
         const notification: CompletionNotification = {
           id: `notification-${Date.now()}`,
           sessionId,
@@ -307,6 +309,8 @@ ${historyParts.join('\n\n')}
 
       if (event.type === 'error') {
         unsubscribe()
+        // 更新会话状态为错误
+        useAssistantStore.getState().updateSessionStatus(sessionId, 'error')
         const notification: CompletionNotification = {
           id: `notification-${Date.now()}`,
           sessionId,
@@ -470,15 +474,20 @@ ${result}
     useAssistantStore.getState().markNotificationAutoReported(notificationId)
 
     // 异步处理，不阻塞主流程
-    this.processAutoReport(reportMessage).catch((error) => {
+    this.processAutoReport(reportMessage, notificationId).catch((error) => {
       console.error('[AssistantEngine] 自动汇报失败:', error)
+      // 标记自动汇报失败，让用户可以手动处理
+      useAssistantStore.getState().updateNotificationError(
+        notificationId,
+        `自动汇报失败: ${(error as Error).message}`
+      )
     })
   }
 
   /**
    * 处理自动汇报的 LLM 调用
    */
-  private async processAutoReport(reportMessage: string): Promise<void> {
+  private async processAutoReport(reportMessage: string, notificationId: string): Promise<void> {
     if (!this.llmEngine) return
 
     // 创建新的 LLM 会话处理汇报
@@ -514,10 +523,11 @@ ${result}
     useAssistantStore.getState().setStreamingMessageId(null)
     this.conversationHistory.push({ role: 'assistant', content: currentContent })
 
-    // 发出事件通知 UI 对话已完成
+    // 发出事件通知 UI 对话已完成，使用通知关联的会话 ID
+    const notification = useAssistantStore.getState().completionNotifications.find(n => n.id === notificationId)
     this.eventBus.emit({
       type: 'assistant_auto_report_complete',
-      sessionId: this.llmEngine.id,
+      sessionId: notification?.sessionId || this.llmEngine.id,
       message: currentContent,
     } as any)
   }

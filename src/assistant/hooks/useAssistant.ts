@@ -44,6 +44,12 @@ export function useAssistant() {
   ) => {
     store.markNotificationHandled(notification.id, handleType)
 
+    // 如果已经自动汇报过，跳过立即处理
+    if (notification.autoReported && handleType === 'immediate') {
+      // 已自动汇报，不再重复调用 AI
+      return
+    }
+
     // 立即处理：将结果反馈给 AI
     if (handleType === 'immediate' && notification.fullResult) {
       store.setLoading(true)
