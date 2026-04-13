@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAssistantStore } from '../store/assistantStore'
 import { useConfigStore } from '../../stores/configStore'
 import { getAssistantEngine, resetAssistantEngine } from '../core/AssistantEngine'
@@ -13,6 +13,7 @@ import { DEFAULT_ASSISTANT_CONFIG } from '../types'
 export function AssistantPanel() {
   const { claudeCodeSessions, initialize } = useAssistantStore()
   const { config } = useConfigStore()
+  const prevConfigRef = useRef<string>('')
 
   // 初始化
   useEffect(() => {
@@ -22,8 +23,18 @@ export function AssistantPanel() {
   // 初始化引擎
   useEffect(() => {
     const assistantConfig = config?.assistant || DEFAULT_ASSISTANT_CONFIG
+    const configKey = `${assistantConfig.enabled}-${assistantConfig.llm.apiKey}-${assistantConfig.llm.baseUrl}-${assistantConfig.llm.model}`
+
+    // 只有配置真正变化时才重新初始化
+    if (configKey === prevConfigRef.current) {
+      return
+    }
+    prevConfigRef.current = configKey
 
     if (assistantConfig.enabled && assistantConfig.llm.apiKey) {
+      // 先清理旧引擎
+      resetAssistantEngine()
+
       const engine = getAssistantEngine()
       engine.initialize({
         baseUrl: assistantConfig.llm.baseUrl,
@@ -32,10 +43,6 @@ export function AssistantPanel() {
         maxTokens: assistantConfig.llm.maxTokens,
         temperature: assistantConfig.llm.temperature,
       })
-
-      return () => {
-        resetAssistantEngine()
-      }
     }
   }, [config?.assistant])
 

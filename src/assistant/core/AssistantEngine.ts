@@ -43,6 +43,11 @@ export class AssistantEngine {
    * 初始化引擎
    */
   initialize(config: AssistantEngineConfig): void {
+    // 如果已经初始化，先清理
+    if (this.llmEngine) {
+      this.cleanup()
+    }
+
     this.llmEngine = new OpenAIProtocolEngine({
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
