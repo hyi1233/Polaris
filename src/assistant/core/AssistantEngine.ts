@@ -48,6 +48,12 @@ export class AssistantEngine {
       this.cleanup()
     }
 
+    // 清理旧的事件订阅
+    if (this.eventUnsubscribe) {
+      this.eventUnsubscribe()
+      this.eventUnsubscribe = null
+    }
+
     this.llmEngine = new OpenAIProtocolEngine({
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,

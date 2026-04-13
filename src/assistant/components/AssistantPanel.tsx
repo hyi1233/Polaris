@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useAssistantStore } from '../store/assistantStore'
 import { useConfigStore } from '../../stores/configStore'
-import { getAssistantEngine, resetAssistantEngine, clearConversation } from '../core/AssistantEngine'
+import { getAssistantEngine, clearConversation } from '../core/AssistantEngine'
 import { AssistantChat } from './AssistantChat'
 import { AssistantInput } from './AssistantInput'
 import { ClaudeCodeSessionPanel, CompletionNotificationPanel } from './ClaudeCodeSessionPanel'
@@ -33,9 +33,6 @@ export function AssistantPanel() {
     prevConfigRef.current = configKey
 
     if (assistantConfig.enabled && assistantConfig.llm.apiKey) {
-      // 先清理旧引擎
-      resetAssistantEngine()
-
       const engine = getAssistantEngine()
       engine.initialize({
         baseUrl: assistantConfig.llm.baseUrl,
