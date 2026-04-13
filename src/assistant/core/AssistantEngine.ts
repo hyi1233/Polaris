@@ -9,7 +9,6 @@ import type {
   AssistantEvent,
   ToolCallInfo,
   ClaudeCodeExecutionEvent,
-  CompletionNotification,
 } from '../types'
 
 /** 段落级缓冲超时（毫秒） */
@@ -353,7 +352,7 @@ export class AssistantEngine {
   private executeClaudeCodeBackground(
     sessionId: string,
     params: ToolCallInfo['arguments'],
-    toolCallId: string
+    _toolCallId: string
   ): void {
     const events: ClaudeCodeExecutionEvent[] = []
     let output = ''
@@ -399,34 +398,17 @@ export class AssistantEngine {
         output += (event as any).content
       }
 
-      // 会话结束，创建通知
+      // 会话结束
       if (event.type === 'session_end') {
         isCompleted = true
         unsubscribe()
         this.backgroundUnsubscribes.delete(sessionId)
         // 更新会话状态为已完成
         useAssistantStore.getState().updateSessionStatus(sessionId, 'completed')
-        const notification: CompletionNotification = {
-          id: `notification-${Date.now()}`,
-          sessionId,
-          toolCallId,
-          prompt: params.prompt,
-          resultSummary: output.slice(0, 200) + (output.length > 200 ? '...' : ''),
-          fullResult: output,
-          createdAt: Date.now(),
-          handled: false,
-        }
-        useAssistantStore.getState().addCompletionNotification(notification)
 
-        // 发出事件通知 UI
-        this.eventBus.emit({
-          type: 'assistant_notification' as any,
-          notification,
-        } as any)
-
-        // 自动汇报给 AI（核心改动）
+        // 自动汇报给 AI
         if (params.autoReport !== false && output) {
-          this.autoReportToAI(params.prompt, output, notification.id)
+          this.autoReportToAI(params.prompt, output)
         }
       }
 
@@ -436,22 +418,6 @@ export class AssistantEngine {
         this.backgroundUnsubscribes.delete(sessionId)
         // 更新会话状态为错误
         useAssistantStore.getState().updateSessionStatus(sessionId, 'error')
-        const notification: CompletionNotification = {
-          id: `notification-${Date.now()}`,
-          sessionId,
-          toolCallId,
-          prompt: params.prompt,
-          resultSummary: `执行失败: ${(event as any).error || '未知错误'}`,
-          createdAt: Date.now(),
-          handled: false,
-        }
-        useAssistantStore.getState().addCompletionNotification(notification)
-
-        // 发出事件通知 UI
-        this.eventBus.emit({
-          type: 'assistant_notification' as any,
-          notification,
-        } as any)
       }
     })
 
@@ -589,11 +555,7 @@ ${result}
    * 自动将后台任务结果汇报给 AI
    * 用于实现 AI 主动汇报能力
    */
-  private autoReportToAI(
-    prompt: string,
-    result: string,
-    notificationId: string
-  ): void {
+  private autoReportToAI(prompt: string, result: string): void {
     if (!this.llmEngine || !result) return
 
     // 构建汇报消息
@@ -610,24 +572,16 @@ ${result}
     // 添加到对话历史
     this.conversationHistory.push({ role: 'user', content: reportMessage })
 
-    // 标记通知已自动汇报
-    useAssistantStore.getState().markNotificationAutoReported(notificationId)
-
     // 异步处理，不阻塞主流程
-    this.processAutoReport(reportMessage, notificationId).catch((error) => {
+    this.processAutoReport(reportMessage).catch((error) => {
       console.error('[AssistantEngine] 自动汇报失败:', error)
-      // 标记自动汇报失败，让用户可以手动处理
-      useAssistantStore.getState().updateNotificationError(
-        notificationId,
-        `自动汇报失败: ${(error as Error).message}`
-      )
     })
   }
 
   /**
    * 处理自动汇报的 LLM 调用
    */
-  private async processAutoReport(reportMessage: string, notificationId: string): Promise<void> {
+  private async processAutoReport(reportMessage: string): Promise<void> {
     if (!this.llmEngine) return
 
     // 构建 OpenAI 消息数组（包含历史）
@@ -674,14 +628,6 @@ ${result}
     this.paragraphBuffer.flush()
     useAssistantStore.getState().setStreamingMessageId(null)
     this.conversationHistory.push({ role: 'assistant', content: currentContent })
-
-    // 发出事件通知 UI 对话已完成，使用通知关联的会话 ID
-    const notification = useAssistantStore.getState().completionNotifications.find(n => n.id === notificationId)
-    this.eventBus.emit({
-      type: 'assistant_auto_report_complete',
-      sessionId: notification?.sessionId || this.llmEngine.id,
-      message: currentContent,
-    } as any)
   }
 
   /**
@@ -781,7 +727,6 @@ export function clearConversation(): void {
 
   // 2. 清理 store 状态
   store.clearMessages()
-  store.clearNotifications()
 
   // 3. 清理所有非 primary 会话
   const allSessions = store.getAllClaudeCodeSessions()

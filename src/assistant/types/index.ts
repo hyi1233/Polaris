@@ -98,38 +98,6 @@ export interface ClaudeCodeExecutionEvent {
 }
 
 // ============================================
-// 完成通知
-// ============================================
-
-/** 后台任务完成通知 */
-export interface CompletionNotification {
-  /** 通知 ID */
-  id: string
-  /** 关联的会话 ID */
-  sessionId: string
-  /** 关联的工具调用 ID */
-  toolCallId: string
-  /** 执行的提示词 */
-  prompt: string
-  /** 执行结果摘要 */
-  resultSummary: string
-  /** 完整结果 */
-  fullResult?: string
-  /** 创建时间 */
-  createdAt: number
-  /** 是否已处理 */
-  handled: boolean
-  /** 处理方式 */
-  handleType?: 'immediate' | 'delayed' | 'ignored'
-  /** 重试次数 */
-  retryCount?: number
-  /** 最后错误信息 */
-  lastError?: string
-  /** 是否已自动汇报给 AI */
-  autoReported?: boolean
-}
-
-// ============================================
 // 助手事件
 // ============================================
 
@@ -143,7 +111,6 @@ export type AssistantEvent =
   | { type: 'claude_code_event'; sessionId: string; event: ClaudeCodeExecutionEvent }
   | { type: 'session_created'; session: ClaudeCodeSessionState }
   | { type: 'session_completed'; sessionId: string; success: boolean }
-  | { type: 'background_task_completed'; notification: CompletionNotification }
 
 // ============================================
 // 配置类型

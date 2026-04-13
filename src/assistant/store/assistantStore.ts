@@ -5,7 +5,6 @@ import type {
   ClaudeCodeSessionState,
   InvokeClaudeCodeParams,
   ClaudeCodeExecutionEvent,
-  CompletionNotification,
 } from '../types'
 import { getClaudeCodeSessionManager } from '../core/ClaudeCodeSessionManager'
 
@@ -20,7 +19,6 @@ const MAX_MESSAGES = 100
  */
 export interface AssistantPersistState {
   messages: AssistantMessage[]
-  completionNotifications: CompletionNotification[]
   version: number
 }
 
@@ -44,11 +42,6 @@ export interface AssistantState {
 
   // 错误状态
   error: string | null
-
-  // 完成通知队列
-  completionNotifications: CompletionNotification[]
-  /** 是否有未处理的通知 */
-  hasUnreadNotifications: boolean
 }
 
 /**
@@ -87,14 +80,6 @@ export interface AssistantActions {
   toggleExecutionPanel: () => void
   setExecutionPanelSession: (sessionId: string | null) => void
 
-  // 完成通知管理
-  addCompletionNotification: (notification: CompletionNotification) => void
-  getPendingNotifications: () => CompletionNotification[]
-  markNotificationHandled: (id: string, handleType: 'immediate' | 'delayed' | 'ignored') => void
-  markNotificationAutoReported: (id: string) => void
-  updateNotificationError: (id: string, error: string) => void
-  clearNotifications: () => void
-
   // 初始化
   initialize: () => void
 }
@@ -116,8 +101,6 @@ export const useAssistantStore = create<AssistantStore>()(
       executionPanelExpanded: false,
       executionPanelSessionId: null,
       error: null,
-      completionNotifications: [],
-      hasUnreadNotifications: false,
 
       // 消息操作
       addMessage: (message) => {
@@ -321,50 +304,6 @@ export const useAssistantStore = create<AssistantStore>()(
         })
       },
 
-      // 完成通知管理
-      addCompletionNotification: (notification) => {
-        set((state) => ({
-          completionNotifications: [...state.completionNotifications, notification],
-          hasUnreadNotifications: true,
-        }))
-      },
-
-      getPendingNotifications: () => {
-        return get().completionNotifications.filter((n) => !n.handled)
-      },
-
-      markNotificationHandled: (id, handleType) => {
-        set((state) => {
-          const notifications = state.completionNotifications.map((n) =>
-            n.id === id ? { ...n, handled: true, handleType } : n
-          )
-          const hasUnread = notifications.some((n) => !n.handled)
-          return { completionNotifications: notifications, hasUnreadNotifications: hasUnread }
-        })
-      },
-
-      markNotificationAutoReported: (id) => {
-        set((state) => {
-          const notifications = state.completionNotifications.map((n) =>
-            n.id === id ? { ...n, autoReported: true } : n
-          )
-          return { completionNotifications: notifications }
-        })
-      },
-
-      updateNotificationError: (id, error) => {
-        set((state) => {
-          const notifications = state.completionNotifications.map((n) =>
-            n.id === id ? { ...n, lastError: error, retryCount: (n.retryCount || 0) + 1 } : n
-          )
-          return { completionNotifications: notifications }
-        })
-      },
-
-      clearNotifications: () => {
-        set({ completionNotifications: [], hasUnreadNotifications: false })
-      },
-
       // 初始化
       initialize: () => {
         // 创建 primary 会话
@@ -381,7 +320,6 @@ export const useAssistantStore = create<AssistantStore>()(
       // 只持久化必要的状态
       partialize: (state): AssistantPersistState => ({
         messages: state.messages,
-        completionNotifications: state.completionNotifications,
         version: PERSIST_VERSION,
       }),
       // 恢复状态时的迁移处理
@@ -395,7 +333,6 @@ export const useAssistantStore = create<AssistantStore>()(
 
         return {
           messages: state?.messages || [],
-          completionNotifications: state?.completionNotifications || [],
           version: PERSIST_VERSION,
         }
       },

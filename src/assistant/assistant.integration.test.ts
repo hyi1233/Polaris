@@ -1,17 +1,17 @@
 /**
- * 集成测试 - AI 助手后台执行与通知处理
+ * 集成测试 - AI 助手后台执行与会话管理
  *
  * 测试场景：
  * 1. 后台执行完整流程
- * 2. 通知处理完整流程（立即处理/延迟处理/忽略）
- * 3. 重试机制
+ * 2. 会话状态管理
+ * 3. 执行面板交互
  *
  * 注意：此测试使用真实的 assistantStore，mock 只针对外部依赖
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAssistantStore, initializeAssistantStore } from './store/assistantStore'
-import type { CompletionNotification, ClaudeCodeExecutionEvent } from './types'
+import type { ClaudeCodeExecutionEvent } from './types'
 
 // ============================================
 // Mock 外部依赖
@@ -70,8 +70,6 @@ describe('Background Execution Integration', () => {
       executionPanelExpanded: false,
       executionPanelSessionId: null,
       error: null,
-      completionNotifications: [],
-      hasUnreadNotifications: false,
     })
   })
 
@@ -87,33 +85,6 @@ describe('Background Execution Integration', () => {
       expect(session).toBeDefined()
       expect(session?.type).toBe('background')
       expect(session?.status).toBe('idle')
-    })
-
-    it('应在后台任务完成时创建通知', async () => {
-      const store = useAssistantStore.getState()
-
-      // 添加完成通知
-      const notification: CompletionNotification = {
-        id: 'notif-1',
-        sessionId: 'bg-session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试提示词',
-        resultSummary: '执行结果摘要',
-        fullResult: '完整的执行结果内容',
-        createdAt: Date.now(),
-        handled: false,
-      }
-
-      store.addCompletionNotification(notification)
-
-      // 验证通知已添加
-      expect(useAssistantStore.getState().completionNotifications).toHaveLength(1)
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(true)
-
-      // 获取待处理通知
-      const pending = useAssistantStore.getState().getPendingNotifications()
-      expect(pending).toHaveLength(1)
-      expect(pending[0].id).toBe('notif-1')
     })
 
     it('应正确跟踪后台会话事件', async () => {
@@ -141,159 +112,6 @@ describe('Background Execution Integration', () => {
       // 验证事件已记录
       const session = useAssistantStore.getState().getClaudeCodeSession(sessionId)
       expect(session?.events).toHaveLength(2)
-    })
-  })
-
-  describe('通知处理', () => {
-    it('应正确处理立即处理模式', async () => {
-      const store = useAssistantStore.getState()
-
-      const notification: CompletionNotification = {
-        id: 'notif-immediate',
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试提示词',
-        resultSummary: '摘要',
-        fullResult: '完整结果',
-        createdAt: Date.now(),
-        handled: false,
-      }
-
-      store.addCompletionNotification(notification)
-      store.markNotificationHandled('notif-immediate', 'immediate')
-
-      // 验证状态更新
-      const handled = useAssistantStore.getState().completionNotifications.find(n => n.id === 'notif-immediate')
-      expect(handled?.handled).toBe(true)
-      expect(handled?.handleType).toBe('immediate')
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(false)
-    })
-
-    it('应正确处理延迟处理模式', async () => {
-      const store = useAssistantStore.getState()
-
-      const notification: CompletionNotification = {
-        id: 'notif-delayed',
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试提示词',
-        resultSummary: '摘要',
-        fullResult: '完整结果',
-        createdAt: Date.now(),
-        handled: false,
-      }
-
-      store.addCompletionNotification(notification)
-      store.markNotificationHandled('notif-delayed', 'delayed')
-
-      const handled = useAssistantStore.getState().completionNotifications.find(n => n.id === 'notif-delayed')
-      expect(handled?.handled).toBe(true)
-      expect(handled?.handleType).toBe('delayed')
-    })
-
-    it('应正确处理忽略模式', async () => {
-      const store = useAssistantStore.getState()
-
-      const notification: CompletionNotification = {
-        id: 'notif-ignored',
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试提示词',
-        resultSummary: '摘要',
-        createdAt: Date.now(),
-        handled: false,
-      }
-
-      store.addCompletionNotification(notification)
-      store.markNotificationHandled('notif-ignored', 'ignored')
-
-      const handled = useAssistantStore.getState().completionNotifications.find(n => n.id === 'notif-ignored')
-      expect(handled?.handled).toBe(true)
-      expect(handled?.handleType).toBe('ignored')
-    })
-
-    it('应支持错误记录和重试计数', async () => {
-      const store = useAssistantStore.getState()
-
-      const notification: CompletionNotification = {
-        id: 'notif-error',
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试提示词',
-        resultSummary: '摘要',
-        fullResult: '完整结果',
-        createdAt: Date.now(),
-        handled: false,
-        retryCount: 0,
-      }
-
-      store.addCompletionNotification(notification)
-
-      // 第一次错误
-      store.updateNotificationError('notif-error', 'Network error')
-      let notif = useAssistantStore.getState().completionNotifications.find(n => n.id === 'notif-error')
-      expect(notif?.lastError).toBe('Network error')
-      expect(notif?.retryCount).toBe(1)
-
-      // 第二次错误
-      store.updateNotificationError('notif-error', 'Timeout error')
-      notif = useAssistantStore.getState().completionNotifications.find(n => n.id === 'notif-error')
-      expect(notif?.lastError).toBe('Timeout error')
-      expect(notif?.retryCount).toBe(2)
-    })
-  })
-
-  describe('多通知管理', () => {
-    it('应正确管理多个通知', async () => {
-      const store = useAssistantStore.getState()
-
-      // 添加多个通知
-      for (let i = 0; i < 3; i++) {
-        store.addCompletionNotification({
-          id: `notif-${i}`,
-          sessionId: `session-${i}`,
-          toolCallId: `tool-${i}`,
-          prompt: `提示词 ${i}`,
-          resultSummary: `摘要 ${i}`,
-          createdAt: Date.now() + i,
-          handled: false,
-        })
-      }
-
-      expect(useAssistantStore.getState().completionNotifications).toHaveLength(3)
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(true)
-
-      // 获取待处理通知
-      const pending = useAssistantStore.getState().getPendingNotifications()
-      expect(pending).toHaveLength(3)
-
-      // 处理一个
-      store.markNotificationHandled('notif-1', 'immediate')
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(true)
-
-      // 处理剩余
-      store.markNotificationHandled('notif-0', 'immediate')
-      store.markNotificationHandled('notif-2', 'immediate')
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(false)
-    })
-
-    it('应支持清空所有通知', async () => {
-      const store = useAssistantStore.getState()
-
-      // 添加通知
-      store.addCompletionNotification({
-        id: 'notif-1',
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        prompt: '测试',
-        resultSummary: '摘要',
-        createdAt: Date.now(),
-        handled: false,
-      })
-
-      store.clearNotifications()
-      expect(useAssistantStore.getState().completionNotifications).toHaveLength(0)
-      expect(useAssistantStore.getState().hasUnreadNotifications).toBe(false)
     })
   })
 
@@ -339,88 +157,6 @@ describe('Background Execution Integration', () => {
   })
 })
 
-describe('Notification Panel Integration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    useAssistantStore.setState({
-      messages: [],
-      isLoading: false,
-      claudeCodeSessions: new Map(),
-      activeClaudeCodeSessionId: null,
-      executionPanelExpanded: false,
-      executionPanelSessionId: null,
-      error: null,
-      completionNotifications: [],
-      hasUnreadNotifications: false,
-    })
-  })
-
-  it('应在有未处理通知时显示徽章', async () => {
-    const store = useAssistantStore.getState()
-
-    expect(useAssistantStore.getState().hasUnreadNotifications).toBe(false)
-
-    // 添加通知
-    store.addCompletionNotification({
-      id: 'notif-1',
-      sessionId: 'session-1',
-      toolCallId: 'tool-1',
-      prompt: '测试',
-      resultSummary: '摘要',
-      createdAt: Date.now(),
-      handled: false,
-    })
-
-    expect(useAssistantStore.getState().hasUnreadNotifications).toBe(true)
-
-    // 处理后消失
-    store.markNotificationHandled('notif-1', 'immediate')
-    expect(useAssistantStore.getState().hasUnreadNotifications).toBe(false)
-  })
-
-  it('应正确过滤已处理的通知', async () => {
-    const store = useAssistantStore.getState()
-
-    // 添加多个通知
-    store.addCompletionNotification({
-      id: 'notif-1',
-      sessionId: 'session-1',
-      toolCallId: 'tool-1',
-      prompt: '测试1',
-      resultSummary: '摘要1',
-      createdAt: Date.now(),
-      handled: false,
-    })
-
-    store.addCompletionNotification({
-      id: 'notif-2',
-      sessionId: 'session-2',
-      toolCallId: 'tool-2',
-      prompt: '测试2',
-      resultSummary: '摘要2',
-      createdAt: Date.now(),
-      handled: true,
-      handleType: 'immediate',
-    })
-
-    store.addCompletionNotification({
-      id: 'notif-3',
-      sessionId: 'session-3',
-      toolCallId: 'tool-3',
-      prompt: '测试3',
-      resultSummary: '摘要3',
-      createdAt: Date.now(),
-      handled: false,
-    })
-
-    const pending = useAssistantStore.getState().getPendingNotifications()
-    expect(pending).toHaveLength(2)
-    expect(pending.map(n => n.id)).toContain('notif-1')
-    expect(pending.map(n => n.id)).toContain('notif-3')
-    expect(pending.map(n => n.id)).not.toContain('notif-2')
-  })
-})
-
 describe('Execution Panel Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -432,8 +168,6 @@ describe('Execution Panel Integration', () => {
       executionPanelExpanded: false,
       executionPanelSessionId: null,
       error: null,
-      completionNotifications: [],
-      hasUnreadNotifications: false,
     })
   })
 

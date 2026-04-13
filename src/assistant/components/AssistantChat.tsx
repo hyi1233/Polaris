@@ -4,9 +4,6 @@ import { useAssistantStore } from '../store/assistantStore'
 import { ProgressiveStreamingMarkdown } from '../../utils/lightweightMarkdown'
 import type { AssistantMessage } from '../types'
 
-/** 视口扩展常量 */
-const VIEWPORT_EXTENSION = { top: 50, bottom: 100 }
-
 /**
  * 用户消息气泡组件
  */

@@ -34,8 +34,6 @@ const mockStore = {
   setStreamingMessageId: vi.fn(),
   appendToLastAssistantMessage: vi.fn(),
   updateLastAssistantMessage: vi.fn(),
-  addCompletionNotification: vi.fn(),
-  markNotificationAutoReported: vi.fn(),
   addSessionEvent: vi.fn(),
 }
 
@@ -134,23 +132,8 @@ describe('AssistantEngine - auto report', () => {
     mockStore.addMessage.mockClear()
     mockStore.setStreamingMessageId.mockClear()
     mockStore.appendToLastAssistantMessage.mockClear()
-    mockStore.addCompletionNotification.mockClear()
-    mockStore.markNotificationAutoReported.mockClear()
 
     engine = new AssistantEngine()
-  })
-
-  it('should call markNotificationAutoReported when auto-report is triggered', async () => {
-    // 验证 autoReportToAI 方法会调用 markNotificationAutoReported
-    // 这是通过 executeClaudeCodeBackground 中的逻辑实现的
-    engine.initialize({
-      baseUrl: 'https://api.openai.com/v1',
-      apiKey: 'test-key',
-      model: 'gpt-4o',
-    })
-
-    // 简单验证初始化成功
-    expect(engine).toBeDefined()
   })
 
   it('should have autoReport field in params type', () => {
