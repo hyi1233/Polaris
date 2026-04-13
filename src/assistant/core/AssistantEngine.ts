@@ -513,6 +513,13 @@ ${result}
 
     useAssistantStore.getState().setStreamingMessageId(null)
     this.conversationHistory.push({ role: 'assistant', content: currentContent })
+
+    // 发出事件通知 UI 对话已完成
+    this.eventBus.emit({
+      type: 'assistant_auto_report_complete',
+      sessionId: this.llmEngine.id,
+      message: currentContent,
+    } as any)
   }
 
   /**
