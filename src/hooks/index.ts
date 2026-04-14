@@ -12,6 +12,7 @@ export { useThrottle, useThrottledCallback, useThrottledStreamingValue } from '.
 // 响应式 Hooks
 export { useWindowSize } from './useWindowSize';
 export type { WindowSize, WindowSizeInfo, UseWindowSizeOptions } from './useWindowSize';
+export { useContainerWidth } from './useContainerWidth';
 
 // 错误处理 Hooks
 export { useError, useGlobalErrorHandler, safeAsync } from './useError';

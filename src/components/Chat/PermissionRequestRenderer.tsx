@@ -25,24 +25,26 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
   const [expandedDenial, setExpandedDenial] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 本地决策状态，用户操作后立即生效
+  const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'denied'>('pending');
+
   const conversationId = useActiveSessionConversationId();
   const { continueChat } = useActiveSessionActions();
 
-  // 是否已处理
-  const isHandled = block.status !== 'pending';
-  const isApproved = block.status === 'approved';
+  const isHandled = localStatus !== 'pending';
 
   // 处理批准
   const handleApprove = useCallback(async () => {
     if (isHandled || isProcessing) return;
 
     setIsProcessing(true);
+    setLocalStatus('approved');
     try {
-      // 提取被拒绝的工具名列表，通过 --allowedTools 重试
-      const deniedToolNames = block.denials.map(d => d.toolName);
+      // 提取被拒绝的工具名列表（去重），通过 --allowedTools 重试
+      const deniedToolNames = [...new Set(block.denials.map(d => d.toolName))];
 
       if (conversationId) {
-        await continueChat('继续执行', deniedToolNames);
+        await continueChat(`[已授权] ${deniedToolNames.join(', ')}`, deniedToolNames);
       }
     } catch (error) {
       console.error('[PermissionRequest] 批准操作失败:', error);
@@ -56,11 +58,10 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
     if (isHandled || isProcessing) return;
 
     setIsProcessing(true);
+    setLocalStatus('denied');
     try {
-      // 构建决策 prompt
       const decisionPrompt = `[权限确认] 用户拒绝了操作\n工具: ${block.denials.map(d => d.toolName).join(', ')}`;
 
-      // 调用 continueChat 发送决策
       if (conversationId) {
         await continueChat(decisionPrompt);
       }
@@ -70,11 +71,6 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
       setIsProcessing(false);
     }
   }, [isHandled, isProcessing, block.denials, conversationId, continueChat]);
-
-  // 切换拒绝详情展开
-  const toggleDenialExpand = useCallback((index: number) => {
-    setExpandedDenial(prev => prev === index ? null : index);
-  }, []);
 
   // 键盘导航处理
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -103,40 +99,46 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
     }
   }, [isHandled]);
 
-  // 状态配置
-  const statusConfig = {
-    pending: { icon: Shield, color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-    approved: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/30' },
-    denied: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-  };
+  // ===== 已处理：紧凑一行显示 =====
+  if (localStatus === 'approved') {
+    const toolNames = [...new Set(block.denials.map(d => d.toolName))].join(', ');
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-green-500/10 border border-green-500/20 text-sm">
+        <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+        <span className="text-green-600">{t('permissionRequest.approved', '已授权')}</span>
+        <span className="font-mono text-xs text-text-tertiary">{toolNames}</span>
+      </div>
+    );
+  }
 
-  const config = statusConfig[block.status];
-  const StatusIcon = config.icon;
+  if (localStatus === 'denied') {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-500/10 border border-red-500/20 text-sm">
+        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+        <span className="text-red-600">{t('permissionRequest.denied', '已拒绝')}</span>
+      </div>
+    );
+  }
 
+  // ===== 待处理：完整面板 =====
   return (
     <div
       ref={containerRef}
       className={clsx(
         'rounded-lg border p-4 transition-all',
-        config.bg,
-        config.border,
-        !isHandled && 'focus:ring-2 focus:ring-amber-500 focus:outline-none'
+        'bg-amber-500/10 border-amber-500/30',
+        'focus:ring-2 focus:ring-amber-500 focus:outline-none'
       )}
       role="region"
       aria-label={t('permissionRequest.ariaLabel', '权限请求')}
-      tabIndex={!isHandled ? 0 : -1}
+      tabIndex={0}
       onKeyDown={handleKeyDown}
     >
       {/* 标题栏 */}
       <div className="flex items-center gap-2 mb-3">
-        <StatusIcon className={clsx('w-5 h-5', config.color)} />
+        <Shield className="w-5 h-5 text-amber-500" />
         <span className="font-medium text-sm">
-          {isHandled
-            ? (isApproved
-                ? t('permissionRequest.approved', '已批准')
-                : t('permissionRequest.denied', '已拒绝'))
-            : t('permissionRequest.title', '权限请求')
-          }
+          {t('permissionRequest.title', '权限请求')}
         </span>
         <span className="text-xs text-muted ml-auto">
           {block.denials.length} {t('permissionRequest.items', '项')}
@@ -161,7 +163,7 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
                 'hover:bg-base-200/50 transition-colors',
                 'focus:outline-none focus:ring-1 focus:ring-primary'
               )}
-              onClick={() => toggleDenialExpand(index)}
+              onClick={() => setExpandedDenial(prev => prev === index ? null : index)}
               aria-expanded={expandedDenial === index}
             >
               {expandedDenial === index ? (
@@ -205,40 +207,31 @@ export const PermissionRequestRenderer = memo(function PermissionRequestRenderer
       </div>
 
       {/* 操作按钮 */}
-      {!isHandled && (
-        <div className="flex items-center gap-2 pt-2 border-t border-base-300">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleApprove}
-            disabled={isProcessing}
-            className="flex-1"
-            aria-label={t('permissionRequest.approveAriaLabel', '批准操作')}
-          >
-            {isProcessing
-              ? t('permissionRequest.processing', '处理中...')
-              : t('permissionRequest.approve', '批准')
-            }
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleDeny}
-            disabled={isProcessing}
-            className="flex-1"
-            aria-label={t('permissionRequest.denyAriaLabel', '拒绝操作')}
-          >
-            {t('permissionRequest.deny', '拒绝')}
-          </Button>
-        </div>
-      )}
-
-      {/* 决策时间 */}
-      {isHandled && block.decision && (
-        <div className="text-xs text-muted mt-2 pt-2 border-t border-base-300">
-          {t('permissionRequest.decisionTime', '决策时间')}: {new Date(block.decision.timestamp).toLocaleTimeString()}
-        </div>
-      )}
+      <div className="flex items-center gap-2 pt-2 border-t border-base-300">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleApprove}
+          disabled={isProcessing}
+          className="flex-1"
+          aria-label={t('permissionRequest.approveAriaLabel', '批准操作')}
+        >
+          {isProcessing
+            ? t('permissionRequest.processing', '处理中...')
+            : t('permissionRequest.approve', '批准')
+          }
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleDeny}
+          disabled={isProcessing}
+          className="flex-1"
+          aria-label={t('permissionRequest.denyAriaLabel', '拒绝操作')}
+        >
+          {t('permissionRequest.deny', '拒绝')}
+        </Button>
+      </div>
     </div>
   );
 });
@@ -260,7 +253,7 @@ export const SimplifiedPermissionRequestRenderer = memo(function SimplifiedPermi
         'bg-base-200/50 text-sm'
       )}
       role="region"
-      aria-label={`${t('permissionRequest.ariaLabel', '权限请求')}: ${isApproved ? t('permissionRequest.approved', '已批准') : t('permissionRequest.denied', '已拒绝')}`}
+      aria-label={`${t('permissionRequest.ariaLabel', '权限请求')}: ${isApproved ? t('permissionRequest.approved', '已授权') : t('permissionRequest.denied', '已拒绝')}`}
       aria-hidden="true"
     >
       <Icon className={clsx('w-4 h-4', iconClass)} />

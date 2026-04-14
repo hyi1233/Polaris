@@ -5,7 +5,7 @@
  * 位于 ChatStatusBar 中，影响下一次发送消息的行为
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Bot, Cpu, Zap, Shield } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -26,6 +26,8 @@ interface SessionConfigSelectorProps {
   onChange: (config: SessionRuntimeConfig) => void
   /** 是否禁用 */
   disabled?: boolean
+  /** 只渲染指定类型的选择器，不传则渲染全部 */
+  visibleTypes?: SelectorType[]
 }
 
 type SelectorType = 'agent' | 'model' | 'effort' | 'permission'
@@ -37,6 +39,7 @@ export function SessionConfigSelector({
   config,
   onChange,
   disabled = false,
+  visibleTypes,
 }: SessionConfigSelectorProps) {
   const { t } = useTranslation('chat')
   const [openDropdown, setOpenDropdown] = useState<SelectorType | null>(null)
@@ -192,39 +195,39 @@ export function SessionConfigSelector({
     </div>
   )
 
+  // 选择器元数据映射
+  const selectorMeta: Record<SelectorType, { icon: React.ReactNode; label: string; getValue: () => string }> = {
+    agent: {
+      icon: <Bot size={12} />,
+      label: t('sessionConfig.agent', 'Agent'),
+      getValue: () => getAgentLabel(config.agent),
+    },
+    model: {
+      icon: <Cpu size={12} />,
+      label: t('sessionConfig.model', '模型'),
+      getValue: () => getModelLabel(config.model),
+    },
+    effort: {
+      icon: <Zap size={12} />,
+      label: t('sessionConfig.effort', '努力'),
+      getValue: () => getEffortLabel(config.effort),
+    },
+    permission: {
+      icon: <Shield size={12} />,
+      label: t('sessionConfig.permission', '权限'),
+      getValue: () => getPermissionLabel(config.permissionMode),
+    },
+  }
+
+  const ALL_TYPES: SelectorType[] = ['agent', 'model', 'effort', 'permission']
+  const typesToShow = visibleTypes ?? ALL_TYPES
+
   return (
     <div ref={containerRef} className="flex items-center gap-1">
-      {/* Agent 选择器 */}
-      {renderSelector(
-        'agent',
-        <Bot size={12} />,
-        t('sessionConfig.agent', 'Agent'),
-        getAgentLabel(config.agent)
-      )}
-
-      {/* Model 选择器 */}
-      {renderSelector(
-        'model',
-        <Cpu size={12} />,
-        t('sessionConfig.model', '模型'),
-        getModelLabel(config.model)
-      )}
-
-      {/* Effort 选择器 */}
-      {renderSelector(
-        'effort',
-        <Zap size={12} />,
-        t('sessionConfig.effort', '努力'),
-        getEffortLabel(config.effort)
-      )}
-
-      {/* Permission 选择器 */}
-      {renderSelector(
-        'permission',
-        <Shield size={12} />,
-        t('sessionConfig.permission', '权限'),
-        getPermissionLabel(config.permissionMode)
-      )}
+      {typesToShow.map(type => {
+        const { icon, label, getValue } = selectorMeta[type]
+        return renderSelector(type, icon, label, getValue())
+      })}
     </div>
   )
 }
