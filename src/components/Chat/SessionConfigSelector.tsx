@@ -226,7 +226,7 @@ export function SessionConfigSelector({
     <div ref={containerRef} className="flex items-center gap-1">
       {typesToShow.map(type => {
         const { icon, label, getValue } = selectorMeta[type]
-        return renderSelector(type, icon, label, getValue())
+        return <React.Fragment key={type}>{renderSelector(type, icon, label, getValue())}</React.Fragment>
       })}
     </div>
   )

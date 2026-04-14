@@ -277,7 +277,7 @@ export function ChatStatusBar({ children }: ChatStatusBarProps) {
       {/* 主行 */}
       <div className="flex items-center justify-between gap-2 py-1.5 min-w-0">
         {/* 左侧：children + 按宽度显示的选择器 */}
-        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0">
           {children}
           {isWide && versionBadge}
           {visibleTypes.length > 0 && (
@@ -346,8 +346,8 @@ export function ChatStatusBar({ children }: ChatStatusBarProps) {
       {/* 展开行（仅窄屏且有溢出内容时渲染） */}
       {!isWide && hasOverflow && (
         <div className={clsx(
-          'overflow-hidden transition-opacity duration-200',
-          expanded ? 'opacity-100' : 'opacity-0',
+          'transition-opacity duration-200',
+          expanded ? 'opacity-100 overflow-visible' : 'opacity-0 overflow-hidden',
         )}>
           <div className="flex items-center gap-2 py-1.5 border-t border-border-subtle/50 flex-wrap">
             {/* 被隐藏的选择器 */}
