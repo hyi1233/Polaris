@@ -16,3 +16,4 @@ export * from './terminal';
 export * from './attachment';
 export * from './errors';
 export * from './requirement';
+export * from './plugin';

@@ -16,6 +16,7 @@ import { AIEngineTab } from './tabs/AIEngineTab';
 import { GeneralTab } from './tabs/GeneralTab';
 import { SystemPromptTab } from './tabs/SystemPromptTab';
 import { PromptSnippetTab } from './tabs/PromptSnippetTab';
+import { PluginTab } from './tabs/PluginTab';
 import { WindowTab } from './tabs/WindowTab';
 import { TranslateTab } from './tabs/TranslateTab';
 import { QQBotTab } from './tabs/QQBotTab';
@@ -41,6 +42,7 @@ const TAB_TITLE_KEYS: Record<SettingsTabId, string> = {
   'prompt-snippet': 'nav.promptSnippet',
   'window': 'nav.window',
   'ai-engine': 'nav.aiEngine',
+  'plugins': 'nav.plugins',
   'translate': 'nav.translate',
   'qqbot': 'nav.qqbot',
   'feishu': 'nav.feishu',
@@ -166,6 +168,10 @@ export function SettingsModal({ onClose, initialTab }: SettingsModalProps) {
                   onConfigChange={setLocalConfig}
                   loading={loading}
                 />
+              )}
+
+              {activeTab === 'plugins' && (
+                <PluginTab />
               )}
 
               {activeTab === 'general' && (

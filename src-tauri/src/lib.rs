@@ -483,6 +483,17 @@ pub fn run() {
             commands::requirement::save_requirement_prototype,
             commands::requirement::read_requirement_prototype,
             commands::requirement::get_requirement_workspace_breakdown,
+            // Plugin 相关
+            commands::plugin::plugin_list,
+            commands::plugin::plugin_install,
+            commands::plugin::plugin_enable,
+            commands::plugin::plugin_disable,
+            commands::plugin::plugin_update,
+            commands::plugin::plugin_uninstall,
+            commands::plugin::marketplace_list,
+            commands::plugin::marketplace_add,
+            commands::plugin::marketplace_remove,
+            commands::plugin::marketplace_update,
 
         ])
         .run(tauri::generate_context!())

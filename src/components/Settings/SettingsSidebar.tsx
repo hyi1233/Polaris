@@ -20,13 +20,14 @@ export type SettingsTabId =
   | 'general'
   | 'system-prompt'
   | 'prompt-snippet'
+  | 'window'
   | 'ai-engine'
+  | 'plugins'
   | 'translate'
   | 'qqbot'
   | 'feishu'
   | 'speech'
   | 'assistant'
-  | 'window'
   | 'advanced';
 
 export interface SettingsNavItem {
@@ -48,6 +49,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'prompt-snippet', icon: <IconMessageSquareText size={16} />, labelKey: 'nav.promptSnippet' },
   { id: 'window', icon: <IconSettings size={16} />, labelKey: 'nav.window' },
   { id: 'ai-engine', icon: <IconAIEngine size={16} />, labelKey: 'nav.aiEngine' },
+  { id: 'plugins', icon: <Sparkles size={16} />, labelKey: 'nav.plugins' },
   { id: 'translate', icon: <IconTranslate size={16} />, labelKey: 'nav.translate' },
   { id: 'qqbot', icon: <IconBot size={16} />, labelKey: 'nav.qqbot' },
   { id: 'feishu', icon: <IconBot size={16} />, labelKey: 'nav.feishu' },

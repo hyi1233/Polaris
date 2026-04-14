@@ -32,3 +32,4 @@ export { useTerminalStore } from './terminalStore';
 export { useChatInputStore } from './chatInputStore';
 export { useRequirementStore } from './requirementStore';
 export { useSessionStore, getSessionEffectiveWorkspace } from './sessionStore';
+export { usePluginStore } from './pluginStore';
