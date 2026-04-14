@@ -29,9 +29,9 @@ import { SessionConfigSelector } from './SessionConfigSelector';
 /** 宽度分级阈值 */
 const BREAKPOINTS = {
   /** 全部元素一行展示，无需展开 */
-  full: 680,
+  full: 550,
   /** 主行显示 Agent + Model */
-  medium: 500,
+  medium: 400,
   /** 主行仅显示 Agent */
   narrow: 300,
 } as const;
@@ -41,8 +41,8 @@ type SelectorType = 'agent' | 'model' | 'effort' | 'permission';
 /** 根据容器宽度计算主行应显示的选择器类型 */
 function getVisibleTypes(width: number): SelectorType[] {
   if (width >= BREAKPOINTS.full) return ['agent', 'model', 'effort', 'permission'];
-  if (width >= BREAKPOINTS.medium) return ['agent', 'model'];
-  if (width >= BREAKPOINTS.narrow) return ['agent'];
+  if (width >= BREAKPOINTS.medium) return ['agent', 'model', 'effort', 'permission'];
+  if (width >= BREAKPOINTS.narrow) return ['agent', 'effort', 'permission'];
   return [];
 }
 
@@ -93,8 +93,6 @@ export function ChatStatusBar({ children }: ChatStatusBarProps) {
   const visibleTypes = getVisibleTypes(containerWidth);
   const hiddenTypes = getHiddenTypes(visibleTypes);
   const isWide = containerWidth >= BREAKPOINTS.full;
-  // 是否有内容被折叠（需要展开按钮）
-  const hasOverflow = !isWide && (hiddenTypes.length > 0 || !!versionBadge);
 
   // 展开/收起
   const [expanded, setExpanded] = useState(false);
@@ -203,6 +201,9 @@ export function ChatStatusBar({ children }: ChatStatusBarProps) {
       v{healthStatus.claudeVersion}
     </span>
   ) : null;
+
+  // 是否有内容被折叠（需要展开按钮）
+  const hasOverflow = !isWide && (hiddenTypes.length > 0 || !!versionBadge);
 
   // 语音识别按钮
   const speechButton = speechEnabled && speechSupported ? (
