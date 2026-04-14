@@ -232,6 +232,10 @@ impl ClaudeEngine {
         session_id: Option<&str>,
         mcp_config_path: Option<&str>,
         additional_dirs: &[String],
+        agent: Option<&str>,
+        model: Option<&str>,
+        effort: Option<&str>,
+        permission_mode: Option<&str>,
     ) -> Result<Command> {
         #[cfg(windows)]
         {
@@ -282,12 +286,41 @@ impl ClaudeEngine {
                 }
             }
 
+            // 添加 Agent 选择参数
+            if let Some(a) = agent {
+                if !a.is_empty() {
+                    cmd.arg("--agent").arg(a);
+                }
+            }
+
+            // 添加模型选择参数
+            if let Some(m) = model {
+                if !m.is_empty() {
+                    cmd.arg("--model").arg(m);
+                }
+            }
+
+            // 添加努力级别参数
+            if let Some(e) = effort {
+                if !e.is_empty() {
+                    cmd.arg("--effort").arg(e);
+                }
+            }
+
+            // 添加权限模式参数（如果用户指定，否则使用默认 bypassPermissions）
+            if let Some(pm) = permission_mode {
+                if !pm.is_empty() {
+                    cmd.arg("--permission-mode").arg(pm);
+                }
+            } else {
+                // 默认使用 bypassPermissions 以支持前端权限交互
+                cmd.arg("--permission-mode").arg("bypassPermissions");
+            }
+
             cmd.arg("--print")
                 .arg("--verbose")
                 .arg("--output-format")
                 .arg("stream-json")
-                .arg("--permission-mode")
-                .arg("bypassPermissions")
                 .arg(message);
 
             Ok(cmd)
@@ -331,12 +364,41 @@ impl ClaudeEngine {
                 }
             }
 
+            // 添加 Agent 选择参数
+            if let Some(a) = agent {
+                if !a.is_empty() {
+                    cmd.arg("--agent").arg(a);
+                }
+            }
+
+            // 添加模型选择参数
+            if let Some(m) = model {
+                if !m.is_empty() {
+                    cmd.arg("--model").arg(m);
+                }
+            }
+
+            // 添加努力级别参数
+            if let Some(e) = effort {
+                if !e.is_empty() {
+                    cmd.arg("--effort").arg(e);
+                }
+            }
+
+            // 添加权限模式参数（如果用户指定，否则使用默认 bypassPermissions）
+            if let Some(pm) = permission_mode {
+                if !pm.is_empty() {
+                    cmd.arg("--permission-mode").arg(pm);
+                }
+            } else {
+                // 默认使用 bypassPermissions 以支持前端权限交互
+                cmd.arg("--permission-mode").arg("bypassPermissions");
+            }
+
             cmd.arg("--print")
                 .arg("--verbose")
                 .arg("--output-format")
                 .arg("stream-json")
-                .arg("--permission-mode")
-                .arg("bypassPermissions")
                 .arg(message);
 
             Ok(cmd)
@@ -363,6 +425,40 @@ impl ClaudeEngine {
         if let Some(ref git_bash_path) = self.config.git_bin_path {
             cmd.env("CLAUDE_CODE_GIT_BASH_PATH", git_bash_path);
         }
+    }
+
+    /// 格式化命令为可复制的字符串（用于日志输出）
+    #[cfg(windows)]
+    fn format_command_for_log(cmd: &Command) -> String {
+        let program = cmd.get_program().to_string_lossy().to_string();
+        let args: Vec<String> = cmd.get_args()
+            .map(|a| {
+                let s = a.to_string_lossy();
+                // 如果参数包含空格或特殊字符，用引号包裹
+                if s.contains(' ') || s.contains('"') || s.contains('\\') {
+                    format!("\"{}\"", s.replace('\\', "\\\\"))
+                } else {
+                    s.to_string()
+                }
+            })
+            .collect();
+        format!("{} {}", program, args.join(" "))
+    }
+
+    #[cfg(not(windows))]
+    fn format_command_for_log(cmd: &Command) -> String {
+        let program = cmd.get_program().to_string_lossy().to_string();
+        let args: Vec<String> = cmd.get_args()
+            .map(|a| {
+                let s = a.to_string_lossy();
+                if s.contains(' ') || s.contains('"') || s.contains('\'') {
+                    format!("\"{}\"", s)
+                } else {
+                    s.to_string()
+                }
+            })
+            .collect();
+        format!("{} {}", program, args.join(" "))
     }
 
     /// 启动后台线程读取事件
@@ -574,8 +670,17 @@ impl AIEngine for ClaudeEngine {
             None,
             options.mcp_config_path.as_deref(),
             &options.additional_dirs,
+            options.agent.as_deref(),
+            options.model.as_deref(),
+            options.effort.as_deref(),
+            options.permission_mode.as_deref(),
         )?;
         self.configure_command(&mut cmd, options.work_dir.as_deref());
+
+        // 打印可复制的命令（方便调试）
+        let cmd_str = Self::format_command_for_log(&cmd);
+        tracing::info!("[ClaudeEngine] 执行命令: {}", cmd_str);
+        eprintln!("\n[ClaudeEngine] 执行命令:\n{}\n", cmd_str);
 
         // 启动进程
         let child = cmd.spawn()
@@ -640,10 +745,17 @@ impl AIEngine for ClaudeEngine {
             Some(&real_session_id),
             options.mcp_config_path.as_deref(),
             &options.additional_dirs,
+            options.agent.as_deref(),
+            options.model.as_deref(),
+            options.effort.as_deref(),
+            options.permission_mode.as_deref(),
         )?;
         self.configure_command(&mut cmd, work_dir.as_deref());
 
-        tracing::info!("[ClaudeEngine] 命令构建完成，准备启动进程...");
+        // 打印可复制的命令（方便调试）
+        let cmd_str = Self::format_command_for_log(&cmd);
+        tracing::info!("[ClaudeEngine] 执行命令: {}", cmd_str);
+        eprintln!("\n[ClaudeEngine] 执行命令:\n{}\n", cmd_str);
 
         // 启动进程
         let child = cmd.spawn()
