@@ -13,7 +13,7 @@ import {
   IconMic,
   IconMessageSquareText,
 } from '../Common/Icons';
-import { Sparkles, Shield } from 'lucide-react';
+import { Sparkles, Shield, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export type SettingsTabId =
@@ -29,6 +29,7 @@ export type SettingsTabId =
   | 'feishu'
   | 'speech'
   | 'assistant'
+  | 'personas'
   | 'advanced';
 
 export interface SettingsNavItem {
@@ -57,6 +58,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { id: 'feishu', icon: <IconBot size={16} />, labelKey: 'nav.feishu' },
   { id: 'speech', icon: <IconMic size={16} />, labelKey: 'nav.speech' },
   { id: 'assistant', icon: <Sparkles size={16} />, labelKey: 'nav.assistant' },
+  { id: 'personas', icon: <Users size={16} />, labelKey: 'nav.personas' },
   // { id: 'advanced', icon: <IconSettings size={16} />, labelKey: 'nav.advanced' },
 ];
 

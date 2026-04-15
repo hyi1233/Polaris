@@ -16,6 +16,8 @@ import { parseWorkspaceReferences, buildWorkspaceSystemPrompt, getUserSystemProm
 import { MessageCompactor, isCompacted } from '../../utils/messageCompactor'
 import { isEditTool, extractEditDiff } from '../../utils/diffExtractor'
 import { getSessionConfig } from '../sessionConfigStore'
+import { usePersonaStore } from '../personaStore'
+import { getFullSystemPrompt } from '../../types/persona'
 
 // ============================================================================
 // 历史消息降级恢复
@@ -899,8 +901,15 @@ export function createConversationStore(
             content: a.content,
           }))
 
-          // 规范化工作区提示词（换行符处理）
-          const normalizedWorkspacePrompt = workspacePrompt
+          // 规范化工作区提示词（换行符处理）+ 角色系统提示词注入
+          const personaPrompt = (() => {
+            const persona = usePersonaStore.getState().getSelectedPersona()
+            return persona ? getFullSystemPrompt(persona) : ''
+          })()
+          const fullWorkspacePrompt = personaPrompt
+            ? `${workspacePrompt}\n\n# 角色设定\n\n${personaPrompt}`
+            : workspacePrompt
+          const normalizedWorkspacePrompt = fullWorkspacePrompt
             .replace(/\r\n/g, '\\n')
             .replace(/\r/g, '\\n')
             .replace(/\n/g, '\\n')
@@ -1057,8 +1066,15 @@ export function createConversationStore(
           .replace(/\n/g, '\\n')
           .trim()
 
-        // 规范化工作区提示词
-        const normalizedWorkspacePrompt = workspacePrompt
+        // 规范化工作区提示词 + 角色系统提示词注入
+        const personaPromptForContinue = (() => {
+          const persona = usePersonaStore.getState().getSelectedPersona()
+          return persona ? getFullSystemPrompt(persona) : ''
+        })()
+        const fullWorkspacePromptForContinue = personaPromptForContinue
+          ? `${workspacePrompt}\n\n# 角色设定\n\n${personaPromptForContinue}`
+          : workspacePrompt
+        const normalizedWorkspacePrompt = fullWorkspacePromptForContinue
           .replace(/\r\n/g, '\\n')
           .replace(/\r/g, '\\n')
           .replace(/\n/g, '\\n')
