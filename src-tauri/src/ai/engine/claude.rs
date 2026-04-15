@@ -613,8 +613,17 @@ impl ClaudeEngine {
                         return;
                     }
                     tracing::info!("[ClaudeEngine] 初始 stdin 数据已发送");
+
+                    // --print + --input-format stream-json 单次交互模式：
+                    // 发送完毕后关闭 stdin，使 Claude CLI 收到 EOF 并正常退出。
+                    // 若不关闭，CLI 会持续等待 stdin 下一条消息，导致进程挂起。
+                    drop(stdin_writer);
+                    tracing::info!("[ClaudeEngine] stdin 已关闭（stream-json 单次发送模式）");
+                    return;
                 }
 
+                // 非流式模式（消息通过 CLI 参数传递）：stdin 保持打开，
+                // 供后续可能的交互输入使用
                 while let Ok(input) = input_receiver.recv() {
                     match stdin_writer.write_all(input.as_bytes()) {
                         Ok(_) => {
