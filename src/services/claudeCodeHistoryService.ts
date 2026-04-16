@@ -40,6 +40,24 @@ export interface SessionMetaResponse {
   fileSize?: number
   claudeProjectName?: string
   filePath?: string
+
+  // === Fork 关系字段 ===
+  parentSessionId?: string
+  childSessionIds?: string[]
+
+  // === Git/PR 关联字段 ===
+  gitBranch?: string
+  linkedPr?: LinkedPR
+}
+
+/**
+ * PR 关联信息
+ */
+export interface LinkedPR {
+  number: number
+  url?: string
+  title?: string
+  state?: 'open' | 'merged' | 'closed'
 }
 
 /**
@@ -57,6 +75,18 @@ export interface ClaudeCodeSessionMeta {
   modified?: string
   filePath: string
   fileSize: number
+
+  // === Fork 关系字段 ===
+  /** 父会话 ID（fork 来源） */
+  parentSessionId?: string
+  /** 子会话 ID 列表 */
+  childSessionIds?: string[]
+
+  // === Git/PR 关联字段 ===
+  /** Git 分支名称 */
+  gitBranch?: string
+  /** PR 关联信息 */
+  linkedPr?: LinkedPR
 }
 
 /**

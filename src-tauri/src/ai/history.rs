@@ -83,6 +83,16 @@ impl<T> PagedResult<T> {
     }
 }
 
+/// PR 关联信息
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedPR {
+    pub number: u32,
+    pub url: Option<String>,
+    pub title: Option<String>,
+    pub state: Option<String>,
+}
+
 /// 统一的会话元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -107,6 +117,23 @@ pub struct SessionMeta {
     pub claude_project_name: Option<String>,
     /// JSONL 文件完整路径
     pub file_path: Option<String>,
+
+    // === Fork 关系字段 ===
+    /// 父会话 ID（fork 来源）
+    #[serde(default)]
+    pub parent_session_id: Option<String>,
+    /// 子会话 ID 列表
+    #[serde(default)]
+    pub child_session_ids: Vec<String>,
+
+    // === Git/PR 关联字段 ===
+    /// Git 分支名称
+    #[serde(default)]
+    pub git_branch: Option<String>,
+    /// PR 关联信息
+    #[serde(default)]
+    pub linked_pr: Option<LinkedPR>,
+
     /// 额外信息（引擎特定）
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,

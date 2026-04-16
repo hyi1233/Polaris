@@ -228,7 +228,10 @@
     "searchPlaceholder": "搜索会话...",
     "noHistory": "暂无历史会话",
     "claudeCodeHint": "• Claude Code 会话来自原生历史记录",
-    "localSessionHint": "• 本地会话可删除，CLI 会话只读"
+    "localSessionHint": "• 本地会话可删除，CLI 会话只读",
+    "forkedFrom": "从会话分叉",
+    "childSessions": "{{count}} 个子会话",
+    "viewPr": "查看 PR"
   },
   "statusBar": {
     "conversations": "对话",

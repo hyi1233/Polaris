@@ -3,6 +3,7 @@
  *
  * 显示所有历史会话（localStorage + Claude Code 原生），支持恢复和删除
  * 支持服务端分页加载 + 按项目/全局范围切换
+ * 集成 Fork/PR 关系可视化 + 树形/列表视图切换
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -10,12 +11,20 @@ import { useTranslation } from 'react-i18next'
 import { historyService } from '../../services/historyService'
 import type { UnifiedHistoryItem, HistoryScope } from '../../services/historyService'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
-import { Clock, MessageSquare, Trash2, RotateCcw, HardDrive, Loader2, X, ChevronDown, Globe, FolderOpen } from 'lucide-react'
+import { sessionStoreManager } from '../../stores/conversationStore/sessionStoreManager'
+import { useViewStore } from '../../stores/index'
+import { Clock, MessageSquare, Trash2, RotateCcw, HardDrive, Loader2, X, ChevronDown, Globe, FolderOpen, List, GitBranch } from 'lucide-react'
+import { ForkIndicator } from './ForkIndicator'
+import { SessionTree } from './SessionTree'
+import { ForkSessionDialog } from './ForkSessionDialog'
 
 const PAGE_SIZE = 20
 
 /** 日期分组类型 */
 type DateGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier'
+
+/** 视图模式 */
+type ViewMode = 'list' | 'tree'
 
 /** 日期分组顺序 */
 const DATE_GROUP_ORDER: DateGroup[] = ['today', 'yesterday', 'thisWeek', 'earlier']
@@ -36,6 +45,8 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
   const [restoring, setRestoring] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'claude-code'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [forkTarget, setForkTarget] = useState<UnifiedHistoryItem | null>(null)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const currentWorkspace = useWorkspaceStore(state => state.getCurrentWorkspace())
@@ -134,6 +145,61 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
     setTotalCount(prev => prev - 1)
   }
 
+  // Fork 会话
+  const handleFork = async (item: UnifiedHistoryItem, branchName?: string) => {
+    try {
+      // 1. 先恢复源会话的消息
+      const messages = await loadSessionMessages(item)
+      if (messages.length === 0) return
+
+      // 2. 创建新会话并复制消息
+      const title = branchName || `Fork: ${item.title}`
+      const newSessionId = sessionStoreManager.getState().createSessionFromHistory(
+        messages,
+        item.id,
+        { title },
+      )
+
+      console.log('[SessionHistoryPanel] Fork 创建成功:', newSessionId, {
+        sourceId: item.id,
+        branchName,
+      })
+
+      // 3. 多窗口模式时自动加入
+      if (useViewStore.getState().multiSessionMode) {
+        useViewStore.getState().addToMultiView(newSessionId)
+      }
+
+      // 4. 关闭对话框
+      setForkTarget(null)
+    } catch (e) {
+      console.error('[SessionHistoryPanel] Fork 失败:', e)
+    }
+  }
+
+  // 加载会话消息（用于 Fork）
+  const loadSessionMessages = async (item: UnifiedHistoryItem) => {
+    // 从 localStorage 尝试
+    const historyJson = localStorage.getItem('event_chat_session_history')
+    const localHistory = historyJson ? JSON.parse(historyJson) : []
+    const localSession = localHistory.find((h: { id: string }) => h.id === item.id)
+    if (localSession?.data?.messages?.length > 0) {
+      return localSession.data.messages
+    }
+
+    // 从 Claude Code 原生历史尝试
+    if (!item.engineId || item.engineId === 'claude-code') {
+      const { getClaudeCodeHistoryService } = await import('../../services/claudeCodeHistoryService')
+      const claudeCodeService = getClaudeCodeHistoryService()
+      const messages = await claudeCodeService.getSessionHistory(item.id, item.claudeProjectName)
+      if (messages.length > 0) {
+        return claudeCodeService.convertToChatMessages(messages)
+      }
+    }
+
+    return []
+  }
+
   // 判断日期分组
   const getDateGroup = (timestamp: string): DateGroup => {
     const date = new Date(timestamp)
@@ -198,6 +264,17 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
     return true
   })
 
+  // 统计 Fork/PR 关联数量
+  const forkStats = useMemo(() => {
+    let forkCount = 0
+    let prCount = 0
+    for (const item of allHistory) {
+      if (item.parentSessionId || (item.childSessionIds && item.childSessionIds.length > 0)) forkCount++
+      if (item.linkedPr) prCount++
+    }
+    return { forkCount, prCount }
+  }, [allHistory])
+
   // 按日期分组
   const groupedHistory = useMemo(() => {
     const groups: Record<DateGroup, UnifiedHistoryItem[]> = {
@@ -260,7 +337,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
         </button>
       </div>
 
-      {/* 范围 + 引擎筛选 */}
+      {/* 范围 + 引擎筛选 + 视图切换 */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border-subtle shrink-0">
         {/* 范围切换 */}
         <button
@@ -310,6 +387,33 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
         >
           Claude Code
         </button>
+
+        {/* 分隔符 */}
+        <span className="border-l border-border h-4" />
+
+        {/* 视图模式切换 */}
+        <button
+          onClick={() => setViewMode('list')}
+          className={`p-1 rounded-md transition-colors ${
+            viewMode === 'list'
+              ? 'bg-primary/20 text-primary'
+              : 'text-text-tertiary hover:bg-background-hover hover:text-text-primary'
+          }`}
+          title="列表视图"
+        >
+          <List className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => setViewMode('tree')}
+          className={`p-1 rounded-md transition-colors ${
+            viewMode === 'tree'
+              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+              : 'text-text-tertiary hover:bg-background-hover hover:text-text-primary'
+          }`}
+          title="树形视图 (Fork/PR 关系)"
+        >
+          <GitBranch className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* 搜索框 */}
@@ -333,7 +437,15 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
             <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
             <p className="text-sm">{t('history.noHistory')}</p>
           </div>
+        ) : viewMode === 'tree' ? (
+          /* ===== 树形视图 ===== */
+          <SessionTree
+            sessions={filteredHistory}
+            onRestore={handleRestore}
+            restoringId={restoring}
+          />
         ) : (
+          /* ===== 列表视图 ===== */
           <>
             {DATE_GROUP_ORDER.map((group) => {
               const items = groupedHistory[group]
@@ -383,7 +495,7 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-4 text-xs text-text-tertiary">
+                            <div className="flex items-center gap-4 text-xs text-text-tertiary mb-1.5">
                               <span className="flex items-center gap-1">
                                 <MessageSquare className="w-3 h-3" />
                                 {t('history.messages', { count: item.messageCount })}
@@ -396,10 +508,30 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
                                 <span>{formatFileSize(item.fileSize)}</span>
                               )}
                             </div>
+
+                            {/* Fork/PR 关系指示器 */}
+                            {(item.parentSessionId || (item.childSessionIds && item.childSessionIds.length > 0) || item.gitBranch || item.linkedPr) && (
+                              <ForkIndicator
+                                parentSessionId={item.parentSessionId}
+                                childSessionIds={item.childSessionIds}
+                                gitBranch={item.gitBranch}
+                                linkedPr={item.linkedPr}
+                                compact
+                              />
+                            )}
                           </div>
 
                           {/* 操作按钮 */}
                           <div className="flex items-center gap-1 shrink-0">
+                            {/* Fork 按钮 */}
+                            <button
+                              onClick={() => setForkTarget(item)}
+                              className="p-1.5 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/30 text-text-tertiary hover:text-amber-500 transition-colors"
+                              title="创建分支"
+                            >
+                              <GitBranch className="w-4 h-4" />
+                            </button>
+                            {/* 恢复按钮 */}
                             <button
                               onClick={() => handleRestore(item)}
                               disabled={isRestoring}
@@ -434,8 +566,8 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
           </>
         )}
 
-        {/* 加载更多 */}
-        {hasMore && (
+        {/* 加载更多（仅列表模式） */}
+        {viewMode === 'list' && hasMore && (
           <div className="flex items-center justify-center py-3">
             <button
               onClick={handleLoadMore}
@@ -455,9 +587,37 @@ export function SessionHistoryPanel({ onClose }: SessionHistoryPanelProps) {
 
       {/* 底部提示 */}
       <div className="px-4 py-2 border-t border-border-subtle text-xs text-text-tertiary shrink-0">
-        <p>{t('history.claudeCodeHint')}</p>
-        <p>{t('history.localSessionHint')}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p>{t('history.claudeCodeHint')}</p>
+            <p>{t('history.localSessionHint')}</p>
+          </div>
+          {/* Fork/PR 统计 */}
+          {(forkStats.forkCount > 0 || forkStats.prCount > 0) && (
+            <div className="flex items-center gap-2 text-[10px]">
+              {forkStats.forkCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                  {forkStats.forkCount} Fork
+                </span>
+              )}
+              {forkStats.prCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                  {forkStats.prCount} PR
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Fork 会话对话框 */}
+      {forkTarget && (
+        <ForkSessionDialog
+          sourceSession={forkTarget}
+          onConfirm={(branchName) => handleFork(forkTarget, branchName)}
+          onCancel={() => setForkTarget(null)}
+        />
+      )}
     </div>
   )
 }

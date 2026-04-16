@@ -17,3 +17,8 @@ export { MultiSessionGrid } from './MultiSessionGrid';
 export { MultiWindowMenu } from './MultiWindowMenu';
 export { SessionCell } from './SessionCell';
 export { NewSessionButton } from './NewSessionButton';
+
+// Fork/PR 关系可视化组件
+export { ForkIndicator, ForkTreeLine } from './ForkIndicator';
+export { SessionTree } from './SessionTree';
+export { ForkSessionDialog } from './ForkSessionDialog';

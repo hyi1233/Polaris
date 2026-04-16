@@ -228,7 +228,10 @@
     "searchPlaceholder": "Search sessions...",
     "noHistory": "No history sessions",
     "claudeCodeHint": "• Claude Code sessions from native history",
-    "localSessionHint": "• Local sessions can be deleted, CLI sessions are read-only"
+    "localSessionHint": "• Local sessions can be deleted, CLI sessions are read-only",
+    "forkedFrom": "Forked from",
+    "childSessions": "{{count}} child sessions",
+    "viewPr": "View PR"
   },
   "statusBar": {
     "conversations": "conversations",

@@ -45,6 +45,23 @@ export interface UnifiedHistoryItem {
   outputTokens?: number
   projectPath?: string
   claudeProjectName?: string
+
+  // === Fork 关系字段 ===
+  /** 父会话 ID（fork 来源） */
+  parentSessionId?: string
+  /** 子会话 ID 列表 */
+  childSessionIds?: string[]
+
+  // === Git/PR 关联字段 ===
+  /** Git 分支名称 */
+  gitBranch?: string
+  /** PR 关联信息 */
+  linkedPr?: {
+    number: number
+    url?: string
+    title?: string
+    state?: 'open' | 'merged' | 'closed'
+  }
 }
 
 /** 分页历史结果 */
@@ -152,6 +169,11 @@ export const historyService = {
         fileSize: s.fileSize,
         projectPath: s.projectPath,
         claudeProjectName: s.claudeProjectName,
+        // Fork/PR 关系字段
+        parentSessionId: s.parentSessionId,
+        childSessionIds: s.childSessionIds,
+        gitBranch: s.gitBranch,
+        linkedPr: s.linkedPr,
       }))
 
       // 3. 合并去重（localStorage 条目优先）

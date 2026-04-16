@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::ai::history::{
-    HistoryMessage, PagedResult, Pagination, SessionHistoryProvider, SessionMeta,
+    HistoryMessage, LinkedPR, PagedResult, Pagination, SessionHistoryProvider, SessionMeta,
 };
 use crate::error::{AppError, Result};
 use crate::models::config::Config;
@@ -163,16 +163,17 @@ impl ClaudeHistoryProvider {
     }
 
     /// 解析会话元数据（只读取必要数据）
-    /// 返回 (first_prompt, message_count, created, real_cwd)
+    /// 返回 (first_prompt, message_count, created, real_cwd, git_branch)
     fn parse_session_metadata_light(
         file_path: &PathBuf,
-    ) -> (Option<String>, usize, Option<String>, Option<String>) {
+    ) -> (Option<String>, usize, Option<String>, Option<String>, Option<String>) {
         use std::io::{BufRead, BufReader};
 
         let mut first_prompt: Option<String> = None;
         let mut message_count = 0usize;
         let mut created: Option<String> = None;
         let mut cwd: Option<String> = None;
+        let mut git_branch: Option<String> = None;
 
         if let Ok(file) = std::fs::File::open(file_path) {
             let reader = BufReader::new(file);
@@ -222,6 +223,10 @@ impl ClaudeHistoryProvider {
                             if cwd.is_none() {
                                 cwd = json.get("cwd").and_then(|c| c.as_str()).map(String::from);
                             }
+                            // 提取 gitBranch
+                            if git_branch.is_none() {
+                                git_branch = json.get("gitBranch").and_then(|b| b.as_str()).map(String::from);
+                            }
                         } else if msg_type == "assistant" {
                             message_count += 1;
                         }
@@ -230,7 +235,42 @@ impl ClaudeHistoryProvider {
             }
         }
 
-        (first_prompt, message_count, created, cwd)
+        (first_prompt, message_count, created, cwd, git_branch)
+    }
+
+    /// 从 git 分支名称中提取 PR 编号
+    fn extract_pr_from_branch(branch_name: &str) -> Option<LinkedPR> {
+        // 规则 1: pr-123 或 pr/123
+        let pr_pattern = regex::Regex::new(r"(?i)pr[-/](\d+)").ok()?;
+        if let Some(caps) = pr_pattern.captures(branch_name) {
+            if let Some(num_str) = caps.get(1) {
+                if let Ok(number) = num_str.as_str().parse::<u32>() {
+                    return Some(LinkedPR {
+                        number,
+                        url: None,
+                        title: None,
+                        state: None,
+                    });
+                }
+            }
+        }
+
+        // 规则 2: 123-feature-description（数字开头）
+        let number_prefix = regex::Regex::new(r"^(\d+)-").ok()?;
+        if let Some(caps) = number_prefix.captures(branch_name) {
+            if let Some(num_str) = caps.get(1) {
+                if let Ok(number) = num_str.as_str().parse::<u32>() {
+                    return Some(LinkedPR {
+                        number,
+                        url: None,
+                        title: None,
+                        state: None,
+                    });
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -313,7 +353,7 @@ impl SessionHistoryProvider for ClaudeHistoryProvider {
         // ── 阶段 4：只解析当前页文件 ──
         let mut items: Vec<SessionMeta> = Vec::with_capacity(page_entries.len());
         for entry in &page_entries {
-            let (first_prompt, message_count, created, real_cwd) =
+            let (first_prompt, message_count, created, real_cwd, git_branch) =
                 Self::parse_session_metadata_light(&entry.file_path);
 
             let updated_at = entry.mtime
@@ -323,6 +363,11 @@ impl SessionHistoryProvider for ClaudeHistoryProvider {
                     chrono::DateTime::from_timestamp(d.as_secs() as i64, 0)
                         .map(|dt| dt.to_rfc3339())
                 });
+
+            // 从 git_branch 推断 PR 关联
+            let linked_pr = git_branch.as_ref().and_then(|branch| {
+                Self::extract_pr_from_branch(branch)
+            });
 
             items.push(SessionMeta {
                 session_id: entry.session_id.clone(),
@@ -335,6 +380,10 @@ impl SessionHistoryProvider for ClaudeHistoryProvider {
                 file_size: Some(entry.file_size),
                 claude_project_name: Some(entry.project_dir_name.clone()),
                 file_path: Some(entry.file_path.to_string_lossy().to_string()),
+                parent_session_id: None, // Fork 检测需要二次处理
+                child_session_ids: Vec::new(),
+                git_branch,
+                linked_pr,
                 extra: HashMap::new(),
             });
         }

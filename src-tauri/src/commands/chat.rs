@@ -725,6 +725,16 @@ pub async fn delete_session(
 
 use std::io::{BufRead, BufReader};
 
+/// PR 关联信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedPR {
+    pub number: u32,
+    pub url: Option<String>,
+    pub title: Option<String>,
+    pub state: Option<String>, // "open" | "merged" | "closed"
+}
+
 /// Claude Code 会话元数据
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -740,6 +750,61 @@ pub struct ClaudeSessionMeta {
     pub modified: Option<String>,
     pub file_path: String,
     pub file_size: u64,
+
+    // === Fork 关系字段 ===
+    /// 父会话 ID（fork 来源，通过消息指纹推断）
+    #[serde(default)]
+    pub parent_session_id: Option<String>,
+    /// 子会话 ID 列表
+    #[serde(default)]
+    pub child_session_ids: Vec<String>,
+
+    // === Git/PR 关联字段 ===
+    /// Git 分支名称（从会话文件中提取）
+    #[serde(default)]
+    pub git_branch: Option<String>,
+    /// PR 关联信息（通过 git branch 推断）
+    #[serde(default)]
+    pub linked_pr: Option<LinkedPR>,
+}
+
+/// 从 git 分支名称中提取 PR 编号
+///
+/// 支持的分支命名格式：
+/// - pr-123, pr/123
+/// - 123-feature-description
+fn extract_pr_from_branch(branch_name: &str) -> Option<LinkedPR> {
+    // 规则 1: pr-123 或 pr/123
+    let pr_pattern = regex::Regex::new(r"(?i)pr[-/](\d+)").ok()?;
+    if let Some(caps) = pr_pattern.captures(branch_name) {
+        if let Some(num_str) = caps.get(1) {
+            if let Ok(number) = num_str.as_str().parse::<u32>() {
+                return Some(LinkedPR {
+                    number,
+                    url: None,
+                    title: None,
+                    state: None,
+                });
+            }
+        }
+    }
+
+    // 规则 2: 123-feature-description（数字开头）
+    let number_prefix = regex::Regex::new(r"^(\d+)-").ok()?;
+    if let Some(caps) = number_prefix.captures(branch_name) {
+        if let Some(num_str) = caps.get(1) {
+            if let Ok(number) = num_str.as_str().parse::<u32>() {
+                return Some(LinkedPR {
+                    number,
+                    url: None,
+                    title: None,
+                    state: None,
+                });
+            }
+        }
+    }
+
+    None
 }
 
 /// Claude Code 历史消息
@@ -752,12 +817,13 @@ pub struct ClaudeHistoryMessage {
     pub timestamp: Option<String>,
 }
 
-/// 解析会话文件获取元数据（包括真实工作区路径 cwd）
-fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option<String>, Option<String>) {
+/// 解析会话文件获取元数据（包括真实工作区路径 cwd 和 gitBranch）
+fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option<String>, Option<String>, Option<String>) {
     let mut first_prompt: Option<String> = None;
     let mut message_count = 0usize;
     let mut created: Option<String> = None;
     let mut cwd: Option<String> = None;
+    let mut git_branch: Option<String> = None;
 
     if let Ok(file) = std::fs::File::open(file_path) {
         let reader = BufReader::new(file);
@@ -807,15 +873,23 @@ fn parse_session_metadata(file_path: &PathBuf) -> (Option<String>, usize, Option
                         if cwd.is_none() {
                             cwd = json.get("cwd").and_then(|c| c.as_str()).map(|s| s.to_string());
                         }
+                        // 获取 git 分支（gitBranch）
+                        if git_branch.is_none() {
+                            git_branch = json.get("gitBranch").and_then(|b| b.as_str()).map(|s| s.to_string());
+                        }
                     } else if msg_type == "assistant" {
                         message_count += 1;
+                        // assistant 消息也可能有 gitBranch
+                        if git_branch.is_none() {
+                            git_branch = json.get("gitBranch").and_then(|b| b.as_str()).map(|s| s.to_string());
+                        }
                     }
                 }
             }
         }
     }
 
-    (first_prompt, message_count, created, cwd)
+    (first_prompt, message_count, created, cwd, git_branch)
 }
 
 /// 列出 Claude Code 会话（旧接口）
@@ -864,12 +938,17 @@ pub async fn list_claude_code_sessions(
                                 });
 
                             // 解析会话内容获取详细信息
-                            let (first_prompt, message_count, created, real_cwd) = parse_session_metadata(&path);
+                            let (first_prompt, message_count, created, real_cwd, git_branch) = parse_session_metadata(&path);
 
                             // claude_project_name: Claude Code 目录名（用于定位 jsonl 文件）
                             let claude_project_name = project_name.clone();
                             // project_path: 真实工作区路径（用于前端匹配/创建工作区）
                             let project_path = real_cwd.unwrap_or_else(|| project_name.clone());
+
+                            // 从 git_branch 推断 PR 关联
+                            let linked_pr = git_branch.as_ref().and_then(|branch| {
+                                extract_pr_from_branch(branch)
+                            });
 
                             sessions.push(ClaudeSessionMeta {
                                 session_id,
@@ -881,6 +960,10 @@ pub async fn list_claude_code_sessions(
                                 modified,
                                 file_path: path.to_string_lossy().to_string(),
                                 file_size,
+                                parent_session_id: None, // 后续通过 fork 检测算法填充
+                                child_session_ids: Vec::new(),
+                                git_branch,
+                                linked_pr,
                             });
                         }
                     }
@@ -896,7 +979,163 @@ pub async fn list_claude_code_sessions(
         time_b.cmp(&time_a)
     });
 
+    // === Fork 检测算法 ===
+    // 基于消息指纹推断 fork 关系
+    infer_fork_relationships(&mut sessions);
+
     Ok(sessions)
+}
+
+/// 会话消息指纹（用于 fork 检测）
+#[derive(Debug, Clone)]
+struct SessionFingerprint {
+    session_id: String,
+    /// 前 N 条消息的内容哈希
+    message_hashes: Vec<String>,
+    /// 创建时间戳
+    created_at: i64,
+}
+
+/// 计算消息内容的简单哈希（用于指纹匹配）
+fn simple_hash(content: &str) -> String {
+    // 使用简单的哈希算法：取前 200 字符的字节和
+    let bytes = content.as_bytes();
+    let sample = &bytes[..bytes.len().min(200)];
+    let hash: u64 = sample.iter().enumerate().map(|(i, &b)| (i as u64 + 1) * b as u64).sum();
+    format!("{:016x}", hash)
+}
+
+/// 从会话文件中提取消息指纹
+fn compute_session_fingerprint(file_path: &PathBuf, session_id: &str) -> Option<SessionFingerprint> {
+    let mut message_hashes = Vec::new();
+    let mut created_at: i64 = 0;
+
+    if let Ok(file) = std::fs::File::open(file_path) {
+        let reader = BufReader::new(file);
+        for line in reader.lines().map_while(|r| r.ok()) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                if let Some(msg_type) = json.get("type").and_then(|t| t.as_str()) {
+                    if msg_type == "user" || msg_type == "assistant" {
+                        // 提取消息内容
+                        if let Some(content) = json.get("message").and_then(|m| m.get("content")) {
+                            let content_str = if let Some(text) = content.as_str() {
+                                text.to_string()
+                            } else if let Some(arr) = content.as_array() {
+                                // 数组格式，拼接所有 text
+                                arr.iter()
+                                    .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                            } else {
+                                String::new()
+                            };
+
+                            // 只取前 5 条消息
+                            if message_hashes.len() < 5 && !content_str.is_empty() {
+                                message_hashes.push(simple_hash(&content_str));
+                            }
+                        }
+
+                        // 获取创建时间
+                        if created_at == 0 {
+                            if let Some(ts) = json.get("timestamp").and_then(|t| t.as_str()) {
+                                created_at = chrono::DateTime::parse_from_rfc3339(ts)
+                                    .map(|dt| dt.timestamp())
+                                    .unwrap_or(0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if message_hashes.is_empty() {
+        None
+    } else {
+        Some(SessionFingerprint {
+            session_id: session_id.to_string(),
+            message_hashes,
+            created_at,
+        })
+    }
+}
+
+/// 推断 fork 关系
+///
+/// 算法：
+/// 1. 计算每个会话的消息指纹（前 5 条消息的哈希）
+/// 2. 按创建时间排序
+/// 3. 对于每个会话，检查是否有更早的会话与其共享消息前缀
+/// 4. 如果找到共享前缀 >= 80%，则认为该会话是 fork
+fn infer_fork_relationships(sessions: &mut [ClaudeSessionMeta]) {
+    use std::collections::HashMap;
+
+    // 计算所有会话的指纹
+    let fingerprints: HashMap<String, SessionFingerprint> = sessions
+        .iter()
+        .filter_map(|s| {
+            compute_session_fingerprint(&PathBuf::from(&s.file_path), &s.session_id)
+                .map(|fp| (s.session_id.clone(), fp))
+        })
+        .collect();
+
+    // 按创建时间排序的会话 ID 列表
+    let mut sorted_ids: Vec<String> = sessions.iter().map(|s| s.session_id.clone()).collect();
+    sorted_ids.sort_by_key(|id| {
+        fingerprints.get(id).map(|fp| fp.created_at).unwrap_or(0)
+    });
+
+    // 构建父子关系映射
+    let mut parent_map: HashMap<String, String> = HashMap::new();
+
+    for (i, session_id) in sorted_ids.iter().enumerate() {
+        if let Some(fp) = fingerprints.get(session_id) {
+            // 检查所有更早的会话
+            for earlier_id in sorted_ids.iter().take(i) {
+                if let Some(earlier_fp) = fingerprints.get(earlier_id) {
+                    // 检查消息前缀匹配
+                    if has_common_prefix(&fp.message_hashes, &earlier_fp.message_hashes) {
+                        // 找到父会话
+                        parent_map.insert(session_id.clone(), earlier_id.clone());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 更新会话的 parent_session_id 和 child_session_ids
+    for session in sessions.iter_mut() {
+        if let Some(parent_id) = parent_map.get(&session.session_id) {
+            session.parent_session_id = Some(parent_id.clone());
+        }
+    }
+
+    // 构建子会话列表
+    let mut child_map: HashMap<String, Vec<String>> = HashMap::new();
+    for (child_id, parent_id) in &parent_map {
+        child_map.entry(parent_id.clone()).or_default().push(child_id.clone());
+    }
+
+    for session in sessions.iter_mut() {
+        if let Some(children) = child_map.get(&session.session_id) {
+            session.child_session_ids = children.clone();
+        }
+    }
+}
+
+/// 检查两个消息哈希列表是否有共同前缀
+fn has_common_prefix(hashes1: &[String], hashes2: &[String]) -> bool {
+    let min_len = hashes1.len().min(hashes2.len());
+    if min_len < 2 {
+        return false;
+    }
+
+    let match_count = hashes1.iter().zip(hashes2.iter()).take(min_len).filter(|(a, b)| a == b).count();
+
+    // 至少 80% 的前缀匹配
+    match_count as f64 / min_len as f64 >= 0.8
 }
 
 /// 获取 Claude Code 会话历史（旧接口）
