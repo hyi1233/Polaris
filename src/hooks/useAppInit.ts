@@ -3,7 +3,7 @@
  *
  * 负责：
  * - 加载配置
- * - 引导 AI 引擎和 Agent 系统
+ * - 引导 AI 引擎
  * - 初始化集成（QQ Bot、飞书）
  * - 预加载设置数据
  * - 检查工作区状态
@@ -17,8 +17,7 @@ import { usePluginStore } from '../stores/pluginStore';
 import { useAutoModeStore } from '../stores/autoModeStore';
 import { useSnippetStore } from '../stores/snippetStore';
 import { useCliInfoStore } from '../stores/cliInfoStore';
-import { bootstrapEngines } from '../core/engine-bootstrap';
-import { bootstrapAgents } from '../core/agent-bootstrap';
+import { bootstrapEngines, type EngineId } from '../core/engine-bootstrap';
 import { bootstrapTools } from '../core/tool-bootstrap';
 import { createLogger } from '../utils/logger';
 
@@ -50,10 +49,7 @@ export function useAppInit({ onNoWorkspaces }: UseAppInitOptions) {
         const defaultEngine = config?.defaultEngine || 'claude-code';
 
         // 按需初始化传统 AI Engine
-        await bootstrapEngines(defaultEngine as any);
-
-        // 初始化 Agent 系统
-        await bootstrapAgents();
+        await bootstrapEngines(defaultEngine as EngineId);
 
         // 注册 AI 工具
         bootstrapTools();
