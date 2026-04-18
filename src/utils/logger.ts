@@ -221,16 +221,14 @@ export class ErrorIntegrationTransport implements LogTransport {
     if (entry.level < this.level) return;
 
     // 动态导入以避免循环依赖
-    import('../types/errors').then(({ AppError, ErrorSeverity, errorLogger }) => {
+    import('../types/errors').then(({ AppError, ErrorSeverity, ErrorSource, errorLogger }) => {
       const severity = entry.level === LogLevel.Fatal
         ? ErrorSeverity.Critical
         : ErrorSeverity.Error;
 
-      const source = this.inferSource(entry.module);
-
       const error = new AppError({
         message: entry.message,
-        source: source as typeof import('../types/errors').ErrorSource[keyof typeof import('../types/errors').ErrorSource],
+        source: this.inferSource(entry.module, ErrorSource),
         severity,
         context: entry.context,
       });
@@ -240,12 +238,12 @@ export class ErrorIntegrationTransport implements LogTransport {
     });
   }
 
-  private inferSource(module: string): string {
-    if (module.includes('git')) return 'git';
-    if (module.includes('ai') || module.includes('engine')) return 'ai';
-    if (module.includes('file')) return 'file';
-    if (module.includes('network')) return 'network';
-    return 'system';
+  private inferSource(module: string, ErrorSource: typeof import('../types/errors').ErrorSource): import('../types/errors').ErrorSource {
+    if (module.includes('git')) return ErrorSource.Git;
+    if (module.includes('ai') || module.includes('engine')) return ErrorSource.AI;
+    if (module.includes('file')) return ErrorSource.File;
+    if (module.includes('network')) return ErrorSource.Network;
+    return ErrorSource.System;
   }
 }
 
