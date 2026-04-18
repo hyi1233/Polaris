@@ -1,0 +1,147 @@
+/**
+ * 应用初始化 Hook
+ *
+ * 负责：
+ * - 加载配置
+ * - 引导 AI 引擎和 Agent 系统
+ * - 初始化集成（QQ Bot、飞书）
+ * - 预加载设置数据
+ * - 检查工作区状态
+ */
+
+import { useEffect, useRef } from 'react';
+import { useConfigStore } from '../stores';
+import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useIntegrationStore } from '../stores/integrationStore';
+import { usePluginStore } from '../stores/pluginStore';
+import { useAutoModeStore } from '../stores/autoModeStore';
+import { useSnippetStore } from '../stores/snippetStore';
+import { useCliInfoStore } from '../stores/cliInfoStore';
+import { bootstrapEngines } from '../core/engine-bootstrap';
+import { bootstrapAgents } from '../core/agent-bootstrap';
+import { bootstrapTools } from '../core/tool-bootstrap';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('AppInit');
+
+interface UseAppInitOptions {
+  onNoWorkspaces: () => void;
+}
+
+export function useAppInit({ onNoWorkspaces }: UseAppInitOptions) {
+  const isInitialized = useRef(false);
+  const hasCheckedWorkspaces = useRef(false);
+
+  const { loadConfig } = useConfigStore();
+  const workspaces = useWorkspaceStore(state => state.workspaces);
+
+  // 初始化配置（只执行一次）
+  useEffect(() => {
+    const initializeApp = async () => {
+      if (isInitialized.current) return;
+      isInitialized.current = true;
+
+      try {
+        // 先加载配置
+        await loadConfig();
+
+        // 获取配置
+        const config = useConfigStore.getState().config;
+        const defaultEngine = config?.defaultEngine || 'claude-code';
+
+        // 按需初始化传统 AI Engine
+        await bootstrapEngines(defaultEngine as any);
+
+        // 初始化 Agent 系统
+        await bootstrapAgents();
+
+        // 注册 AI 工具
+        bootstrapTools();
+
+        // 恢复窗口透明度
+        if (config?.window) {
+          const initialOpacity = (config.window.normalOpacity ?? 100) / 100;
+          if (initialOpacity < 1.0) {
+            document.documentElement.style.setProperty('--window-opacity', String(initialOpacity));
+            log.info(`窗口透明度已恢复: ${initialOpacity}`);
+          }
+        }
+
+        // 初始化集成管理器
+        const qqbotConfig = config?.qqbot ?? null;
+        const feishuConfig = config?.feishu ?? null;
+
+        if (qqbotConfig || feishuConfig) {
+          try {
+            const { initialize, startPlatform } = useIntegrationStore.getState();
+            await initialize(qqbotConfig, feishuConfig);
+
+            if (qqbotConfig && qqbotConfig.instances.length > 0) {
+              const activeInstance = qqbotConfig.activeInstanceId
+                ? qqbotConfig.instances.find(i => i.id === qqbotConfig.activeInstanceId)
+                : qqbotConfig.instances.find(i => i.enabled);
+
+              if (activeInstance && activeInstance.autoConnect !== false) {
+                log.info('自动连接 QQ Bot...');
+                await startPlatform('qqbot');
+              }
+            }
+
+            if (feishuConfig && feishuConfig.instances.length > 0) {
+              const activeInstance = feishuConfig.activeInstanceId
+                ? feishuConfig.instances.find(i => i.id === feishuConfig.activeInstanceId)
+                : feishuConfig.instances.find(i => i.enabled);
+
+              if (activeInstance && activeInstance.autoConnect !== false) {
+                log.info('自动连接 Feishu...');
+                await startPlatform('feishu');
+              }
+            }
+          } catch (error) {
+            log.error('集成管理器初始化失败', error as Error);
+          }
+        }
+
+        // 预加载设置相关数据
+        try {
+          await Promise.all([
+            useSnippetStore.getState().loadSnippets(),
+            useIntegrationStore.getState().loadInstances(),
+            usePluginStore.getState().fetchInstalled(),
+            useAutoModeStore.getState().fetchConfig(),
+          ]);
+        } catch (error) {
+          log.warn('设置数据预加载部分失败', { error: String(error) });
+        }
+      } catch (error) {
+        log.error('初始化失败', error as Error);
+        isInitialized.current = false;
+      }
+    };
+
+    initializeApp();
+
+    // 初始化 CLI 信息事件监听
+    const cleanupCliListeners = useCliInfoStore.getState().initEventListeners();
+
+    return () => {
+      const { cleanup } = useIntegrationStore.getState();
+      cleanup();
+      cleanupCliListeners();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 检查工作区状态
+  useEffect(() => {
+    if (hasCheckedWorkspaces.current) return;
+
+    if (workspaces.length === 0 && isInitialized.current) {
+      console.log('[App] 无工作区，显示创建工作区模态框');
+      onNoWorkspaces();
+      hasCheckedWorkspaces.current = true;
+    } else if (workspaces.length > 0) {
+      hasCheckedWorkspaces.current = true;
+    }
+  }, [workspaces.length, onNoWorkspaces]);
+}
