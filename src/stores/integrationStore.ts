@@ -389,7 +389,7 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
       log.info('Removed instance', { instanceId });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : '移除实例失败' });
-      console.error('[IntegrationStore] Remove instance error:', error);
+      log.error('Remove instance error', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   },
@@ -417,13 +417,13 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
       }
 
       set({ loading: false });
-      console.log('[IntegrationStore] Switched to instance:', instanceId);
+      log.info('Switched to instance', { instanceId });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '切换实例失败',
         loading: false,
       });
-      console.error('[IntegrationStore] Switch instance error:', error);
+      log.error('Switch instance error', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   },
@@ -441,13 +441,13 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
       }));
       await get().refreshStatus(platform);
       set({ loading: false });
-      console.log('[IntegrationStore] Disconnected instance:', platform);
+      log.info('Disconnected instance', { platform });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '断开实例失败',
         loading: false,
       });
-      console.error('[IntegrationStore] Disconnect instance error:', error);
+      log.error('Disconnect instance error', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   },

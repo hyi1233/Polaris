@@ -349,7 +349,7 @@ export abstract class BaseCLIEngine implements AIEngine {
     const result = validateCLIEngineConfig(this.config)
     if (!result.valid) {
       const messages = result.errors.map((e) => `${e.field}: ${e.message}`)
-      console.warn(`[${this.id}] Configuration validation warnings:\n${messages.join('\n')}`)
+      log.warn(`Configuration validation warnings: ${messages.join(', ')}`)
       return false
     }
     return true
