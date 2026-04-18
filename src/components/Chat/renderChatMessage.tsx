@@ -1,0 +1,52 @@
+/**
+ * 消息渲染器 + 滚动操作类型
+ */
+
+import React from 'react';
+import type { ChatMessage } from '../../types';
+import { UserBubble } from './chatBubbles/UserBubble';
+import { AssistantBubble } from './chatBubbles/AssistantBubble';
+import { SystemBubble } from './chatBubbles/SystemBubble';
+
+/** 消息滚动操作集合 */
+export interface MessageScrollActions {
+  scrollToMessage: (index: number) => void;
+  scrollToTop: () => void;
+  scrollToBottom: () => void;
+}
+
+/** 消息渲染器 */
+export function renderChatMessage(
+  message: ChatMessage,
+  messageIndex: number | undefined,
+  scrollActions: MessageScrollActions | undefined,
+): React.ReactNode {
+  switch (message.type) {
+    case 'user':
+      return (
+        <UserBubble
+          key={message.id}
+          message={message}
+          messageIndex={messageIndex}
+          onScrollToMessage={scrollActions?.scrollToMessage}
+          onScrollToTop={scrollActions?.scrollToTop}
+          onScrollToBottom={scrollActions?.scrollToBottom}
+        />
+      );
+    case 'assistant':
+      return (
+        <AssistantBubble
+          key={message.id}
+          message={message}
+          messageIndex={messageIndex}
+          onScrollToMessage={scrollActions?.scrollToMessage}
+          onScrollToTop={scrollActions?.scrollToTop}
+          onScrollToBottom={scrollActions?.scrollToBottom}
+        />
+      );
+    case 'system':
+      return <SystemBubble key={message.id} content={(message as any).content} />;
+    default:
+      return null;
+  }
+}
