@@ -5,7 +5,7 @@
  */
 
 import { memo, useMemo, useRef, useCallback, useEffect, useSyncExternalStore } from 'react';
-import { Virtuoso } from 'react-virtuoso';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { sessionStoreManager } from '../../stores/conversationStore/sessionStoreManager';
 import { renderChatMessage } from './EnhancedChatMessages';
 import type { MessageScrollActions } from './EnhancedChatMessages';
@@ -88,7 +88,7 @@ function useSessionStoreSubscription<T>(
 }
 
 export const SessionMessagesView = memo(function SessionMessagesView({ sessionId }: SessionMessagesViewProps) {
-  const virtuosoRef = useRef<any>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const autoScrollRef = useRef(true);
 
   // 直接订阅特定 session store 的状态

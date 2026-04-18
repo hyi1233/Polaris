@@ -112,7 +112,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ code, id }: Mermaid
     if (!isVisible) return;
 
     let mounted = true;
-    let mermaidInstance: any = null;
+    let mermaidInstance: import('mermaid').MermaidAPI | null = null;
 
     const renderDiagram = async () => {
       // 空代码不渲染

@@ -11,6 +11,73 @@ import type {
   ClaudeCodeExecutionEvent,
 } from '../types'
 
+/** 将 AIEvent 类型映射为 ClaudeCodeExecutionEvent 类型 */
+function mapEventType(event: AIEvent): ClaudeCodeExecutionEvent['type'] {
+  switch (event.type) {
+    case 'tool_call_start':
+    case 'tool_call_end':
+      return 'tool_call';
+    case 'token':
+      return 'token';
+    case 'thinking':
+      return 'progress';
+    case 'progress':
+      return 'progress';
+    case 'error':
+      return 'error';
+    case 'session_start':
+      return 'session_start';
+    case 'session_end':
+      return 'session_end';
+    case 'assistant_message':
+      return 'assistant_message';
+    case 'result':
+      return 'complete';
+    default:
+      return 'progress';
+  }
+}
+
+/** 从 AIEvent 安全提取事件数据 */
+function extractEventData(event: AIEvent): ClaudeCodeExecutionEvent['data'] {
+  switch (event.type) {
+    case 'token':
+      return { content: event.value };
+    case 'assistant_message':
+      return { content: event.content, message: event.content };
+    case 'thinking':
+      return { content: event.content };
+    case 'tool_call_start':
+      return { tool: event.tool };
+    case 'tool_call_end':
+      return { tool: event.tool };
+    case 'error':
+      return { error: event.error };
+    case 'progress':
+      return { message: event.message };
+    case 'result':
+      return { content: String(event.output ?? '') };
+    default:
+      return {};
+  }
+}
+
+/** 从 AIEvent 安全提取文本内容 */
+function extractEventContent(event: AIEvent): string {
+  if (event.type === 'assistant_message' || event.type === 'token') {
+    return (event.type === 'token' ? event.value : event.content) || '';
+  }
+  return '';
+}
+
+/** 从 AIEvent 安全提取错误信息 */
+function extractEventError(event: AIEvent): string {
+  if (event.type === 'error') {
+    return event.error || '';
+  }
+  return '';
+}
+
 /** 段落级缓冲超时（毫秒） */
 const PARAGRAPH_TIMEOUT = 200
 
@@ -380,22 +447,19 @@ export class AssistantEngine {
       if (eventSessionId && eventSessionId !== sessionId) return
 
       const execEvent: ClaudeCodeExecutionEvent = {
-        type: event.type as any,
+        type: mapEventType(event),
         timestamp: Date.now(),
         sessionId,
         data: {
-          content: (event as any).content,
-          message: (event as any).message,
-          tool: (event as any).tool,
-          error: (event as any).error,
-          isDelta: (event as any).isDelta,
+          ...extractEventData(event),
+          isDelta: event.type === 'token',
         },
       }
       events.push(execEvent)
       useAssistantStore.getState().addSessionEvent(sessionId, execEvent)
 
-      if (event.type === 'assistant_message' && (event as any).content) {
-        output += (event as any).content
+      if (event.type === 'assistant_message') {
+        output += extractEventContent(event)
       }
 
       // 会话结束
@@ -446,22 +510,17 @@ export class AssistantEngine {
 
         // 收集事件
         const execEvent: ClaudeCodeExecutionEvent = {
-          type: event.type as any,
+          type: mapEventType(event),
           timestamp: Date.now(),
           sessionId,
-          data: {
-            content: (event as any).content,
-            message: (event as any).message,
-            tool: (event as any).tool,
-            error: (event as any).error,
-          },
+          data: extractEventData(event),
         }
         events.push(execEvent)
         useAssistantStore.getState().addSessionEvent(sessionId, execEvent)
 
         // 收集输出
-        if (event.type === 'assistant_message' && (event as any).content) {
-          output += (event as any).content
+        if (event.type === 'assistant_message') {
+          output += extractEventContent(event)
         }
 
         // 会话结束
@@ -473,7 +532,7 @@ export class AssistantEngine {
         // 错误
         if (event.type === 'error') {
           unsubscribe()
-          reject(new Error((event as any).error || 'Claude Code 执行失败'))
+          reject(new Error(extractEventError(event) || 'Claude Code 执行失败'))
         }
       })
 

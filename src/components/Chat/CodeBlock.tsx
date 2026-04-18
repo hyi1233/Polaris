@@ -155,10 +155,10 @@ function scheduleHighlight(
 
   // 使用 requestIdleCallback 或 setTimeout 延迟执行
   if ('requestIdleCallback' in window) {
-    const id = (window as any).requestIdleCallback(doHighlight, { timeout: 100 });
+    const id = window.requestIdleCallback(doHighlight, { timeout: 100 });
     return () => {
       cancelled = true;
-      (window as any).cancelIdleCallback(id);
+      window.cancelIdleCallback(id);
     };
   } else {
     const id = setTimeout(doHighlight, 16);

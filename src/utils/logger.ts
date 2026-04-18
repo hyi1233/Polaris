@@ -221,21 +221,20 @@ export class ErrorIntegrationTransport implements LogTransport {
     if (entry.level < this.level) return;
 
     // 动态导入以避免循环依赖
-    import('../types/errors').then(({ errorLogger, ErrorSeverity }) => {
-      const severity = entry.level === LogLevel.Fatal 
-        ? ErrorSeverity.Critical 
+    import('../types/errors').then(({ AppError, ErrorSeverity, errorLogger }) => {
+      const severity = entry.level === LogLevel.Fatal
+        ? ErrorSeverity.Critical
         : ErrorSeverity.Error;
-      
-      errorLogger.log({
-        name: 'LoggedError',
+
+      const source = this.inferSource(entry.module);
+
+      const error = new AppError({
         message: entry.message,
-        source: this.inferSource(entry.module),
+        source: source as typeof import('../types/errors').ErrorSource[keyof typeof import('../types/errors').ErrorSource],
         severity,
-        timestamp: new Date(entry.timestamp),
         context: entry.context,
-        toJSON: () => entry,
-        getUserMessage: () => entry.message,
-      } as any);
+      });
+      errorLogger.log(error);
     }).catch(() => {
       // 忽略导入失败
     });

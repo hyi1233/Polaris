@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import type { ChatMessage } from '../../types';
+import type { ChatMessage, SystemChatMessage } from '../../types';
 import { UserBubble } from './chatBubbles/UserBubble';
 import { AssistantBubble } from './chatBubbles/AssistantBubble';
 import { SystemBubble } from './chatBubbles/SystemBubble';
@@ -45,7 +45,7 @@ export function renderChatMessage(
         />
       );
     case 'system':
-      return <SystemBubble key={message.id} content={(message as any).content} />;
+      return <SystemBubble key={message.id} content={(message as SystemChatMessage).content} />;
     default:
       return null;
   }

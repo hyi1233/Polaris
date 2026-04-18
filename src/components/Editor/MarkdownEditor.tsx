@@ -8,7 +8,7 @@ import { CodeMirrorEditor } from './Editor';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { MermaidDiagram } from '../Chat/MermaidDiagram';
-import { splitMarkdownWithMermaid } from '../../utils/markdown';
+import { splitMarkdownWithMermaid, type MarkdownPart } from '../../utils/markdown';
 import hljs from 'highlight.js';
 
 interface MarkdownEditorProps {
@@ -260,7 +260,7 @@ export function MarkdownEditor({ value, onChange, onSave, readOnly = false }: Ma
               className="flex-1 overflow-auto bg-background-base"
             >
               <div className="max-w-none px-6 py-4 prose prose-invert prose-sm">
-                {previewParts.map((part: any, index: number) => {
+                {previewParts.map((part: MarkdownPart, index: number) => {
                   if (part.type === 'mermaid') {
                     return (
                       <div key={`mermaid-${part.id || index}`}>

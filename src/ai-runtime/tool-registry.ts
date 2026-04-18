@@ -159,7 +159,7 @@ export class ToolRegistryImpl implements ToolRegistry {
             type: string
             description?: string
             enum?: string[]
-            default?: any
+            default?: string | number | boolean | null
           }
           const required = tool.inputSchema.required?.includes(paramName)
           const requiredText = required ? ' (required)' : ' (optional)'

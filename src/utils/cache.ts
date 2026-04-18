@@ -4,6 +4,7 @@
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import type { FileMatch } from '../services/fileSearch';
 
 // 配置 marked
 marked.setOptions({
@@ -479,8 +480,8 @@ export class MarkdownRenderCache {
 }
 
 // 预定义的缓存实例
-export const fileSearchCache = new AsyncCache<any[]>(5000);
-export const commandCache = new SyncCache<any[]>(10000);
+export const fileSearchCache = new AsyncCache<FileMatch[]>(5000);
+export const commandCache = new SyncCache<unknown[]>(10000);
 
 // 仅用于旧格式消息兼容路径，新格式走 ProgressiveStreamingMarkdown
 export const markdownCache = new MarkdownRenderCache(20);

@@ -1070,8 +1070,8 @@ export function isQuestionEvent(event: AIEvent): event is QuestionEvent {
  * 返回 null 如果事件没有 sessionId 字段
  */
 export function getEventSessionId(event: AIEvent): string | null {
-  if ('sessionId' in event && typeof (event as any).sessionId === 'string') {
-    return (event as any).sessionId
+  if ('sessionId' in event && typeof (event as AIEvent & { sessionId?: string }).sessionId === 'string') {
+    return (event as AIEvent & { sessionId: string }).sessionId
   }
   return null
 }
@@ -1081,5 +1081,5 @@ export function getEventSessionId(event: AIEvent): string | null {
  * 用于兼容旧代码的运行时检查
  */
 export function hasSessionId(event: AIEvent): event is AIEvent & { sessionId: string } {
-  return 'sessionId' in event && typeof (event as any).sessionId === 'string'
+  return 'sessionId' in event && typeof (event as AIEvent & { sessionId?: string }).sessionId === 'string'
 }

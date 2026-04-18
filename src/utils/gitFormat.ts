@@ -12,7 +12,7 @@
  */
 export function formatGitTimestamp(
   timestamp: number,
-  t: (key: string, params?: any) => string
+  t: (key: string, params?: Record<string, unknown>) => string
 ): string {
   const date = new Date(timestamp * 1000)
   const now = new Date()

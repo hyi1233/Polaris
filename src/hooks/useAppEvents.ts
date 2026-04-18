@@ -49,7 +49,7 @@ export function useAppEvents() {
 
   // file:opened → 创建 Editor Tab
   useEffect(() => {
-    const unlistenPromise = listen('file:opened', (event: any) => {
+    const unlistenPromise = listen<{ path: string; name: string }>('file:opened', (event) => {
       const { path, name } = event.payload;
       console.log('[App] 收到 file:opened 事件:', { path, name });
       useTabStore.getState().openEditorTab(path, name);
@@ -62,7 +62,7 @@ export function useAppEvents() {
 
   // file:preview → 创建 Preview Tab
   useEffect(() => {
-    const unlistenPromise = listen('file:preview', (event: any) => {
+    const unlistenPromise = listen<{ path: string; name: string; kind?: string }>('file:preview', (event) => {
       const { path, name, kind } = event.payload;
       console.log('[App] 收到 file:preview 事件:', { path, name, kind });
       useTabStore.getState().openPreviewTab(path, name, { kind });

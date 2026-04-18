@@ -49,7 +49,7 @@ export function StatusBar({ className = '' }: StatusBarProps) {
     const editorEl = document.querySelector('.cm-editor')
     if (!editorEl) return
 
-    const view = (editorEl as any).cmView?.view as EditorView | undefined
+    const view = (editorEl as HTMLElement & { cmView?: { view?: EditorView } }).cmView?.view
     if (!view) return
 
     const updateCursor = () => {

@@ -92,7 +92,7 @@ export const FileTreeNode = memo<FileTreeNodeProps>(({
     }
   }, [isHighlighted]);
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
 
     if (file.is_dir) {
@@ -116,7 +116,7 @@ export const FileTreeNode = memo<FileTreeNodeProps>(({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      handleClick(e as any);
+      handleClick(e);
     }
   };
 

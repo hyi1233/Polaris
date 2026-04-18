@@ -208,7 +208,11 @@ export function useMessageSearch(messages: Array<{ id: string; content?: string;
       if (msg.blocks) {
         const text = msg.blocks
           .filter(block => block.type === 'text' || block.type === 'thinking')
-          .map(block => (block as any).content || '')
+          .map(block => {
+            if (block.type === 'text') return (block as import('../../types').TextBlock).content || '';
+            if (block.type === 'thinking') return (block as import('../../types').ThinkingBlock).content || '';
+            return '';
+          })
           .join(' ');
         return { id: msg.id, text };
       }
