@@ -304,6 +304,58 @@ export class SpeechService {
   }
 
   /**
+   * 暂停语音识别（用于 TTS 播报期间临时静音）
+   *
+   * 与 stop() 的区别：
+   * - stop() 是用户主动关闭，shouldKeepListening = false，不自动重启
+   * - pause() 是临时暂停，记录"之前是否在持续监听"，resume 时恢复原状态
+   */
+  pause(): void {
+    if (this.recognition) {
+      // 记录暂停前的监听状态，resume 时恢复
+      this._wasKeepingListening = this.shouldKeepListening;
+      this.shouldKeepListening = false;
+      this.recognition.abort();
+      log.info('语音识别已暂停');
+    }
+  }
+
+  /**
+   * 恢复语音识别（配合 pause 使用）
+   *
+   * 如果暂停前处于持续监听模式，恢复后也回到持续监听
+   */
+  resume(): void {
+    if (!this.isSupported) return;
+
+    // 恢复暂停前的监听状态
+    if (this._wasKeepingListening) {
+      this.shouldKeepListening = true;
+    }
+
+    this.retryCount = 0;
+
+    if (!this.recognition) {
+      this.initRecognition();
+    }
+
+    try {
+      this.recognition?.start();
+      log.info('语音识别已恢复');
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('already started')) {
+        // 已经在运行，无需重复启动
+        log.debug('语音识别已在运行中');
+      } else {
+        log.error('恢复识别失败', e as Error);
+      }
+    }
+  }
+
+  /** 暂停前的监听状态 */
+  private _wasKeepingListening = false;
+
+  /**
    * 销毁实例
    */
   destroy(): void {

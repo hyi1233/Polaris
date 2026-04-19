@@ -452,6 +452,7 @@ impl OldConfig {
             speech: Default::default(),
             tts: Default::default(),
             wake_word: None,
+            voice_notification: None,
             assistant: Default::default(),
             claude_cmd: Some(claude_cmd_clone),
         }

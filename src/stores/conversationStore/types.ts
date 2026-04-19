@@ -140,7 +140,7 @@ export interface ConversationActions {
   deleteMessage: (messageId: string) => void
   editMessage: (messageId: string, newContent: string) => void
   clearMessages: () => void
-  finishMessage: () => void
+  finishMessage: () => ChatMessage | null
 
   // ===== 输入草稿 =====
   updateInputDraft: (draft: InputDraft) => void

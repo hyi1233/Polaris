@@ -7,6 +7,7 @@
 import type { AIEvent } from '../../ai-runtime'
 import { isEditTool, extractEditDiff } from '../../utils/diffExtractor'
 import type { ConversationStore } from './types'
+import { voiceNotificationService } from '../../services/voiceNotificationService'
 import { createLogger } from '../../utils/logger'
 
 const log = createLogger('EventHandler')
@@ -31,18 +32,23 @@ export function handleAIEvent(
       log.info('Session started', { sessionId: event.sessionId })
       break
 
-    case 'session_end':
-      state.finishMessage()
+    case 'session_end': {
+      const completedMessage = state.finishMessage()
       set({
         isStreaming: false,
         progressMessage: null,
       })
+      // 语音提醒：AI 回复自动朗读
+      if (completedMessage) {
+        voiceNotificationService.speakAIResponse(completedMessage)
+      }
       log.info('Session ended', {
         sessionId: state.sessionId,
         reason: event.reason,
         isStreaming: false,
       })
       break
+    }
 
     case 'token':
       state.appendTextBlock(event.value)
@@ -101,6 +107,8 @@ export function handleAIEvent(
         isStreaming: false,
         currentMessage: null,
       })
+      // 语音提醒：错误提醒
+      voiceNotificationService.notifyError()
       break
 
     case 'result':

@@ -498,6 +498,75 @@ impl Default for WakeWordConfig {
     }
 }
 
+/// 语音提醒配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceNotificationConfig {
+    /// 是否启用语音提醒（总开关）
+    #[serde(default = "default_notif_enabled")]
+    pub enabled: bool,
+
+    /// 发送确认：消息发送后播报
+    #[serde(default = "default_notif_send_confirm")]
+    pub send_confirm: bool,
+
+    /// 发送确认文本
+    #[serde(default = "default_notif_send_confirm_text")]
+    pub send_confirm_text: String,
+
+    /// 唤醒回应：唤醒词匹配后播报
+    #[serde(default = "default_notif_wake_response")]
+    pub wake_response: bool,
+
+    /// 唤醒回应语列表（随机选一个）
+    #[serde(default = "default_notif_wake_response_texts")]
+    pub wake_response_texts: Vec<String>,
+
+    /// 错误提醒：出错时播报
+    #[serde(default = "default_notif_error_alert")]
+    pub error_alert: bool,
+
+    /// 错误提醒文本
+    #[serde(default = "default_notif_error_alert_text")]
+    pub error_alert_text: String,
+
+    /// 后台回复完成通知
+    #[serde(default = "default_notif_background_notify")]
+    pub background_notify: bool,
+
+    /// 后台完成通知文本
+    #[serde(default = "default_notif_background_notify_text")]
+    pub background_notify_text: String,
+}
+
+fn default_notif_enabled() -> bool { true }
+fn default_notif_send_confirm() -> bool { true }
+fn default_notif_send_confirm_text() -> String { "已发送".to_string() }
+fn default_notif_wake_response() -> bool { true }
+fn default_notif_wake_response_texts() -> Vec<String> {
+    vec!["在的".to_string(), "我在".to_string(), "嗯嗯".to_string()]
+}
+fn default_notif_error_alert() -> bool { true }
+fn default_notif_error_alert_text() -> String { "出错了".to_string() }
+fn default_notif_background_notify() -> bool { true }
+fn default_notif_background_notify_text() -> String { "后台任务完成了".to_string() }
+
+impl Default for VoiceNotificationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_notif_enabled(),
+            send_confirm: default_notif_send_confirm(),
+            send_confirm_text: default_notif_send_confirm_text(),
+            wake_response: default_notif_wake_response(),
+            wake_response_texts: default_notif_wake_response_texts(),
+            error_alert: default_notif_error_alert(),
+            error_alert_text: default_notif_error_alert_text(),
+            background_notify: default_notif_background_notify(),
+            background_notify_text: default_notif_background_notify_text(),
+        }
+    }
+}
+
 fn default_speech_enabled() -> bool { true }
 fn default_speech_language() -> String { "zh-CN".to_string() }
 
@@ -749,6 +818,10 @@ pub struct Config {
     #[serde(default)]
     pub wake_word: Option<WakeWordConfig>,
 
+    /// 语音提醒配置
+    #[serde(default)]
+    pub voice_notification: Option<VoiceNotificationConfig>,
+
     /// AI 助手配置
     #[serde(default)]
     pub assistant: AssistantConfig,
@@ -780,6 +853,7 @@ impl Default for Config {
             speech: SpeechConfig::default(),
             tts: TTSConfig::default(),
             wake_word: None,
+            voice_notification: None,
             assistant: AssistantConfig::default(),
             claude_cmd: None,
         }

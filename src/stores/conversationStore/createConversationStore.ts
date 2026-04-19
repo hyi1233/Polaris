@@ -243,7 +243,9 @@ export function createConversationStore(
             messages: [...messages, completedMessage],
             currentMessage: null,
           })
+          return completedMessage
         }
+        return null
       },
 
       // ===== 输入草稿 =====

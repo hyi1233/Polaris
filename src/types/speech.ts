@@ -141,6 +141,45 @@ export function matchWakeWord(text: string, words: string[]): WakeWordMatchResul
 }
 
 // ========================================
+// 语音提醒类型定义
+// ========================================
+
+/** 语音提醒配置 */
+export interface VoiceNotificationConfig {
+  /** 是否启用语音提醒（总开关） */
+  enabled: boolean;
+  /** 发送确认：消息发送后播报 */
+  sendConfirm: boolean;
+  /** 发送确认文本 */
+  sendConfirmText: string;
+  /** 唤醒回应：唤醒词匹配后播报 */
+  wakeResponse: boolean;
+  /** 唤醒回应语列表（随机选一个） */
+  wakeResponseTexts: string[];
+  /** 错误提醒：出错时播报 */
+  errorAlert: boolean;
+  /** 错误提醒文本 */
+  errorAlertText: string;
+  /** 后台回复完成通知 */
+  backgroundNotify: boolean;
+  /** 后台完成通知文本 */
+  backgroundNotifyText: string;
+}
+
+/** 默认语音提醒配置 */
+export const DEFAULT_VOICE_NOTIFICATION_CONFIG: VoiceNotificationConfig = {
+  enabled: true,
+  sendConfirm: true,
+  sendConfirmText: '已发送',
+  wakeResponse: true,
+  wakeResponseTexts: ['在的', '我在', '嗯嗯'],
+  errorAlert: true,
+  errorAlertText: '出错了',
+  backgroundNotify: true,
+  backgroundNotifyText: '后台任务完成了',
+};
+
+// ========================================
 // TTS 语音合成类型定义
 // ========================================
 

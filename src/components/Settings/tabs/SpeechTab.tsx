@@ -6,16 +6,18 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useCallback, type KeyboardEvent } from 'react';
 import type { Config } from '../../../types';
-import type { SpeechLanguage, TTSVoice, WakeWordConfig } from '../../../types/speech';
+import type { SpeechLanguage, TTSVoice, WakeWordConfig, VoiceNotificationConfig } from '../../../types/speech';
 import {
   SPEECH_LANGUAGE_OPTIONS,
   DEFAULT_SPEECH_CONFIG,
   DEFAULT_TTS_CONFIG,
   DEFAULT_WAKE_WORD_CONFIG,
+  DEFAULT_VOICE_NOTIFICATION_CONFIG,
   TTS_VOICE_OPTIONS,
   TTS_RATE_OPTIONS,
 } from '../../../types/speech';
 import { ttsService } from '../../../services/ttsService';
+import { voiceNotificationService } from '../../../services/voiceNotificationService';
 import { createLogger } from '../../../utils/logger';
 
 const log = createLogger('SpeechTab');
@@ -30,11 +32,13 @@ export function SpeechTab({ config, onConfigChange, loading }: SpeechTabProps) {
   const { t } = useTranslation('settings');
   const [isTestingVoice, setIsTestingVoice] = useState(false);
   const [newWakeWord, setNewWakeWord] = useState('');
+  const [newWakeResponse, setNewWakeResponse] = useState('');
 
   // 获取语音配置（带默认值）
   const speechConfig = config.speech ?? DEFAULT_SPEECH_CONFIG;
   const ttsConfig = config.tts ?? DEFAULT_TTS_CONFIG;
   const wakeWordConfig = config.wakeWord ?? DEFAULT_WAKE_WORD_CONFIG;
+  const notifConfig = config.voiceNotification ?? DEFAULT_VOICE_NOTIFICATION_CONFIG;
 
   const updateSpeechConfig = (updates: Partial<typeof speechConfig>) => {
     onConfigChange({
@@ -74,6 +78,34 @@ export function SpeechTab({ config, onConfigChange, loading }: SpeechTabProps) {
     }
   }, [addWakeWord]);
 
+  const updateNotifConfig = (updates: Partial<VoiceNotificationConfig>) => {
+    const newNotifConfig = { ...notifConfig, ...updates };
+    onConfigChange({
+      ...config,
+      voiceNotification: newNotifConfig,
+    });
+    // 配置变更时触发语音包重新生成
+    voiceNotificationService.preGenerateVoicePackage();
+  };
+
+  const addWakeResponseText = useCallback(() => {
+    const text = newWakeResponse.trim();
+    if (!text || notifConfig.wakeResponseTexts.includes(text)) return;
+    updateNotifConfig({ wakeResponseTexts: [...notifConfig.wakeResponseTexts, text] });
+    setNewWakeResponse('');
+  }, [newWakeResponse, notifConfig.wakeResponseTexts]);
+
+  const removeWakeResponseText = useCallback((text: string) => {
+    updateNotifConfig({ wakeResponseTexts: notifConfig.wakeResponseTexts.filter(t => t !== text) });
+  }, [notifConfig.wakeResponseTexts]);
+
+  const handleWakeResponseKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addWakeResponseText();
+    }
+  }, [addWakeResponseText]);
+
   const updateTTSConfig = (updates: Partial<typeof ttsConfig>) => {
     const newConfig = {
       ...config,
@@ -86,6 +118,11 @@ export function SpeechTab({ config, onConfigChange, loading }: SpeechTabProps) {
 
     // 同步更新 TTS 服务配置
     ttsService.setConfig(newConfig.tts ?? DEFAULT_TTS_CONFIG);
+
+    // TTS 角色/语速变更时重新生成语音包
+    if (updates.voice || updates.rate) {
+      voiceNotificationService.preGenerateVoicePackage();
+    }
   };
 
   // 测试语音
@@ -425,6 +462,233 @@ export function SpeechTab({ config, onConfigChange, loading }: SpeechTabProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ========== 语音提醒部分 ========== */}
+      <div className="border-t border-border pt-6">
+        <h2 className="text-base font-medium text-text-primary mb-4">
+          {t('speech.notification.title', '语音提醒')}
+        </h2>
+
+        {/* 总开关 */}
+        <div className="p-4 bg-surface rounded-lg border border-border mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-text-primary">
+                {t('speech.notification.enabled.title', '启用语音提醒')}
+              </h3>
+              <p className="text-xs text-text-secondary mt-1">
+                {t('speech.notification.enabled.desc', '在关键事件时通过语音播报提醒，如消息已发送、唤醒回应等')}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notifConfig.enabled}
+                onChange={(e) => updateNotifConfig({ enabled: e.target.checked })}
+                disabled={loading}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+        </div>
+
+        {/* 各场景开关 */}
+        {notifConfig.enabled && (
+          <>
+            {/* 发送确认 */}
+            <div className="p-4 bg-surface rounded-lg border border-border mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-text-primary">
+                    {t('speech.notification.sendConfirm.title', '发送确认')}
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {t('speech.notification.sendConfirm.desc', '发送消息后播报确认语音')}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifConfig.sendConfirm}
+                    onChange={(e) => updateNotifConfig({ sendConfirm: e.target.checked })}
+                    disabled={loading}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+              {notifConfig.sendConfirm && (
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">
+                    {t('speech.notification.sendConfirm.label', '播报文本')}
+                  </label>
+                  <input
+                    type="text"
+                    value={notifConfig.sendConfirmText}
+                    onChange={(e) => updateNotifConfig({ sendConfirmText: e.target.value })}
+                    disabled={loading}
+                    className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 唤醒回应 */}
+            <div className="p-4 bg-surface rounded-lg border border-border mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-text-primary">
+                    {t('speech.notification.wakeResponse.title', '唤醒回应')}
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {t('speech.notification.wakeResponse.desc', '唤醒词匹配后播报回应语音，随机选择一条')}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifConfig.wakeResponse}
+                    onChange={(e) => updateNotifConfig({ wakeResponse: e.target.checked })}
+                    disabled={loading}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+              {notifConfig.wakeResponse && (
+                <div>
+                  {notifConfig.wakeResponseTexts.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {notifConfig.wakeResponseTexts.map(text => (
+                        <span
+                          key={text}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-600 rounded text-xs"
+                        >
+                          {text}
+                          <button
+                            onClick={() => removeWakeResponseText(text)}
+                            className="text-green-600/60 hover:text-green-600"
+                            title={t('speech.notification.wakeResponse.remove', '删除')}
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newWakeResponse}
+                      onChange={(e) => setNewWakeResponse(e.target.value)}
+                      onKeyDown={handleWakeResponseKeyDown}
+                      placeholder={t('speech.notification.wakeResponse.placeholder', '输入回应语，按回车添加')}
+                      disabled={loading}
+                      className="flex-1 px-3 py-1.5 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <button
+                      onClick={addWakeResponseText}
+                      disabled={loading || !newWakeResponse.trim()}
+                      className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {t('speech.notification.wakeResponse.add', '添加')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 错误提醒 */}
+            <div className="p-4 bg-surface rounded-lg border border-border mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-text-primary">
+                    {t('speech.notification.errorAlert.title', '错误提醒')}
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {t('speech.notification.errorAlert.desc', '聊天出错时播报错误提醒')}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifConfig.errorAlert}
+                    onChange={(e) => updateNotifConfig({ errorAlert: e.target.checked })}
+                    disabled={loading}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+              {notifConfig.errorAlert && (
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">
+                    {t('speech.notification.errorAlert.label', '播报文本')}
+                  </label>
+                  <input
+                    type="text"
+                    value={notifConfig.errorAlertText}
+                    onChange={(e) => updateNotifConfig({ errorAlertText: e.target.value })}
+                    disabled={loading}
+                    className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 后台完成通知 */}
+            <div className="p-4 bg-surface rounded-lg border border-border mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-text-primary">
+                    {t('speech.notification.backgroundNotify.title', '后台完成通知')}
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {t('speech.notification.backgroundNotify.desc', '后台任务完成时播报通知')}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifConfig.backgroundNotify}
+                    onChange={(e) => updateNotifConfig({ backgroundNotify: e.target.checked })}
+                    disabled={loading}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+              {notifConfig.backgroundNotify && (
+                <div>
+                  <label className="text-xs text-text-secondary mb-1 block">
+                    {t('speech.notification.backgroundNotify.label', '播报文本')}
+                  </label>
+                  <input
+                    type="text"
+                    value={notifConfig.backgroundNotifyText}
+                    onChange={(e) => updateNotifConfig({ backgroundNotifyText: e.target.value })}
+                    disabled={loading}
+                    className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* AI 回复朗读提示 */}
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <svg className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-text-secondary">
+                  {t('speech.notification.autoPlayHint', 'AI 回复自动朗读由上方「自动播放」开关控制，开启后 AI 每次回复完成都会自动朗读内容。')}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

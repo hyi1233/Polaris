@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { IconSend, IconStop, IconPaperclip } from '../Common/Icons'
 import { useWorkspaceStore, useSessionStore } from '../../stores'
 import { useActiveSessionId } from '../../stores/conversationStore'
+import { voiceNotificationService } from '../../services/voiceNotificationService'
 import { useActiveSessionInputDraft, useActiveSessionActions, useActiveSessionWorkspace, usePendingQuestions } from '../../stores/conversationStore/useActiveSession'
 import { useDebouncedCallback } from '../../hooks/useDebounce'
 import { UnifiedSuggestion, type SuggestionItem } from './FileSuggestion'
@@ -510,6 +511,8 @@ export function ChatInput({
     setQuestionPanelHidden(false)
     // 发送后重置语音唤醒状态（回到待命）
     setSpeechWakeActive(false)
+    // 语音提醒：发送确认
+    voiceNotificationService.notifySendConfirm()
   }, [value, disabled, isStreaming, attachments, onSend, updateInputDraft, cancelPersistDraft, currentWorkspace, setSpeechWakeActive])
 
   // 问题浮窗：填入格式化文本并直接发送

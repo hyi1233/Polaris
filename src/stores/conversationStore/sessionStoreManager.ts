@@ -22,6 +22,7 @@ import { createConversationStore } from './createConversationStore'
 import { getEventRouter } from '../../services/eventRouter'
 import { useConfigStore } from '../configStore'
 import { getEventBus } from '../../ai-runtime'
+import { voiceNotificationService } from '../../services/voiceNotificationService'
 import { useWorkspaceStore } from '../workspaceStore'
 import { useViewStore } from '../index'
 import { createLogger } from '../../utils/logger'
@@ -509,6 +510,8 @@ function createSessionManagerStore() {
                 )
               })
             }
+            // 语音提醒：后台完成通知
+            voiceNotificationService.notifyBackgroundComplete()
           }
         } else if (event.type === 'error') {
           newStatus = 'error'

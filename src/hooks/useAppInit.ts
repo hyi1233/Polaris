@@ -19,6 +19,7 @@ import { useSnippetStore } from '../stores/snippetStore';
 import { useCliInfoStore } from '../stores/cliInfoStore';
 import { bootstrapEngines, type EngineId } from '../core/engine-bootstrap';
 import { bootstrapTools } from '../core/tool-bootstrap';
+import { voiceNotificationService } from '../services/voiceNotificationService';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('AppInit');
@@ -43,6 +44,9 @@ export function useAppInit({ onNoWorkspaces }: UseAppInitOptions) {
       try {
         // 先加载配置
         await loadConfig();
+
+        // 绑定语音提醒服务的配置获取
+        voiceNotificationService.initialize(() => useConfigStore.getState().config);
 
         // 获取配置
         const config = useConfigStore.getState().config;

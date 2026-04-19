@@ -7,6 +7,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { speechService } from '../services/speechService';
+import { voiceNotificationService } from '../services/voiceNotificationService';
+import type { SpeechControl } from '../services/voiceNotificationService';
 import type {
   SpeechRecognitionStatus,
   SpeechRecognitionError,
@@ -83,6 +85,13 @@ export function useSpeechRecognition(
   const getWakeActiveRef = useRef(getWakeActive);
   const setWakeActiveRef = useRef(setWakeActive);
 
+  /**
+   * 静默标志：唤醒回应播报期间为 true，丢弃所有识别结果
+   * 这是第二层防御——即使 speechService.pause() 有时序漏洞，
+   * mute flag 也能保证 onResult 回调不处理任何结果
+   */
+  const muteRef = useRef(false);
+
   useEffect(() => {
     onResultRef.current = onResult;
     onErrorRef.current = onError;
@@ -96,6 +105,27 @@ export function useSpeechRecognition(
   useEffect(() => {
     if (!isSupported) return;
 
+    // 注入语音识别控制到 voiceNotificationService（用于唤醒回应时暂停/恢复识别）
+    const speechControl: SpeechControl = {
+      pause: () => {
+        // 第二层防御：mute flag 立即生效（同步），确保后续结果被丢弃
+        muteRef.current = true;
+        // 第一层防御：正式暂停识别器，阻止自动重启
+        speechService.pause();
+        log.debug('语音识别已暂停 + 静默窗口开启');
+      },
+      resume: () => {
+        // 恢复识别器
+        speechService.resume();
+        // mute flag 保持一段时间再关闭，等待声学回声消散
+        setTimeout(() => {
+          muteRef.current = false;
+          log.debug('静默窗口关闭，识别结果恢复正常处理');
+        }, 300);
+      },
+    };
+    voiceNotificationService.setSpeechControl(speechControl);
+
     // 设置回调
     speechService.setCallbacks({
       onStatusChange: (newStatus) => {
@@ -105,6 +135,12 @@ export function useSpeechRecognition(
         }
       },
       onResult: (transcript, isFinal) => {
+        // 静默窗口：唤醒回应播报期间丢弃所有结果
+        if (muteRef.current) {
+          log.debug('静默窗口中，丢弃识别结果', { transcript });
+          return;
+        }
+
         if (isFinal) {
           // 1. 检查是否是语音命令（仅最终结果）
           const command = checkVoiceCommand(transcript);
@@ -130,6 +166,8 @@ export function useSpeechRecognition(
             if (match) {
               log.info('唤醒词匹配:', { wakeWord: match.wakeWord, content: match.content });
               setWakeActiveRef.current?.(true);
+              // 语音提醒：唤醒回应
+              voiceNotificationService.notifyWakeResponse();
               // 唤醒词后紧跟的内容也写入
               if (match.content) {
                 onResultRef.current?.(match.content);
