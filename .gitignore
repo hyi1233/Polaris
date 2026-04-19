@@ -47,9 +47,18 @@ lerna-debug.log*
 coverage/
 *.lcov
 
+# IDE
+*.iml
+
+# AI tool artifacts
+prototypes/
+
 # OS generated files
 Thumbs.db
 Desktop.ini
+
+# AI assistant working directories
 .polaris
 .oprcli
 .claude
+.kiro
