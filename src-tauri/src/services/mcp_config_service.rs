@@ -258,8 +258,20 @@ fn resolve_mcp_executable_path(
         return Ok(dev_path);
     }
 
+    // Fallback: also check release directory (debug path may not exist if only release was built)
+    let release_relative_path = dev_relative_path.replace("/debug/", "/release/");
+    let release_path = app_root.join(Path::new(&release_relative_path));
+    if release_path.exists() {
+        tracing::info!(
+            "[MCP] {} 在 debug 目录未找到，使用 release 目录: {}",
+            bin_name,
+            release_path.display()
+        );
+        return Ok(release_path);
+    }
+
     Err(AppError::ProcessError(format!(
-        "无法定位 {}。已检查资源路径 '{}'、'{}' 与开发路径 '{}'",
+        "无法定位 {}。已检查资源路径 '{}'、'{}' 与开发路径 '{}'、'{}'",
         bin_name,
         resource_dir
             .as_ref()
@@ -269,7 +281,8 @@ fn resolve_mcp_executable_path(
             .as_ref()
             .map(|dir| dir.join(Path::new(bundled_fallback_relative_path)).display().to_string())
             .unwrap_or_else(|| "<无资源目录>".to_string()),
-        dev_path.display()
+        dev_path.display(),
+        release_path.display()
     )))
 }
 
@@ -360,6 +373,31 @@ mod tests {
             "POLARIS_TODO_MCP_PATH",
         ).unwrap();
         assert_eq!(path, app_root.join(fixture_exe("src-tauri/target/debug/polaris-todo-mcp")));
+
+        let _ = std::fs::remove_dir_all(&temp_root);
+    }
+
+    #[test]
+    fn falls_back_to_release_path_when_debug_missing() {
+        let temp_root = std::env::temp_dir().join(format!("polaris-mcp-test-{}", uuid::Uuid::new_v4()));
+        let app_root = temp_root.join("app-root");
+        let resource_dir = temp_root.join("resources");
+
+        // Only create release binary, no debug binary
+        std::fs::create_dir_all(app_root.join("src-tauri/target/release")).unwrap();
+        std::fs::create_dir_all(&resource_dir).unwrap();
+        std::fs::write(app_root.join(fixture_exe("src-tauri/target/release/polaris-todo-mcp")), "release bin").unwrap();
+
+        let path = resolve_mcp_executable_path(
+            Some(resource_dir),
+            app_root.clone(),
+            TODO_MCP_BIN_NAME,
+            &todo_bundle_path(),
+            &todo_fallback_path(),
+            &todo_dev_path(),
+            "POLARIS_TODO_MCP_PATH",
+        ).unwrap();
+        assert_eq!(path, app_root.join(fixture_exe("src-tauri/target/release/polaris-todo-mcp")));
 
         let _ = std::fs::remove_dir_all(&temp_root);
     }
